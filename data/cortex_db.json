@@ -1,0 +1,955 @@
+{
+  "users": [
+    {
+      "id": "usr_dev_primary",
+      "email": "developer@nexa.ai",
+      "name": "Nexa Lead Architect",
+      "passwordHash": "$2b$10$eOyjnU8Y42b.zcywGmeFXuUPEvJ26yZT9P8bAFmB1tZNfwcf/EJ2C",
+      "role": "admin",
+      "createdAt": "2026-10-11T06:26:54.822Z"
+    },
+    {
+      "id": "test_u1_1791700014991",
+      "email": "u1_1791700014991@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$BJtb0ohC2lCfkHR7T3sWX.aOfygxcEEoF.reTdg1JJLRgICWlMcxe",
+      "role": "user",
+      "createdAt": "2026-10-11T06:26:55.015Z"
+    },
+    {
+      "id": "test_u2_1791700015015",
+      "email": "u2_1791700015015@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$Yf7A5ux0DVJIbxmJHWbqBeIuhiMB27fP6G68MsIBI5AEWhZrA.EzC",
+      "role": "user",
+      "createdAt": "2026-10-11T06:26:55.038Z"
+    },
+    {
+      "id": "test_u1_1791701855104",
+      "email": "u1_1791701855104@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$73j.RANIJq.UtvWYm7QfKO/NHcB6/b/KQyr3k7clUkE2.ewSdPgsG",
+      "role": "user",
+      "createdAt": "2026-10-11T06:57:35.142Z"
+    },
+    {
+      "id": "test_u2_1791701855142",
+      "email": "u2_1791701855142@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$lVi2vn.sMCx13OHYdZFGWu9.gUOIfJ7/05Lb8wFbVxMUKITZh2AvS",
+      "role": "user",
+      "createdAt": "2026-10-11T06:57:35.165Z"
+    },
+    {
+      "id": "test_u1_1791704666311",
+      "email": "u1_1791704666311@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$hMaCtON.v7UDhFAXTu9XZOMJEdi1r7pj/iDBdG6v9DjCX1vQv3KGe",
+      "role": "user",
+      "createdAt": "2026-10-11T07:44:26.345Z"
+    },
+    {
+      "id": "test_u2_1791704666346",
+      "email": "u2_1791704666346@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$zr8zB1IqlpY/U71c0UZdm.sXuYASaUcR83ZYBl4HlaNJCVrlxN52y",
+      "role": "user",
+      "createdAt": "2026-10-11T07:44:26.370Z"
+    },
+    {
+      "id": "test_u1_1791723252588",
+      "email": "u1_1791723252588@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$TiYDml84nELgqyhNWuQ.muJW2gPWTZBq/tjG758M8EXXf8ySqoTzy",
+      "role": "user",
+      "createdAt": "2026-10-11T12:54:12.633Z"
+    },
+    {
+      "id": "test_u2_1791723252634",
+      "email": "u2_1791723252634@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$8xP78d.sxVwzUVdAsL2U9u5foyCFwordU.XD6I0Q.I3DMnjmFqPBa",
+      "role": "user",
+      "createdAt": "2026-10-11T12:54:12.660Z"
+    },
+    {
+      "id": "test_u1_1791729670639",
+      "email": "u1_1791729670639@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$dDoZSy3vHufRsXbaNHq/J.uFoknB.eVDAhdvPrdRPTa7zAxaCeJmm",
+      "role": "user",
+      "createdAt": "2026-10-11T14:41:10.665Z"
+    },
+    {
+      "id": "test_u2_1791729670666",
+      "email": "u2_1791729670666@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$Gu8xKEVvQXXWfOcasfEOreUv8v3xkyOIyRET7izD9KCz9uZU2vE9y",
+      "role": "user",
+      "createdAt": "2026-10-11T14:41:10.706Z"
+    },
+    {
+      "id": "test_u1_1791730732774",
+      "email": "u1_1791730732774@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$MClaJ2qToLnQllyzU.sfwex4xV81jRK.gdCdL8gkOzHukSdeOkVdy",
+      "role": "user",
+      "createdAt": "2026-10-11T14:58:52.801Z"
+    },
+    {
+      "id": "test_u2_1791730732801",
+      "email": "u2_1791730732801@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$Kmnz0wzlXVInNVC10u19QOKi8So5kZRA2358ayxZl2kZYkY3f7Jti",
+      "role": "user",
+      "createdAt": "2026-10-11T14:58:52.823Z"
+    },
+    {
+      "id": "test_u1_1791732794622",
+      "email": "u1_1791732794622@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$q0hKYixOY2n5hCOD7xnnAu8vKmZOa4.UOTXuoNVibOh1tsbn0jCTG",
+      "role": "user",
+      "createdAt": "2026-10-11T15:33:14.664Z"
+    },
+    {
+      "id": "test_u2_1791732794664",
+      "email": "u2_1791732794664@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$pTx8R3sBGka0UyAsWo0vwO1PlsS.xvheC2jb2cEDLz52E//vJXo2a",
+      "role": "user",
+      "createdAt": "2026-10-11T15:33:14.698Z"
+    },
+    {
+      "id": "test_u1_1791733004595",
+      "email": "u1_1791733004595@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$zf2taYE9YTbQ0E/fNM.nBeeGQE1xDuhlduRugC1A0y0WmUl008zF2",
+      "role": "user",
+      "createdAt": "2026-10-11T15:36:44.644Z"
+    },
+    {
+      "id": "test_u2_1791733004644",
+      "email": "u2_1791733004644@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$x424foJK77NbnI8D4H4U/.EqLdL6aEHbjARXnVnsthyd40XB9Adwi",
+      "role": "user",
+      "createdAt": "2026-10-11T15:36:44.679Z"
+    }
+  ],
+  "sessions": [],
+  "conversations": [
+    {
+      "id": "conv_msgs_1791733004683",
+      "userId": "test_u1_1791733004595",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T15:36:44.683Z",
+      "updatedAt": "2026-10-11T15:36:44.683Z"
+    },
+    {
+      "id": "conv_1791733004681",
+      "userId": "test_u1_1791733004595",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T15:36:44.681Z",
+      "updatedAt": "2026-10-11T15:36:44.681Z"
+    },
+    {
+      "id": "conv_msgs_1791732794703",
+      "userId": "test_u1_1791732794622",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T15:33:14.703Z",
+      "updatedAt": "2026-10-11T15:33:14.703Z"
+    },
+    {
+      "id": "conv_1791732794700",
+      "userId": "test_u1_1791732794622",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T15:33:14.700Z",
+      "updatedAt": "2026-10-11T15:33:14.700Z"
+    },
+    {
+      "id": "conv_msgs_1791730732826",
+      "userId": "test_u1_1791730732774",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T14:58:52.826Z",
+      "updatedAt": "2026-10-11T14:58:52.826Z"
+    },
+    {
+      "id": "conv_1791730732824",
+      "userId": "test_u1_1791730732774",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T14:58:52.824Z",
+      "updatedAt": "2026-10-11T14:58:52.824Z"
+    },
+    {
+      "id": "conv_1791730076433_u1nxm",
+      "userId": "usr_dev_primary",
+      "title": "hiii",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "skillId": null,
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T14:47:56.433Z",
+      "updatedAt": "2026-10-11T14:51:10.631Z"
+    },
+    {
+      "id": "conv_msgs_1791729670716",
+      "userId": "test_u1_1791729670639",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T14:41:10.716Z",
+      "updatedAt": "2026-10-11T14:41:10.716Z"
+    },
+    {
+      "id": "conv_1791729670713",
+      "userId": "test_u1_1791729670639",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T14:41:10.714Z",
+      "updatedAt": "2026-10-11T14:41:10.714Z"
+    },
+    {
+      "id": "conv_msgs_1791723252663",
+      "userId": "test_u1_1791723252588",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T12:54:12.663Z",
+      "updatedAt": "2026-10-11T12:54:12.663Z"
+    },
+    {
+      "id": "conv_1791723252661",
+      "userId": "test_u1_1791723252588",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T12:54:12.661Z",
+      "updatedAt": "2026-10-11T12:54:12.661Z"
+    },
+    {
+      "id": "conv_msgs_1791704666372",
+      "userId": "test_u1_1791704666311",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T07:44:26.372Z",
+      "updatedAt": "2026-10-11T07:44:26.372Z"
+    },
+    {
+      "id": "conv_1791704666371",
+      "userId": "test_u1_1791704666311",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T07:44:26.371Z",
+      "updatedAt": "2026-10-11T07:44:26.371Z"
+    },
+    {
+      "id": "conv_msgs_1791701855168",
+      "userId": "test_u1_1791701855104",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T06:57:35.168Z",
+      "updatedAt": "2026-10-11T06:57:35.168Z"
+    },
+    {
+      "id": "conv_1791701855166",
+      "userId": "test_u1_1791701855104",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T06:57:35.166Z",
+      "updatedAt": "2026-10-11T06:57:35.166Z"
+    },
+    {
+      "id": "conv_msgs_1791700015040",
+      "userId": "test_u1_1791700014991",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T06:26:55.040Z",
+      "updatedAt": "2026-10-11T06:26:55.040Z"
+    },
+    {
+      "id": "conv_1791700015039",
+      "userId": "test_u1_1791700014991",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-11T06:26:55.039Z",
+      "updatedAt": "2026-10-11T06:26:55.039Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg_1791730076441_u",
+      "conversationId": "conv_1791730076433_u1nxm",
+      "role": "user",
+      "content": "hiii",
+      "attachments": [],
+      "createdAt": "2026-10-11T14:47:56.441Z"
+    },
+    {
+      "id": "msg_1791730079178_a",
+      "conversationId": "conv_1791730076433_u1nxm",
+      "role": "assistant",
+      "content": "Hello! How can I help you today? 😊",
+      "modelUsed": "nvidia/nemotron-3.5-lightning:free",
+      "providerUsed": "openrouter",
+      "createdAt": "2026-10-11T14:47:59.178Z"
+    },
+    {
+      "id": "msg_1791730202710_u",
+      "conversationId": "conv_1791730076433_u1nxm",
+      "role": "user",
+      "content": "i need to change this resume to next level what will i change ?",
+      "attachments": [
+        {
+          "id": "att_1791730171827_1pfbe",
+          "name": "Jayasriraam S- Full Stack Developer.pdf",
+          "size": 302476,
+          "mimeType": "application/pdf",
+          "url": "/uploads/1791730171818-Jayasriraam_S-_Full_Stack_Developer.pdf",
+          "createdAt": "2026-10-11T14:49:31.827Z"
+        }
+      ],
+      "createdAt": "2026-10-11T14:50:02.710Z"
+    },
+    {
+      "id": "msg_1791730246492_u",
+      "conversationId": "conv_1791730076433_u1nxm",
+      "role": "user",
+      "content": "now tell",
+      "attachments": [],
+      "createdAt": "2026-10-11T14:50:46.492Z"
+    },
+    {
+      "id": "msg_1791730270631_a",
+      "conversationId": "conv_1791730076433_u1nxm",
+      "role": "assistant",
+      "content": "To give you the best advice, I need to see your current resume. Since I don't have it yet, I can give you a comprehensive checklist of the \"next level\" upgrades you can make.\n\nHowever, if you paste your resume here, I can give you specific feedback.\n\nIn the meantime, here is the **Resume Upgrade Framework**—the specific things that move a resume from \"basic\" to \"next level\":\n\n### 1. Quantify Everything (The Biggest Upgrade)\nMost people list duties; \"next level\" resumes list achievements with numbers.\n*   **Before:** \"Responsible for sales and customer service.\"\n*   **After:** \"Increased sales revenue by 20% year-over-year and maintained a 98% customer satisfaction rating.\"\n*   **What to add:** Percentages, dollar amounts, time saved, number of people managed, etc.\n\n### 2. Replace \"Responsibilities\" with \"Accomplishments\"\nJob descriptions often just list what you were *supposed* to do. You need to show what you *actually* achieved.\n*   **Action Verbs:** Start every bullet point with a strong verb (e.g., *Spearheaded, Optimized, Launched, Spearheaded*).\n*   **The \"So What?\" Test:** After writing a bullet point, ask yourself: \"So what? Why does this matter?\"\n\n### 3. Optimize for ATS (Applicant Tracking Systems)\nMany resumes are rejected by robots before a human ever sees them.\n*   **Keywords:** Mirror the language from the job description. If they ask for \"Project Management\" and \"Budgeting,\" make sure those exact words appear in your skills section and experience.\n*   **Formatting:** Avoid columns, graphics, or weird fonts. Use standard headings (Experience, Education, Skills).\n\n### 4. The \"Summary\" Section (Instead of Objective)\nOld resumes start with \"Objective: Seeking a position...\" New resumes start with a **Professional Summary**.\n*   **What it is:** 3-4 lines at the top highlighting your years of experience, key skills, and what you bring to the table.\n*   **Example:** \"Results-oriented Marketing Manager with 10+ years of experience in digital strategy and brand growth. Proven track record of increasing online engagement by 150%.\"\n\n### 5. Skills Section: Be Specific\nDon't just list \"Microsoft Office.\" List the specific tools you use.\n*   **Before:** \"Excel, Word, PowerPoint.\"\n*   **After:** \"Advanced Excel (Pivot Tables, VLOOKUP), Adobe Creative Suite (Photoshop, InDesign), CRM Software (Salesforce).\"\n\n### 6. Clean Up the Design\nA \"next level\" resume looks modern and easy to read.\n*   **Font:** Use clean, modern fonts like Helvetica, Calibri, or Garamond.\n*   **White Space:** Don't cram everything in. Use margins and spacing to make it breathe.\n*   **Length:** 1 page for < 10 years experience; 2 pages is acceptable for senior-level roles.\n\n---\n\n**Ready to level up?**\n**Paste your current resume below**, and I will:\n1. Rewrite your bullet points with quantifiable achievements.\n2. Write a strong Professional Summary for you.\n3. Optimize it for keywords based on a job you want.\n\n*What is your current job/industry?* (This helps me tailor the advice better).",
+      "modelUsed": "nvidia/nemotron-3.5-lightning:free",
+      "providerUsed": "openrouter",
+      "createdAt": "2026-10-11T14:51:10.631Z"
+    }
+  ],
+  "skills": [
+    {
+      "id": "skill-software-engineer",
+      "name": "Software Engineer",
+      "description": "Full-stack software engineering, architecture design, TypeScript/Go/Python coding, and clean refactoring.",
+      "category": "engineering",
+      "version": "1.2.0",
+      "instructions": "You are a principal software engineer. Provide idiomatic, clean, modular code with production error handling, type safety, and clear docstrings. Avoid unnecessary dependencies.",
+      "allowedTools": [
+        "workspace_list_files",
+        "workspace_read_file",
+        "workspace_create_artifact",
+        "workspace_edit_artifact",
+        "code_diff_analyzer"
+      ],
+      "icon": "Terminal",
+      "isSystem": true,
+      "isEnabled": true,
+      "createdAt": "2026-10-11T06:26:54.689Z",
+      "updatedAt": "2026-10-11T06:26:54.690Z"
+    },
+    {
+      "id": "skill-code-reviewer",
+      "name": "Code Reviewer",
+      "description": "Rigorous static analysis, OWASP security audit, performance bottlenecks, and architectural critique.",
+      "category": "engineering",
+      "version": "1.1.0",
+      "instructions": "You are an adversarial senior code reviewer. Scrutinize code for security vulnerabilities, logic bugs, race conditions, memory leaks, and readability. Produce prioritized findings: High, Medium, Low.",
+      "allowedTools": [
+        "workspace_read_file",
+        "code_diff_analyzer"
+      ],
+      "icon": "ShieldCheck",
+      "isSystem": true,
+      "isEnabled": true,
+      "createdAt": "2026-10-11T06:26:54.690Z",
+      "updatedAt": "2026-10-11T06:26:54.690Z"
+    },
+    {
+      "id": "skill-technical-researcher",
+      "name": "Technical Researcher",
+      "description": "Literature synthesis, distributed systems research, benchmark analysis, and technological tradeoff matrices.",
+      "category": "research",
+      "version": "1.0.0",
+      "instructions": "You are a technical researcher. Provide thorough, objective analysis supported by algorithmic complexity, empirical measurements, and structural comparisons.",
+      "allowedTools": [
+        "workspace_search",
+        "document_outline_generator"
+      ],
+      "icon": "Search",
+      "isSystem": true,
+      "isEnabled": true,
+      "createdAt": "2026-10-11T06:26:54.690Z",
+      "updatedAt": "2026-10-11T06:26:54.690Z"
+    },
+    {
+      "id": "skill-document-analyst",
+      "name": "Document Analyst",
+      "description": "Deep document comprehension, contract analysis, structured summary extraction, and table parsing.",
+      "category": "analysis",
+      "version": "1.0.0",
+      "instructions": "You are a senior document analyst. Extract key executive takeaways, obligations, numerical figures, and discrepancies with high precision.",
+      "allowedTools": [
+        "workspace_read_file",
+        "structured_data_extractor"
+      ],
+      "icon": "FileText",
+      "isSystem": true,
+      "isEnabled": true,
+      "createdAt": "2026-10-11T06:26:54.690Z",
+      "updatedAt": "2026-10-11T06:26:54.690Z"
+    },
+    {
+      "id": "skill-data-analyst",
+      "name": "Data Analyst",
+      "description": "Exploratory data analysis, SQL query synthesis, statistical modeling, and CSV/JSON data transformation.",
+      "category": "analysis",
+      "version": "1.1.0",
+      "instructions": "You are a staff data analyst. Analyze distributions, detect anomalies, write performant SQL/pandas transformations, and communicate insights with quantitative clarity.",
+      "allowedTools": [
+        "structured_data_extractor",
+        "workspace_create_artifact"
+      ],
+      "icon": "BarChart2",
+      "isSystem": true,
+      "isEnabled": true,
+      "createdAt": "2026-10-11T06:26:54.690Z",
+      "updatedAt": "2026-10-11T06:26:54.690Z"
+    },
+    {
+      "id": "skill-technical-writer",
+      "name": "Technical Writer",
+      "description": "Clear API documentation, architecture decision records (ADRs), runbooks, and developer tutorials.",
+      "category": "writing",
+      "version": "1.0.0",
+      "instructions": "You are a principal technical writer. Write scannable, precise, jargon-free technical prose with concrete code snippets, parameters tables, and quickstarts.",
+      "allowedTools": [
+        "workspace_create_artifact",
+        "workspace_edit_artifact"
+      ],
+      "icon": "BookOpen",
+      "isSystem": true,
+      "isEnabled": true,
+      "createdAt": "2026-10-11T06:26:54.690Z",
+      "updatedAt": "2026-10-11T06:26:54.690Z"
+    },
+    {
+      "id": "skill-bug-investigator",
+      "name": "Bug Investigator",
+      "description": "Stack trace deconstruction, bisect analysis, root-cause isolation, and regression prevention testing.",
+      "category": "engineering",
+      "version": "1.0.0",
+      "instructions": "You are a debugging specialist. Formulate hypotheses, trace call graphs, examine state transitions, and produce minimal reproduction steps followed by the verified fix.",
+      "allowedTools": [
+        "workspace_read_file",
+        "code_diff_analyzer",
+        "workspace_create_artifact"
+      ],
+      "icon": "Bug",
+      "isSystem": true,
+      "isEnabled": true,
+      "createdAt": "2026-10-11T06:26:54.690Z",
+      "updatedAt": "2026-10-11T06:26:54.690Z"
+    },
+    {
+      "id": "skill-project-planner",
+      "name": "Project Planner",
+      "description": "Milestone decomposition, critical path analysis, dependency graphs, and engineering estimation.",
+      "category": "productivity",
+      "version": "1.0.0",
+      "instructions": "You are a technical product manager and project lead. Break down epics into actionable user stories with explicit acceptance criteria, sequencing, and risks.",
+      "allowedTools": [
+        "document_outline_generator",
+        "workspace_create_artifact"
+      ],
+      "icon": "Calendar",
+      "isSystem": true,
+      "isEnabled": true,
+      "createdAt": "2026-10-11T06:26:54.690Z",
+      "updatedAt": "2026-10-11T06:26:54.690Z"
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "ws_default_01",
+      "userId": "usr_dev_primary",
+      "name": "General Engineering Workspace",
+      "description": "Default agentic co-work environment for system design, artifacts, and multi-model workflows.",
+      "createdAt": "2026-10-11T06:26:54.822Z",
+      "updatedAt": "2026-10-11T06:26:54.822Z"
+    },
+    {
+      "id": "ws_test_1791700015043",
+      "userId": "test_u1_1791700014991",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-11T06:26:55.043Z",
+      "updatedAt": "2026-10-11T06:26:55.043Z"
+    },
+    {
+      "id": "ws_test_1791701855170",
+      "userId": "test_u1_1791701855104",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-11T06:57:35.170Z",
+      "updatedAt": "2026-10-11T06:57:35.170Z"
+    },
+    {
+      "id": "ws_test_1791704666379",
+      "userId": "test_u1_1791704666311",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-11T07:44:26.379Z",
+      "updatedAt": "2026-10-11T07:44:26.379Z"
+    },
+    {
+      "id": "ws_1791708691330_aov9o",
+      "userId": "usr_dev_primary",
+      "name": "Distributed Cache Service",
+      "description": "Multi-region Redis and Memcached caching layer",
+      "createdAt": "2026-10-11T08:51:31.330Z",
+      "updatedAt": "2026-10-11T08:51:31.330Z"
+    },
+    {
+      "id": "ws_test_1791723252668",
+      "userId": "test_u1_1791723252588",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-11T12:54:12.668Z",
+      "updatedAt": "2026-10-11T12:54:12.668Z"
+    },
+    {
+      "id": "ws_test_1791729670735",
+      "userId": "test_u1_1791729670639",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-11T14:41:10.735Z",
+      "updatedAt": "2026-10-11T14:41:10.735Z"
+    },
+    {
+      "id": "ws_test_1791730732829",
+      "userId": "test_u1_1791730732774",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-11T14:58:52.829Z",
+      "updatedAt": "2026-10-11T14:58:52.830Z"
+    },
+    {
+      "id": "ws_test_1791732794706",
+      "userId": "test_u1_1791732794622",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-11T15:33:14.706Z",
+      "updatedAt": "2026-10-11T15:33:14.706Z"
+    },
+    {
+      "id": "ws_test_1791733004687",
+      "userId": "test_u1_1791733004595",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-11T15:36:44.687Z",
+      "updatedAt": "2026-10-11T15:36:44.687Z"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "art_arch_01",
+      "workspaceId": "ws_default_01",
+      "title": "Nexa AI Architecture Spec",
+      "fileName": "architecture.md",
+      "language": "markdown",
+      "content": "# Nexa AI Architecture Specification\n\nNexa AI provides multi-model routing, persistent state, and an agentic Co-Work engine.\n\n- **Efficient Mode**: Sub-second latency models for quick queries\n- **Balanced Mode**: Well-rounded models for development & reasoning\n- **Powerful Mode**: Frontier reasoning models with deep reflection\n\nZero-Cost routing ensures users are never charged unless explicitly opting into premium tiers.",
+      "version": 1,
+      "createdAt": "2026-10-11T06:26:54.822Z",
+      "updatedAt": "2026-10-11T06:26:54.822Z"
+    },
+    {
+      "id": "art_1791700015043_8you6",
+      "workspaceId": "ws_test_1791700015043",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-11T06:26:55.043Z",
+      "updatedAt": "2026-10-11T06:26:55.043Z"
+    },
+    {
+      "id": "art_1791701855171_736wl",
+      "workspaceId": "ws_test_1791701855170",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-11T06:57:35.171Z",
+      "updatedAt": "2026-10-11T06:57:35.171Z"
+    },
+    {
+      "id": "art_1791704666379_xpisw",
+      "workspaceId": "ws_test_1791704666379",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-11T07:44:26.379Z",
+      "updatedAt": "2026-10-11T07:44:26.379Z"
+    },
+    {
+      "id": "art_1791708665884_22kvv",
+      "workspaceId": "ws_default_01",
+      "title": "Build Redis Health Checker Artifact",
+      "fileName": "build_redis_health_checker.md",
+      "language": "markdown",
+      "content": "# Build Redis Health Checker\n\n**Goal**: Create a TypeScript helper function to check Redis connection status and ping latency\n\n### Executed Steps\n- Initialized workspace context\n- Generated artifact schema\n- Completed quality gates\n\n*Generated by Nexa AI Co-Work Agent*",
+      "version": 1,
+      "createdAt": "2026-10-11T08:51:05.884Z",
+      "updatedAt": "2026-10-11T08:51:05.884Z"
+    },
+    {
+      "id": "art_1791708691353_oyrfl",
+      "workspaceId": "ws_1791708691330_aov9o",
+      "title": "Redis Cluster Configuration",
+      "fileName": "redis.conf",
+      "language": "plaintext",
+      "content": "port 6379\ncluster-enabled yes\ncluster-config-file nodes.conf\ncluster-node-timeout 5000\nappendonly yes",
+      "version": 1,
+      "createdAt": "2026-10-11T08:51:31.353Z",
+      "updatedAt": "2026-10-11T08:51:31.353Z"
+    },
+    {
+      "id": "art_1791723252668_a3yqy",
+      "workspaceId": "ws_test_1791723252668",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-11T12:54:12.668Z",
+      "updatedAt": "2026-10-11T12:54:12.668Z"
+    },
+    {
+      "id": "art_1791729670736_4oox3",
+      "workspaceId": "ws_test_1791729670735",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-11T14:41:10.736Z",
+      "updatedAt": "2026-10-11T14:41:10.736Z"
+    },
+    {
+      "id": "art_1791730732830_2jfmj",
+      "workspaceId": "ws_test_1791730732829",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-11T14:58:52.830Z",
+      "updatedAt": "2026-10-11T14:58:52.830Z"
+    },
+    {
+      "id": "art_1791732794707_g2pff",
+      "workspaceId": "ws_test_1791732794706",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-11T15:33:14.707Z",
+      "updatedAt": "2026-10-11T15:33:14.707Z"
+    },
+    {
+      "id": "art_1791733004688_5c3gk",
+      "workspaceId": "ws_test_1791733004687",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-11T15:36:44.688Z",
+      "updatedAt": "2026-10-11T15:36:44.688Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task_1791708698179_gkz2c",
+      "workspaceId": "ws_default_01",
+      "userId": "usr_dev_primary",
+      "title": "Diff Analysis Verification",
+      "goal": "Analyze code diff between initial and refactored config",
+      "status": "running",
+      "modelId": "gemini-3.8-flash",
+      "steps": [
+        {
+          "id": "step_1791708707131_1",
+          "title": "Locate Configuration Files",
+          "description": "Scan the workspace to identify the exact file paths for the initial and refactored configuration files.",
+          "status": "running",
+          "tool": "workspace_list_files",
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-11T08:51:47.131Z"
+        },
+        {
+          "id": "step_1791708707131_2",
+          "title": "Analyze Configuration Diff",
+          "description": "Run a comparative diff analysis between the initial and refactored configuration files to isolate syntactic and structural changes.",
+          "status": "pending",
+          "tool": "code_diff_analyzer",
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-11T08:51:47.131Z"
+        },
+        {
+          "id": "step_1791708707131_3",
+          "title": "Outline Diff Report",
+          "description": "Draft a structured outline covering modifications, breaking changes, performance impact, and migration notes.",
+          "status": "pending",
+          "tool": "document_outline_generator",
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-11T08:51:47.131Z"
+        },
+        {
+          "id": "step_1791708707131_4",
+          "title": "Create Diff Analysis Document",
+          "description": "Synthesize the findings into a comprehensive structured document detailing all configuration changes and implications.",
+          "status": "pending",
+          "tool": "workspace_create_artifact",
+          "requiresApproval": true,
+          "isApproved": false,
+          "createdAt": "2026-10-11T08:51:47.131Z"
+        }
+      ],
+      "artifactIds": [],
+      "createdAt": "2026-10-11T08:51:38.179Z",
+      "updatedAt": "2026-10-11T08:51:47.132Z"
+    },
+    {
+      "id": "task_1791708486340_cu6rx",
+      "workspaceId": "ws_default_01",
+      "userId": "usr_dev_primary",
+      "title": "Build Redis Health Checker",
+      "goal": "Create a TypeScript helper function to check Redis connection status and ping latency",
+      "constraints": "Zero dependencies, TypeScript",
+      "desiredOutput": "redis-health.ts file artifact",
+      "status": "completed",
+      "modelId": "gemini-3.8-flash",
+      "steps": [
+        {
+          "id": "step_1791708492531_1",
+          "title": "Inspect workspace environment",
+          "description": "Inspect the workspace directory to verify existing TypeScript configurations and ensure no naming conflicts for the new Redis utility.",
+          "status": "completed",
+          "tool": "workspace_list_files",
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-11T08:48:12.531Z",
+          "toolOutput": {
+            "files": [
+              {
+                "id": "art_arch_01",
+                "title": "Nexa AI Architecture Spec",
+                "fileName": "architecture.md",
+                "language": "markdown",
+                "version": 1,
+                "updatedAt": "2026-10-11T06:26:54.822Z"
+              }
+            ],
+            "totalCount": 1
+          },
+          "completedAt": "2026-10-11T08:48:34.597Z"
+        },
+        {
+          "id": "step_1791708492531_2",
+          "title": "Design zero-dependency Redis ping specification",
+          "description": "Draft an outline for a raw TCP socket implementation using Node.js standard 'net' module to send RESP PING commands and measure round-trip latency.",
+          "status": "completed",
+          "tool": "document_outline_generator",
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-11T08:48:12.531Z",
+          "toolOutput": {
+            "depth": 3,
+            "sections": [
+              {
+                "section": "1. Executive Summary & Goals",
+                "priority": "High"
+              },
+              {
+                "section": "2. Architectural Blueprint & Invariants",
+                "priority": "High"
+              },
+              {
+                "section": "3. Data Schema & Persistence Model",
+                "priority": "Medium"
+              },
+              {
+                "section": "4. API & Integration Contracts",
+                "priority": "Medium"
+              },
+              {
+                "section": "5. Security, RBAC & Isolation Controls",
+                "priority": "Critical"
+              },
+              {
+                "section": "6. Verification, Test Matrices & Rollout",
+                "priority": "High"
+              }
+            ]
+          },
+          "completedAt": "2026-10-11T08:50:42.821Z"
+        },
+        {
+          "id": "step_1791708492531_3",
+          "title": "Generate redis-health.ts utility",
+          "description": "Create the redis-health.ts file artifact containing the TypeScript helper function with strict type definitions, timeout handling, connection status evaluation, and latency calculation without external dependencies.",
+          "status": "completed",
+          "tool": "workspace_create_artifact",
+          "requiresApproval": true,
+          "isApproved": true,
+          "createdAt": "2026-10-11T08:48:12.531Z",
+          "toolOutput": {
+            "id": "art_1791708665884_22kvv",
+            "fileName": "build_redis_health_checker.md",
+            "title": "Build Redis Health Checker Artifact",
+            "version": 1,
+            "message": "Created artifact build_redis_health_checker.md successfully."
+          },
+          "completedAt": "2026-10-11T08:51:05.884Z"
+        }
+      ],
+      "artifactIds": [
+        "art_1791708665884_22kvv"
+      ],
+      "createdAt": "2026-10-11T08:48:06.340Z",
+      "updatedAt": "2026-10-11T08:51:05.884Z",
+      "summary": "Co-Work task \"Build Redis Health Checker\" has been successfully completed with all steps verified."
+    }
+  ],
+  "notifications": [
+    {
+      "id": "notif_task_1791708665884",
+      "userId": "usr_dev_primary",
+      "title": "Co-Work Task Completed",
+      "message": "Task \"Build Redis Health Checker\" finished all steps and produced workspace artifacts.",
+      "channel": "in_app",
+      "type": "task_completed",
+      "read": false,
+      "createdAt": "2026-10-11T08:51:05.884Z"
+    },
+    {
+      "id": "notif_1791708365969",
+      "userId": "usr_dev_primary",
+      "title": "Test Notification (email)",
+      "message": "Verification message for channel email. Integration adapter validated successfully.",
+      "channel": "email",
+      "type": "system",
+      "read": true,
+      "createdAt": "2026-10-11T08:46:05.969Z"
+    },
+    {
+      "id": "notif_1791708337066",
+      "userId": "usr_dev_primary",
+      "title": "Test Notification (in_app)",
+      "message": "Verification message for channel in_app. Integration adapter validated successfully.",
+      "channel": "in_app",
+      "type": "system",
+      "read": true,
+      "createdAt": "2026-10-11T08:45:37.066Z"
+    },
+    {
+      "id": "notif_welcome",
+      "userId": "usr_dev_primary",
+      "title": "Welcome to Nexa AI",
+      "message": "Your multi-model routing gateway and agentic Co-Work workspace are active.",
+      "channel": "in_app",
+      "type": "system",
+      "read": true,
+      "createdAt": "2026-10-11T06:26:54.822Z"
+    }
+  ],
+  "preferences": [
+    {
+      "userId": "usr_dev_primary",
+      "emailEnabled": true,
+      "pushEnabled": true,
+      "whatsappEnabled": false
+    }
+  ]
+}
