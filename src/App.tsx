@@ -10,6 +10,9 @@ import { NotificationModal } from './components/NotificationModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { DocsView } from './components/DocsView';
 import { CognivoLogo } from './components/CognivoLogo';
+import { ExploreModal } from './components/ExploreModal';
+import { KnowledgeModal } from './components/KnowledgeModal';
+import { TemplatesModal } from './components/TemplatesModal';
 import { fetchGraphQL, streamChat } from './lib/api';
 import {
   Conversation,
@@ -59,6 +62,9 @@ export default function App() {
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isExploreOpen, setIsExploreOpen] = useState(false);
+  const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const stopStreamRef = useRef<(() => void) | null>(null);
@@ -462,6 +468,9 @@ export default function App() {
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onOpenSettings={() => setIsNotificationsOpen(true)}
+          onOpenExplore={() => setIsExploreOpen(true)}
+          onOpenKnowledge={() => setIsKnowledgeOpen(true)}
+          onOpenTemplates={() => setIsTemplatesOpen(true)}
         />
 
         {/* Right Main Content Area */}
@@ -528,7 +537,7 @@ export default function App() {
               )}
 
               {/* Message List or Empty State */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 md:py-6 no-scrollbar">
+              <div className="flex-1 overflow-y-auto px-4 py-4 md:py-6 no-scrollbar min-h-0">
                 {messages.length === 0 && !isStreaming ? (
                   /* Cognivo Empty State matching Image 1 & 3 pixel-by-pixel */
                   <div className="h-full flex flex-col items-center justify-center max-w-3xl mx-auto py-2">
@@ -629,7 +638,7 @@ export default function App() {
                   </div>
                 ) : (
                   /* Active Chat Stream */
-                  <div className="max-w-3xl mx-auto space-y-4 pb-4">
+                  <div className="max-w-3xl mx-auto space-y-4 pb-6">
                     {messages.map((msg) => (
                       <ChatMessage
                         key={msg.id}
@@ -662,9 +671,9 @@ export default function App() {
                 )}
               </div>
 
-              {/* Chat Composer sticky at bottom when conversation is active */}
+              {/* Chat Composer pinned cleanly at bottom when conversation is active */}
               {messages.length > 0 && (
-                <div className="pt-2 pb-4 bg-white">
+                <div className="shrink-0 pt-2 pb-3 bg-white border-t border-[#F0F2F4]">
                   <ChatComposer
                     onSendMessage={handleSendMessage}
                     isStreaming={isStreaming}
@@ -673,7 +682,7 @@ export default function App() {
                     selectedMode={selectedMode}
                     onOpenModelModal={() => setIsModelModalOpen(true)}
                   />
-                  <div className="text-center text-[11px] text-slate-400 mt-2">
+                  <div className="text-center text-[11px] text-slate-400 mt-1.5">
                     Cognivo can make mistakes. Check important info.
                   </div>
                 </div>
@@ -734,6 +743,27 @@ export default function App() {
           } else if (act === 'toggle_sidebar') {
             setIsSidebarCollapsed(!isSidebarCollapsed);
           }
+        }}
+      />
+
+      <ExploreModal
+        isOpen={isExploreOpen}
+        onClose={() => setIsExploreOpen(false)}
+        onSelectPrompt={(prompt) => {
+          handleSendMessage(prompt, []);
+        }}
+      />
+
+      <KnowledgeModal
+        isOpen={isKnowledgeOpen}
+        onClose={() => setIsKnowledgeOpen(false)}
+      />
+
+      <TemplatesModal
+        isOpen={isTemplatesOpen}
+        onClose={() => setIsTemplatesOpen(false)}
+        onSelectPrompt={(prompt) => {
+          handleSendMessage(prompt, []);
         }}
       />
     </div>

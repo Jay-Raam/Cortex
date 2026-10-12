@@ -11,10 +11,10 @@ import {
   Download,
   Plus,
   RefreshCw,
-  ShieldAlert,
   GitCommit,
   Check,
   ChevronRight,
+  Layers,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact } from '../server/types';
 import { fetchGraphQL, advanceTaskApi } from '../lib/api';
@@ -58,7 +58,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
             modelId
             summary
             error
-            createdAt
+            currentStepIndex
             steps {
               id
               title
@@ -67,85 +67,101 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
               tool
               requiresApproval
               isApproved
-              completedAt
+              output
             }
-            artifactIds
           }
           artifacts(workspaceId: $wsId) {
             id
-            workspaceId
             title
             fileName
             language
             content
             version
+            createdAt
             updatedAt
           }
         }
       `, { wsId: workspace.id });
 
-      setTasks(data.agentTasks || []);
-      setArtifacts(data.artifacts || []);
-
-      if (data.agentTasks && data.agentTasks.length > 0 && !selectedTaskId) {
-        setSelectedTaskId(data.agentTasks[0].id);
-      }
-      if (data.artifacts && data.artifacts.length > 0 && !selectedArtifact) {
-        setSelectedArtifact(data.artifacts[0]);
+      if (data) {
+        if (data.agentTasks) {
+          setTasks(data.agentTasks);
+          if (data.agentTasks.length > 0 && !selectedTaskId) {
+            setSelectedTaskId(data.agentTasks[0].id);
+          }
+        }
+        if (data.artifacts) {
+          setArtifacts(data.artifacts);
+          if (data.artifacts.length > 0 && !selectedArtifact) {
+            setSelectedArtifact(data.artifacts[0]);
+          }
+        }
       }
     } catch (err) {
-      console.error('Failed to load Co-Work workspace data:', err);
+      console.error('Failed to load workspace data', err);
     }
   };
 
   useEffect(() => {
     loadWorkspaceData();
-  }, [workspace?.id]);
+  }, [workspace]);
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workspace || !goal.trim() || !title.trim()) return;
+    if (!workspace || !title.trim() || !goal.trim()) return;
 
     setIsSubmitting(true);
     try {
       const data = await fetchGraphQL(`
-        mutation CreateTask($wsId: ID!, $title: String!, $goal: String!, $constraints: String, $desiredOutput: String) {
-          createAgentTask(workspaceId: $wsId, title: $title, goal: $goal, constraints: $constraints, desiredOutput: $desiredOutput) {
+        mutation CreateTask(
+          $workspaceId: ID!
+          $title: String!
+          $goal: String!
+          $constraints: String
+          $desiredOutput: String
+        ) {
+          createAgentTask(
+            workspaceId: $workspaceId
+            title: $title
+            goal: $goal
+            constraints: $constraints
+            desiredOutput: $desiredOutput
+          ) {
             id
             title
             status
           }
         }
       `, {
-        wsId: workspace.id,
+        workspaceId: workspace.id,
         title,
         goal,
-        constraints,
-        desiredOutput,
+        constraints: constraints || null,
+        desiredOutput: desiredOutput || null,
       });
 
-      setIsCreatingTask(false);
-      setGoal('');
-      setTitle('');
-      setConstraints('');
-      setDesiredOutput('');
-      await loadWorkspaceData();
-      if (data.createAgentTask) {
+      if (data?.createAgentTask) {
+        setTitle('');
+        setGoal('');
+        setConstraints('');
+        setDesiredOutput('');
+        setIsCreatingTask(false);
+        await loadWorkspaceData();
         setSelectedTaskId(data.createAgentTask.id);
       }
     } catch (err: any) {
-      alert(`Task creation failed: ${err.message}`);
+      alert(`Failed to create task: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleAdvanceStep = async (taskId: string) => {
+  const handleAdvanceTask = async (taskId: string) => {
     try {
       await advanceTaskApi(taskId);
       await loadWorkspaceData();
     } catch (err: any) {
-      alert(`Failed to advance step: ${err.message}`);
+      alert(`Failed to execute step: ${err.message}`);
     }
   };
 
@@ -184,22 +200,24 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden bg-[#090d12]">
+    <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden bg-white font-sans">
       {/* Left Column: Task list & Planning State Machine */}
-      <div className="w-full md:w-1/2 border-r border-[#1d2737] flex flex-col h-full overflow-hidden">
+      <div className="w-full md:w-1/2 border-r border-[#E5E7EB] flex flex-col h-full overflow-hidden bg-white">
         {/* Workspace Toolbar */}
-        <div className="p-4 border-b border-[#1d2737] bg-[#0c1219] flex items-center justify-between">
+        <div className="p-4 border-b border-[#F0F2F4] bg-white flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <Briefcase className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-semibold text-white">{workspace?.name || 'Co-Work Workspace'}</h2>
+              <div className="w-6 h-6 rounded-md bg-[#FFF9F3] border border-[#FFE8D6] flex items-center justify-center text-[#FF6B00]">
+                <Briefcase className="w-3.5 h-3.5" />
+              </div>
+              <h2 className="text-sm font-bold text-slate-900">{workspace?.name || 'Co-Work Workspace'}</h2>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">Autonomous task decomposition, approval gates &amp; artifacts</p>
+            <p className="text-xs text-slate-500 mt-0.5">Autonomous task decomposition, approval gates &amp; artifacts</p>
           </div>
 
           <button
             onClick={() => setIsCreatingTask(!isCreatingTask)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#FF6B00] hover:bg-[#E86000] rounded-xl shadow-2xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Task</span>
@@ -208,196 +226,196 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
 
         {/* Task Creation Form (collapsible) */}
         {isCreatingTask && (
-          <form onSubmit={handleCreateTask} className="p-4 bg-[#111822] border-b border-[#1d2737] space-y-3">
+          <form onSubmit={handleCreateTask} className="p-4 bg-[#FFF9F3] border-b border-[#FFE8D6] space-y-3">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Task Title</label>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Task Title</label>
               <input
                 type="text"
                 placeholder="e.g. Implement Distributed Rate Limiter"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                className="w-full px-3 py-1.5 bg-[#090d12] border border-[#232f42] rounded-md text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full px-3 py-1.5 bg-white border border-[#E5E7EB] rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#FF6B00]"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Objective &amp; Goal</label>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Objective &amp; Goal</label>
               <textarea
                 rows={2}
                 placeholder="Describe the objective, problem statement, or code to engineer..."
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 required
-                className="w-full px-3 py-1.5 bg-[#090d12] border border-[#232f42] rounded-md text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full px-3 py-1.5 bg-white border border-[#E5E7EB] rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#FF6B00]"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Constraints</label>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Constraints</label>
                 <input
                   type="text"
                   placeholder="e.g. Strict TypeScript, Zero deps"
                   value={constraints}
                   onChange={(e) => setConstraints(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-[#090d12] border border-[#232f42] rounded-md text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-1.5 bg-white border border-[#E5E7EB] rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#FF6B00]"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Desired Output</label>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Desired Output</label>
                 <input
                   type="text"
-                  placeholder="e.g. Full source file + tests"
+                  placeholder="e.g. 1 Artifact, tested"
                   value={desiredOutput}
                   onChange={(e) => setDesiredOutput(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-[#090d12] border border-[#232f42] rounded-md text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-1.5 bg-white border border-[#E5E7EB] rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#FF6B00]"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-1">
+            <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setIsCreatingTask(false)}
-                className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                className="px-3 py-1 text-xs text-slate-600 hover:text-slate-900 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-1.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-md transition-colors"
+                className="px-3 py-1 text-xs font-semibold text-white bg-[#FF6B00] hover:bg-[#E86000] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
               >
-                {isSubmitting ? 'Planning Task...' : 'Decompose & Plan'}
+                {isSubmitting ? 'Planning...' : 'Generate Plan'}
               </button>
             </div>
           </form>
         )}
 
-        {/* Task Selection Bar */}
-        <div className="p-2 border-b border-[#1d2737] bg-[#0c1219] flex items-center gap-1 overflow-x-auto">
-          {tasks.map((t) => (
+        {/* Tasks Horizontal Switcher */}
+        <div className="px-4 py-2 bg-slate-50 border-b border-[#F0F2F4] flex items-center gap-2 overflow-x-auto no-scrollbar">
+          {tasks.map((task) => (
             <button
-              key={t.id}
-              onClick={() => setSelectedTaskId(t.id)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
-                t.id === selectedTaskId
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#131b26]'
+              key={task.id}
+              onClick={() => setSelectedTaskId(task.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedTaskId === task.id
+                  ? 'bg-white text-slate-900 border border-[#E5E7EB] shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
-              <span>{t.title}</span>
-              <span className="text-[10px] text-slate-500 font-mono">({t.status})</span>
+              <span className={`w-2 h-2 rounded-full ${task.status === 'completed' ? 'bg-emerald-500' : task.status === 'running' ? 'bg-[#FF6B00]' : 'bg-slate-300'}`} />
+              <span>{task.title}</span>
+              <span className="text-[10px] font-mono text-slate-400">({task.status})</span>
             </button>
           ))}
           {tasks.length === 0 && (
-            <span className="text-xs text-slate-500 px-2 py-1">No tasks in workspace. Click "+ New Task" to begin.</span>
+            <span className="text-xs text-slate-400 py-1">No tasks in this workspace yet.</span>
           )}
         </div>
 
-        {/* Selected Task Details & Execution State Machine */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Selected Task Execution Timeline */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
           {selectedTask ? (
-            <div>
-              {/* Task Goal Overview */}
-              <div className="p-3.5 bg-[#0f1722] border border-[#232f42] rounded-lg">
-                <div className="flex items-center justify-between mb-1.5">
-                  <h3 className="text-sm font-semibold text-white">{selectedTask.title}</h3>
+            <div className="space-y-4">
+              {/* Task Header Card */}
+              <div className="p-4 rounded-xl bg-white border border-[#E5E7EB] shadow-2xs">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">{selectedTask.title}</h3>
+                    <p className="text-xs text-slate-500 mt-1">{selectedTask.goal}</p>
+                  </div>
                   <span
-                    className={`px-2 py-0.5 rounded text-[11px] font-mono font-medium capitalize ${
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize ${
                       selectedTask.status === 'completed'
-                        ? 'bg-emerald-500/15 text-emerald-400'
-                        : selectedTask.status === 'awaiting_approval'
-                        ? 'bg-amber-500/15 text-amber-400'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         : selectedTask.status === 'running'
-                        ? 'bg-blue-500/15 text-blue-400'
-                        : 'bg-slate-700/30 text-slate-300'
+                        ? 'bg-orange-50 text-[#FF6B00] border border-orange-200'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
                     }`}
                   >
-                    {selectedTask.status.replace('_', ' ')}
+                    {selectedTask.status}
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{selectedTask.goal}</p>
 
-                {selectedTask.summary && (
-                  <div className="mt-3 pt-2.5 border-t border-[#1d2737] text-xs text-emerald-400">
-                    <span className="font-semibold">Result: </span>
-                    {selectedTask.summary}
+                {selectedTask.constraints && (
+                  <div className="mt-3 text-[11px] text-slate-500">
+                    <strong className="text-slate-700">Constraints:</strong> {selectedTask.constraints}
                   </div>
                 )}
               </div>
 
-              {/* Steps Timeline */}
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Execution Plan ({selectedTask.steps.length} Steps)
-                  </span>
-
-                  {selectedTask.status !== 'completed' && (
-                    <button
-                      onClick={() => handleAdvanceStep(selectedTask.id)}
-                      className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-900 bg-emerald-400 hover:bg-emerald-300 rounded-md transition-colors cursor-pointer"
-                    >
-                      <Play className="w-3 h-3 fill-current" />
-                      <span>Advance Step</span>
-                    </button>
-                  )}
+              {/* Steps Progress Header & Advance Button */}
+              <div className="flex items-center justify-between pt-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Execution Plan ({selectedTask.steps.length} Steps)
                 </div>
 
-                <div className="space-y-2">
-                  {selectedTask.steps.map((step, idx) => (
-                    <div
-                      key={step.id}
-                      className={`p-3 rounded-lg border transition-all ${
-                        step.status === 'completed'
-                          ? 'bg-[#0c1410] border-emerald-500/30'
-                          : step.status === 'running'
-                          ? 'bg-[#101b29] border-blue-500/50'
-                          : step.status === 'awaiting_approval'
-                          ? 'bg-[#1c180e] border-amber-500/50'
-                          : 'bg-[#0f1722] border-[#232f42]'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2.5">
-                          <div className="mt-0.5">
-                            {step.status === 'completed' && (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                            )}
-                            {step.status === 'running' && (
-                              <RefreshCw className="w-4 h-4 text-blue-400 animate-spin" />
-                            )}
-                            {step.status === 'awaiting_approval' && (
-                              <AlertTriangle className="w-4 h-4 text-amber-400" />
-                            )}
-                            {step.status === 'pending' && (
-                              <Clock className="w-4 h-4 text-slate-500" />
-                            )}
-                          </div>
+                {selectedTask.status !== 'completed' && (
+                  <button
+                    onClick={() => handleAdvanceTask(selectedTask.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#FF6B00] hover:bg-[#E86000] rounded-lg shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Advance Step</span>
+                  </button>
+                )}
+              </div>
 
-                          <div>
-                            <div className="text-xs font-semibold text-white">
-                              {idx + 1}. {step.title}
-                            </div>
-                            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                              {step.description}
-                            </p>
-                            {step.tool && (
-                              <div className="mt-1 font-mono text-[11px] text-slate-500">
-                                Tool: <span className="text-emerald-400/90">{step.tool}</span>
-                              </div>
-                            )}
-                          </div>
+              {/* Execution Steps */}
+              <div className="space-y-2.5">
+                {selectedTask.steps.map((step, idx) => (
+                  <div
+                    key={step.id}
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      step.status === 'completed'
+                        ? 'bg-slate-50/70 border-slate-200'
+                        : step.status === 'running'
+                        ? 'bg-[#FFF9F3] border-[#FFE8D6] shadow-2xs'
+                        : 'bg-white border-[#E5E7EB]'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {step.status === 'completed' ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        ) : step.status === 'running' ? (
+                          <RefreshCw className="w-4 h-4 text-[#FF6B00] animate-spin" />
+                        ) : (
+                          <Clock className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-slate-900">
+                            {idx + 1}. {step.title}
+                          </h4>
+                          <span className="text-[10px] font-mono text-slate-400 capitalize">
+                            {step.status}
+                          </span>
                         </div>
+                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                          {step.description}
+                        </p>
 
-                        {/* Approval Gate Button */}
-                        {step.status === 'awaiting_approval' && (
-                          <div className="shrink-0 flex items-center gap-1.5">
+                        {step.tool && (
+                          <div className="mt-2 text-[10px] text-slate-500 font-mono">
+                            Tool: <span className="text-[#FF6B00]">{step.tool}</span>
+                          </div>
+                        )}
+
+                        {/* Approval Gate */}
+                        {step.requiresApproval && !step.isApproved && step.status === 'running' && (
+                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs text-amber-900">
+                              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span>Approval required before running destructive tool</span>
+                            </div>
                             <button
                               onClick={() => handleApproveStep(selectedTask.id, step.id)}
-                              className="px-2.5 py-1 text-xs font-semibold text-slate-900 bg-emerald-400 hover:bg-emerald-300 rounded shadow transition-colors cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
                             >
                               Approve
                             </button>
@@ -405,12 +423,12 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
-            <div className="py-20 text-center text-xs text-slate-500">
+            <div className="py-20 text-center text-xs text-slate-400">
               Select or create a Co-Work task above.
             </div>
           )}
@@ -418,12 +436,14 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
       </div>
 
       {/* Right Column: Artifacts Explorer & Preview */}
-      <div className="w-full md:w-1/2 flex flex-col h-full overflow-hidden bg-[#0a0f16]">
+      <div className="w-full md:w-1/2 flex flex-col h-full overflow-hidden bg-slate-50">
         {/* Artifacts Header */}
-        <div className="p-3 border-b border-[#1d2737] bg-[#0c1219] flex items-center justify-between">
+        <div className="p-4 border-b border-[#F0F2F4] bg-white flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FileCode className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
+            <div className="w-6 h-6 rounded-md bg-[#FFF9F3] border border-[#FFE8D6] flex items-center justify-center text-[#FF6B00]">
+              <FileCode className="w-3.5 h-3.5" />
+            </div>
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Workspace Artifacts ({artifacts.length})
             </h3>
           </div>
@@ -432,22 +452,22 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => copyArtifactContent(selectedArtifact)}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs text-slate-300 bg-[#16212e] hover:bg-[#1f2f42] border border-[#27374d] rounded transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
                 title="Copy artifact content"
               >
                 {copiedArtId === selectedArtifact.id ? (
-                  <Check className="w-3 h-3 text-emerald-400" />
+                  <Check className="w-3 h-3 text-emerald-600" />
                 ) : (
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3 h-3 text-slate-500" />
                 )}
                 <span>{copiedArtId === selectedArtifact.id ? 'Copied' : 'Copy'}</span>
               </button>
               <button
                 onClick={() => downloadArtifact(selectedArtifact)}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs text-slate-300 bg-[#16212e] hover:bg-[#1f2f42] border border-[#27374d] rounded transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
                 title="Download artifact file"
               >
-                <Download className="w-3 h-3" />
+                <Download className="w-3 h-3 text-slate-500" />
                 <span>Export</span>
               </button>
             </div>
@@ -455,41 +475,43 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         </div>
 
         {/* Artifact File Tabs */}
-        <div className="p-2 border-b border-[#1d2737] bg-[#080d13] flex items-center gap-1 overflow-x-auto">
+        <div className="px-4 py-2 border-b border-[#F0F2F4] bg-slate-50 flex items-center gap-1 overflow-x-auto no-scrollbar">
           {artifacts.map((art) => (
             <button
               key={art.id}
               onClick={() => setSelectedArtifact(art)}
-              className={`px-3 py-1.5 rounded-md text-xs font-mono whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
                 selectedArtifact?.id === art.id
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#131b26]'
+                  ? 'bg-white text-slate-900 border border-[#E5E7EB] shadow-2xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
-              <FileText className="w-3 h-3" />
+              <FileText className="w-3 h-3 text-[#FF6B00]" />
               <span>{art.fileName}</span>
-              <span className="text-[10px] text-slate-500">v{art.version}</span>
+              <span className="text-[10px] text-slate-400">v{art.version}</span>
             </button>
           ))}
           {artifacts.length === 0 && (
-            <span className="text-xs text-slate-500 px-2 py-1">No artifacts created yet.</span>
+            <span className="text-xs text-slate-400 px-2 py-1">No artifacts created yet.</span>
           )}
         </div>
 
         {/* Artifact Content Preview */}
-        <div className="flex-1 overflow-y-auto p-4 bg-[#080d13]">
+        <div className="flex-1 overflow-y-auto p-6 bg-white">
           {selectedArtifact ? (
             <div>
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#1d2737] text-xs text-slate-400">
-                <span className="font-semibold text-white">{selectedArtifact.title}</span>
-                <span className="font-mono text-[11px]">Format: {selectedArtifact.language}</span>
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 text-xs text-slate-500">
+                <span className="font-bold text-slate-900 text-sm">{selectedArtifact.title}</span>
+                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                  Format: {selectedArtifact.language}
+                </span>
               </div>
-              <pre className="text-xs font-mono text-slate-200 leading-relaxed whitespace-pre-wrap">
+              <pre className="text-xs font-mono text-slate-800 leading-relaxed whitespace-pre-wrap p-4 bg-slate-50 rounded-xl border border-slate-200">
                 <code>{selectedArtifact.content}</code>
               </pre>
             </div>
           ) : (
-            <div className="py-24 text-center text-xs text-slate-500">
+            <div className="py-24 text-center text-xs text-slate-400">
               Select an artifact above to inspect its code or documentation.
             </div>
           )}

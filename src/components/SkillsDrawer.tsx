@@ -24,14 +24,14 @@ interface SkillsDrawerProps {
 }
 
 const ICON_MAP: Record<string, React.ReactNode> = {
-  Terminal: <Terminal className="w-5 h-5" />,
-  ShieldCheck: <ShieldCheck className="w-5 h-5" />,
-  Search: <Search className="w-5 h-5" />,
-  FileText: <FileText className="w-5 h-5" />,
-  BarChart2: <BarChart2 className="w-5 h-5" />,
-  BookOpen: <BookOpen className="w-5 h-5" />,
-  Bug: <Bug className="w-5 h-5" />,
-  Calendar: <Calendar className="w-5 h-5" />,
+  Terminal: <Terminal className="w-4 h-4 text-[#FF6B00]" />,
+  ShieldCheck: <ShieldCheck className="w-4 h-4 text-[#FF6B00]" />,
+  Search: <Search className="w-4 h-4 text-[#FF6B00]" />,
+  FileText: <FileText className="w-4 h-4 text-[#FF6B00]" />,
+  BarChart2: <BarChart2 className="w-4 h-4 text-[#FF6B00]" />,
+  BookOpen: <BookOpen className="w-4 h-4 text-[#FF6B00]" />,
+  Bug: <Bug className="w-4 h-4 text-[#FF6B00]" />,
+  Calendar: <Calendar className="w-4 h-4 text-[#FF6B00]" />,
 };
 
 export const SkillsDrawer: React.FC<SkillsDrawerProps> = ({
@@ -49,47 +49,47 @@ export const SkillsDrawer: React.FC<SkillsDrawerProps> = ({
   const categories = ['all', 'engineering', 'analysis', 'research', 'writing', 'productivity'];
 
   const filtered = skills.filter((s) => {
+    const matchesCategory = selectedCategory === 'all' || s.category === selectedCategory;
     const matchesSearch =
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.description.toLowerCase().includes(search.toLowerCase());
-    const matchesCat = selectedCategory === 'all' || s.category === selectedCategory;
-    return matchesSearch && matchesCat;
+    return matchesCategory && matchesSearch;
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-[#0f1722] border border-[#232f42] rounded-xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150 font-sans">
+      <div className="relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#232f42]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
-            <h2 className="text-base font-semibold text-white">Skills &amp; Agent Workflows</h2>
-            <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
+            <h2 className="text-base font-bold text-slate-900">Skills &amp; Agent Workflows</h2>
+            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
               <span>Domain-Specific Personas</span>
               <span aria-hidden="true">·</span>
               <span>Constrained Tool Allowlists</span>
               <span aria-hidden="true">·</span>
-              <span>Zod-Validated Schemas</span>
+              <span className="text-[#FF6B00] font-medium">Zod-Validated Schemas</span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#1a2533] cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Filter Bar */}
-        <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-[#0a0f16] border-b border-[#232f42]">
-          <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-slate-50 border-b border-slate-100">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1 text-xs font-medium rounded-md capitalize transition-colors cursor-pointer ${
+                className={`px-3 py-1 text-xs font-semibold rounded-lg capitalize transition-colors cursor-pointer ${
                   selectedCategory === cat
-                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-[#FF6B00] text-white shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-200/60'
                 }`}
               >
                 {cat}
@@ -100,7 +100,7 @@ export const SkillsDrawer: React.FC<SkillsDrawerProps> = ({
           {activeSkillId && (
             <button
               onClick={() => onSelectSkill(null)}
-              className="text-xs text-amber-400 hover:underline shrink-0"
+              className="text-xs text-[#FF6B00] hover:underline shrink-0 font-medium"
             >
               Clear Active Skill
             </button>
@@ -108,7 +108,7 @@ export const SkillsDrawer: React.FC<SkillsDrawerProps> = ({
         </div>
 
         {/* Skills Cards Grid */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+        <div className="flex-1 overflow-y-auto p-6 space-y-3 no-scrollbar">
           {filtered.map((skill) => {
             const isActive = skill.id === activeSkillId;
             return (
@@ -117,39 +117,39 @@ export const SkillsDrawer: React.FC<SkillsDrawerProps> = ({
                 onClick={() => onSelectSkill(isActive ? null : skill.id)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-[#111e17] border-emerald-500/60 shadow-md'
-                    : 'bg-[#121a24] border-[#222f42] hover:border-[#32435b] hover:bg-[#15202c]'
+                    ? 'bg-[#FFF9F3] border-[#FF6B00] shadow-2xs'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div
-                      className={`p-2.5 rounded-lg shrink-0 ${
+                      className={`p-2.5 rounded-xl shrink-0 ${
                         isActive
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                          : 'bg-[#1a2535] text-slate-300 border border-[#2b3a4f]'
+                          ? 'bg-[#FFE8D6] text-[#FF6B00] border border-[#FF6B00]/30'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
                       }`}
                     >
-                      {ICON_MAP[skill.icon] || <Sparkles className="w-5 h-5" />}
+                      {ICON_MAP[skill.icon] || <Sparkles className="w-4 h-4 text-[#FF6B00]" />}
                     </div>
 
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-white">{skill.name}</h3>
-                        <span className="text-[10px] text-slate-500 font-mono">v{skill.version}</span>
-                        <span className="text-[10px] text-emerald-400/80 font-mono">({skill.category})</span>
+                        <h3 className="text-xs font-bold text-slate-900">{skill.name}</h3>
+                        <span className="text-[10px] text-slate-400 font-mono">v{skill.version}</span>
+                        <span className="text-[10px] text-[#FF6B00] font-mono font-medium">({skill.category})</span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">{skill.description}</p>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">{skill.description}</p>
                     </div>
                   </div>
 
                   <div className="shrink-0 mt-1">
                     {isActive ? (
-                      <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400">
+                      <span className="flex items-center gap-1 text-xs font-bold text-[#FF6B00]">
                         <Check className="w-3.5 h-3.5" /> Active
                       </span>
                     ) : (
-                      <span className="text-xs font-medium text-slate-500 hover:text-slate-300">
+                      <span className="text-xs font-medium text-slate-400 hover:text-slate-700">
                         Activate
                       </span>
                     )}
@@ -157,12 +157,12 @@ export const SkillsDrawer: React.FC<SkillsDrawerProps> = ({
                 </div>
 
                 {/* Allowed Tools */}
-                <div className="mt-3 pt-2.5 border-t border-[#1d293a] flex items-center gap-2 text-[11px] text-slate-500">
+                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500">
                   <Wrench className="w-3 h-3 text-slate-400" />
-                  <span>Allowed Tools:</span>
+                  <span className="text-slate-400">Allowed Tools:</span>
                   <div className="flex flex-wrap gap-1">
                     {skill.allowedTools.map((t) => (
-                      <span key={t} className="font-mono text-slate-300">
+                      <span key={t} className="font-mono text-slate-700 px-1.5 py-0.5 rounded bg-slate-100 text-[10px]">
                         {t}
                       </span>
                     ))}
@@ -174,16 +174,16 @@ export const SkillsDrawer: React.FC<SkillsDrawerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3 bg-[#0a0f16] border-t border-[#232f42] text-xs text-slate-400">
+        <div className="flex items-center justify-between px-6 py-3 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
           <div>
             Active Skill:{' '}
-            <span className="text-white font-medium">
+            <span className="text-slate-900 font-bold">
               {skills.find((s) => s.id === activeSkillId)?.name || 'None (Standard Assistant)'}
             </span>
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer"
+            className="px-4 py-1.5 text-xs font-semibold text-white bg-[#FF6B00] hover:bg-[#E86000] rounded-xl shadow-2xs transition-colors cursor-pointer"
           >
             Done
           </button>
