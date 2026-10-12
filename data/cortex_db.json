@@ -167,10 +167,103 @@
       "passwordHash": "$2b$08$Eg9GYGkshDlK0I1SrcL8JODBaiUXsXzgUi3ScXUYHk2PQogJm7fg2",
       "role": "user",
       "createdAt": "2026-10-12T13:52:50.708Z"
+    },
+    {
+      "id": "test_u1_1791814310000",
+      "email": "u1_1791814310000@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$bNQaA8tDFlgSmpOrqYN7.eozCI7yfsaxS5fJoy3gz0uCtL02KeFSe",
+      "role": "user",
+      "createdAt": "2026-10-12T14:11:50.033Z"
+    },
+    {
+      "id": "test_u2_1791814310033",
+      "email": "u2_1791814310033@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$31SvHNyrDoGs4TMVbFuEH.ue5.vDMtfVhZe7MCktjtxkc42R9WPt2",
+      "role": "user",
+      "createdAt": "2026-10-12T14:11:50.059Z"
+    },
+    {
+      "id": "test_u1_1791814803527",
+      "email": "u1_1791814803527@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$qU6Ry8qoSr8bbj5S4zSVdekaxarOOpySRMP4VoZeBYLnO9UGLhn4C",
+      "role": "user",
+      "createdAt": "2026-10-12T14:20:03.593Z"
+    },
+    {
+      "id": "test_u2_1791814803593",
+      "email": "u2_1791814803593@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$S8.5R5x6roOBAq6QhVvi2eLsB5beZ8Vq2EnYCvhqTfVZrTR/bQIR.",
+      "role": "user",
+      "createdAt": "2026-10-12T14:20:03.644Z"
     }
   ],
   "sessions": [],
   "conversations": [
+    {
+      "id": "conv_msgs_1791814803649",
+      "userId": "test_u1_1791814803527",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T14:20:03.649Z",
+      "updatedAt": "2026-10-12T14:20:03.649Z"
+    },
+    {
+      "id": "conv_1791814803647",
+      "userId": "test_u1_1791814803527",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T14:20:03.647Z",
+      "updatedAt": "2026-10-12T14:20:03.647Z"
+    },
+    {
+      "id": "conv_1791814450504_p104y",
+      "userId": "usr_dev_primary",
+      "title": "New Chat",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "skillId": null,
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T14:14:10.504Z",
+      "updatedAt": "2026-10-12T14:14:34.714Z"
+    },
+    {
+      "id": "conv_msgs_1791814310062",
+      "userId": "test_u1_1791814310000",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T14:11:50.062Z",
+      "updatedAt": "2026-10-12T14:11:50.062Z"
+    },
+    {
+      "id": "conv_1791814310060",
+      "userId": "test_u1_1791814310000",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T14:11:50.060Z",
+      "updatedAt": "2026-10-12T14:11:50.060Z"
+    },
     {
       "id": "conv_msgs_1791813170711",
       "userId": "test_u1_1791813170653",
@@ -476,6 +569,23 @@
       "modelUsed": "nvidia/nemotron-3.5-lightning:free",
       "providerUsed": "openrouter",
       "createdAt": "2026-10-11T14:51:10.631Z"
+    },
+    {
+      "id": "msg_1791814472496_u",
+      "conversationId": "conv_1791814450504_p104y",
+      "role": "user",
+      "content": "Hello Cognivo, tell me 3 concise productivity tips",
+      "attachments": [],
+      "createdAt": "2026-10-12T14:14:32.496Z"
+    },
+    {
+      "id": "msg_1791814474714_a",
+      "conversationId": "conv_1791814450504_p104y",
+      "role": "assistant",
+      "content": "Here are 3 concise productivity tips:\n\n1.  **The Two-Minute Rule:** If a task takes less than two minutes to complete, do it immediately instead of putting it on a to-do list.\n2.  **Time Blocking:** Schedule specific blocks of time for specific tasks, rather than working from an open-ended to-do list.\n3.  **The \"Eat the Frog\" Method:** Tackle your most difficult and important task first thing in the morning to build momentum for the rest of the day.",
+      "modelUsed": "nvidia/nemotron-3.5-lightning:free",
+      "providerUsed": "openrouter",
+      "createdAt": "2026-10-12T14:14:34.714Z"
     }
   ],
   "skills": [
@@ -716,6 +826,22 @@
       "description": "Co-Work testing space",
       "createdAt": "2026-10-12T13:52:50.714Z",
       "updatedAt": "2026-10-12T13:52:50.714Z"
+    },
+    {
+      "id": "ws_test_1791814310066",
+      "userId": "test_u1_1791814310000",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T14:11:50.066Z",
+      "updatedAt": "2026-10-12T14:11:50.066Z"
+    },
+    {
+      "id": "ws_test_1791814803657",
+      "userId": "test_u1_1791814803527",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T14:20:03.657Z",
+      "updatedAt": "2026-10-12T14:20:03.657Z"
     }
   ],
   "artifacts": [
@@ -861,6 +987,28 @@
       "version": 1,
       "createdAt": "2026-10-12T13:52:50.715Z",
       "updatedAt": "2026-10-12T13:52:50.715Z"
+    },
+    {
+      "id": "art_1791814310066_9u6nh",
+      "workspaceId": "ws_test_1791814310066",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T14:11:50.066Z",
+      "updatedAt": "2026-10-12T14:11:50.066Z"
+    },
+    {
+      "id": "art_1791814803658_spkto",
+      "workspaceId": "ws_test_1791814803657",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T14:20:03.658Z",
+      "updatedAt": "2026-10-12T14:20:03.658Z"
     }
   ],
   "tasks": [
