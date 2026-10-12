@@ -282,21 +282,21 @@
       "createdAt": "2026-10-12T17:08:04.196Z"
     },
     {
-      "id": "test_u1_1791825278867",
-      "email": "u1_1791825278867@nexa.ai",
+      "id": "test_u1_1791825562784",
+      "email": "u1_1791825562784@nexa.ai",
       "name": "Updated Name",
-      "passwordHash": "$2b$08$HLwCOD/LAC0ptYFobJGLQ.EgA6PkNIC4eBVglhkxGEjVfJnj9MY3.",
+      "passwordHash": "$2b$08$np.W7kncChLs3VyAyVdpKOhlk0vYcJ6lr9xvLP74sI9dQyvlLf53u",
       "role": "user",
-      "createdAt": "2026-10-12T17:14:38.899Z",
+      "createdAt": "2026-10-12T17:19:22.816Z",
       "avatar": "data:image/webp;base64,sampleAvatarData"
     },
     {
-      "id": "test_u2_1791825278900",
-      "email": "u2_1791825278900@nexa.ai",
+      "id": "test_u2_1791825562817",
+      "email": "u2_1791825562817@nexa.ai",
       "name": "Test Engineer 2",
-      "passwordHash": "$2b$08$cSG2QSoNPjb5XPAPnLySqOCSZ6Ijo2FpSYHY2M.Me9cQ90vD5390W",
+      "passwordHash": "$2b$08$U5ywCOXpgSrPE3814n21QOfWqRhu9VdLnOGSfGXVejDYKiyww.cNO",
       "role": "user",
-      "createdAt": "2026-10-12T17:14:38.922Z"
+      "createdAt": "2026-10-12T17:19:22.839Z"
     }
   ],
   "sessions": [
@@ -317,28 +317,41 @@
   ],
   "conversations": [
     {
-      "id": "conv_msgs_1791825278924",
-      "userId": "test_u1_1791825278867",
+      "id": "conv_msgs_1791825562842",
+      "userId": "test_u1_1791825562784",
       "title": "User 1 Private Thread",
       "modelId": "gemini-3.8-flash",
       "providerId": "gemini",
       "mode": "balanced",
       "isPinned": false,
       "isArchived": false,
-      "createdAt": "2026-10-12T17:14:38.924Z",
-      "updatedAt": "2026-10-12T17:14:38.924Z"
+      "createdAt": "2026-10-12T17:19:22.842Z",
+      "updatedAt": "2026-10-12T17:19:22.842Z"
     },
     {
-      "id": "conv_1791825278923",
-      "userId": "test_u1_1791825278867",
+      "id": "conv_1791825562840",
+      "userId": "test_u1_1791825562784",
       "title": "Secret Project Alpha",
       "modelId": "gemini-3.8-flash",
       "providerId": "gemini",
       "mode": "balanced",
       "isPinned": false,
       "isArchived": false,
-      "createdAt": "2026-10-12T17:14:38.923Z",
-      "updatedAt": "2026-10-12T17:14:38.923Z"
+      "createdAt": "2026-10-12T17:19:22.840Z",
+      "updatedAt": "2026-10-12T17:19:22.840Z"
+    },
+    {
+      "id": "conv_1791825449734_texo8",
+      "userId": "usr_dev_primary",
+      "title": "New Chat",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "skillId": null,
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T17:17:29.734Z",
+      "updatedAt": "2026-10-12T17:18:11.324Z"
     },
     {
       "id": "conv_msgs_1791824884198",
@@ -435,19 +448,6 @@
       "isArchived": false,
       "createdAt": "2026-10-12T16:14:08.251Z",
       "updatedAt": "2026-10-12T16:14:08.251Z"
-    },
-    {
-      "id": "conv_1791821554780_5hl3t",
-      "userId": "usr_dev_primary",
-      "title": "New Chat",
-      "modelId": "gemini-3.8-flash",
-      "providerId": "gemini",
-      "mode": "balanced",
-      "skillId": null,
-      "isPinned": false,
-      "isArchived": false,
-      "createdAt": "2026-10-12T16:12:34.780Z",
-      "updatedAt": "2026-10-12T16:12:34.780Z"
     },
     {
       "id": "conv_msgs_1791821195694",
@@ -762,7 +762,16 @@
       "updatedAt": "2026-10-11T06:26:55.039Z"
     }
   ],
-  "messages": [],
+  "messages": [
+    {
+      "id": "msg_1791825491324_u",
+      "conversationId": "conv_1791825449734_texo8",
+      "role": "user",
+      "content": "Help me plan and scaffold a complete full-stack web feature with automated tests.",
+      "attachments": [],
+      "createdAt": "2026-10-12T17:18:11.324Z"
+    }
+  ],
   "skills": [
     {
       "id": "skill-software-engineer",
@@ -1059,12 +1068,12 @@
       "updatedAt": "2026-10-12T17:08:04.202Z"
     },
     {
-      "id": "ws_test_1791825278928",
-      "userId": "test_u1_1791825278867",
+      "id": "ws_test_1791825562846",
+      "userId": "test_u1_1791825562784",
       "name": "Test Sandbox",
       "description": "Co-Work testing space",
-      "createdAt": "2026-10-12T17:14:38.928Z",
-      "updatedAt": "2026-10-12T17:14:38.928Z"
+      "createdAt": "2026-10-12T17:19:22.846Z",
+      "updatedAt": "2026-10-12T17:19:22.846Z"
     }
   ],
   "artifacts": [
@@ -1289,15 +1298,15 @@
       "updatedAt": "2026-10-12T17:08:04.202Z"
     },
     {
-      "id": "art_1791825278928_mgq7j",
-      "workspaceId": "ws_test_1791825278928",
+      "id": "art_1791825562846_onb2e",
+      "workspaceId": "ws_test_1791825562846",
       "title": "Config Map",
       "fileName": "config.json",
       "language": "json",
       "content": "{\"env\": \"test\"}",
       "version": 1,
-      "createdAt": "2026-10-12T17:14:38.928Z",
-      "updatedAt": "2026-10-12T17:14:38.928Z"
+      "createdAt": "2026-10-12T17:19:22.846Z",
+      "updatedAt": "2026-10-12T17:19:22.846Z"
     }
   ],
   "tasks": [

@@ -508,9 +508,9 @@ export default function App() {
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="flex h-screen w-screen p-2 md:p-3 bg-[#F1F3F5] text-slate-900 font-sans overflow-hidden select-none">
-      {/* Outer Rounded Container Framing the Entire Application (Cognivo Aesthetic) */}
-      <div className="flex h-full w-full rounded-2xl border border-[#E5E7EB] bg-white overflow-hidden shadow-xs">
+    <div className="flex h-screen w-screen bg-white text-slate-900 font-sans overflow-hidden select-none">
+      {/* Full-width, full-height Application Container */}
+      <div className="flex h-full w-full bg-white overflow-hidden">
         {/* Left Sidebar */}
         <Sidebar
           conversations={conversations}
