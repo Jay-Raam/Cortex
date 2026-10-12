@@ -10,7 +10,7 @@
 
 <br />
 
-<img src="docs/screenshots/cortex-social-preview.png" alt="Cortex AI Platform Preview" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #1e293b;" />
+<img src="docs/qa/screenshots/desktop-chat-real-data.png" alt="Cortex AI Platform Preview" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #1e293b;" />
 
 <p align="center">
   <strong>Production-Grade Multi-Model Gateway • Bounded Agentic Co-Work • Real-Time SSE Streaming • Enterprise Multi-Tenancy</strong>

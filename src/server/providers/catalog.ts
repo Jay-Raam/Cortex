@@ -123,7 +123,7 @@ export const INITIAL_MODELS: ModelInfo[] = [
     providerId: 'openrouter',
     displayName: 'Qwen 2.5 Coder 32B (Free)',
     description: 'Specialized code generation, debugging, refactoring, and AST manipulation model.',
-    mode: 'balanced',
+    mode: 'efficient',
     isFree: true,
     pricingDescription: 'Free tier on OpenRouter',
     contextWindow: 32768,
