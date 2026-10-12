@@ -11,6 +11,7 @@ import {
   Trash2,
   Plus,
   LogOut,
+  UserCircle,
 } from 'lucide-react';
 import { Conversation, User } from '../server/types';
 import { CognivoLogo } from './CognivoLogo';
@@ -31,6 +32,7 @@ interface SidebarProps {
   onOpenTemplates?: () => void;
   onLogout?: () => void;
   onOpenAuth?: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -49,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenTemplates,
   onLogout,
   onOpenAuth,
+  onOpenProfile,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
@@ -328,9 +331,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title={`Signed in as ${userName} (${currentUser?.email || 'authenticated'})`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-[#FF6B00]/10 border border-orange-200 text-[#FF6B00] flex items-center justify-center text-xs font-bold shrink-0">
-                {userInitial}
-              </div>
+              {currentUser?.avatar ? (
+                <img
+                  src={currentUser.avatar}
+                  alt={userName}
+                  className="w-7 h-7 rounded-full object-cover border border-orange-200 shrink-0"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-[#FF6B00]/10 border border-orange-200 text-[#FF6B00] flex items-center justify-center text-xs font-bold shrink-0">
+                  {userInitial}
+                </div>
+              )}
               <div className="min-w-0">
                 <div className="text-xs font-semibold text-slate-900 truncate">{userName}</div>
                 <div className="text-[10px] text-slate-400 font-medium">{userRole}</div>
@@ -346,6 +357,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="text-xs font-semibold text-slate-900 truncate">{userName}</div>
                 <div className="text-[10px] text-slate-400 truncate">{currentUser?.email}</div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserMenu(false);
+                  if (onOpenProfile) onOpenProfile();
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer text-left"
+              >
+                <UserCircle className="w-3.5 h-3.5 text-slate-500" />
+                <span>Edit Profile</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {

@@ -3,7 +3,7 @@
     {
       "id": "usr_dev_primary",
       "email": "developer@nexa.ai",
-      "name": "Nexa Lead Architect",
+      "name": "Jay Raam",
       "passwordHash": "$2b$10$kn8PZEdiTLGKDQdqg581hOFGlulAx/4wqixm0bdTXkyG/1yEkAAri",
       "role": "admin",
       "createdAt": "2026-10-11T06:26:54.822Z"
@@ -231,6 +231,72 @@
       "passwordHash": "$2b$08$WvqVfYG1BLS7dz8tfTW66.mtxd1xL9Vd6xKoNbVTw69wzylW7fx3u",
       "role": "user",
       "createdAt": "2026-10-12T16:14:08.250Z"
+    },
+    {
+      "id": "test_u1_1791822995250",
+      "email": "u1_1791822995250@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$euo2/72XBoa.iZUkMSxUWe1JpyAD/hpTv8t/KSHEiaGMAX1l2XGv2",
+      "role": "user",
+      "createdAt": "2026-10-12T16:36:35.293Z"
+    },
+    {
+      "id": "test_u2_1791822995293",
+      "email": "u2_1791822995293@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$FCVkzmUnmTRtspA8U2r6nef7eb7ygIR9JIGzjR2NrzmJB3VmP7a/6",
+      "role": "user",
+      "createdAt": "2026-10-12T16:36:35.325Z"
+    },
+    {
+      "id": "test_u1_1791824859026",
+      "email": "u1_1791824859026@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$av1pvHUtvUOtfDw6k44afeBaWkWyztH28JkNv1GRJ8dKds0Andn9m",
+      "role": "user",
+      "createdAt": "2026-10-12T17:07:39.060Z"
+    },
+    {
+      "id": "test_u2_1791824859060",
+      "email": "u2_1791824859060@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$P8EzTBNtimJQ.quc90NvFOEPuDT4./DasvU6j2tRt3tfVbBkrrew6",
+      "role": "user",
+      "createdAt": "2026-10-12T17:07:39.085Z"
+    },
+    {
+      "id": "test_u1_1791824884145",
+      "email": "u1_1791824884145@nexa.ai",
+      "name": "Updated Name",
+      "passwordHash": "$2b$08$XTG88lwiN5lt5NlOysnl7efJmM.fKtrKZnLRs.Z1WLbI.cLD9SOXq",
+      "role": "user",
+      "createdAt": "2026-10-12T17:08:04.172Z",
+      "avatar": "data:image/webp;base64,sampleAvatarData"
+    },
+    {
+      "id": "test_u2_1791824884173",
+      "email": "u2_1791824884173@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$mgOw06OFfwO6TJ8dHfKtS.hdNCYxc2D3rGgtuKn/4Iw8q19j7nyQS",
+      "role": "user",
+      "createdAt": "2026-10-12T17:08:04.196Z"
+    },
+    {
+      "id": "test_u1_1791825278867",
+      "email": "u1_1791825278867@nexa.ai",
+      "name": "Updated Name",
+      "passwordHash": "$2b$08$HLwCOD/LAC0ptYFobJGLQ.EgA6PkNIC4eBVglhkxGEjVfJnj9MY3.",
+      "role": "user",
+      "createdAt": "2026-10-12T17:14:38.899Z",
+      "avatar": "data:image/webp;base64,sampleAvatarData"
+    },
+    {
+      "id": "test_u2_1791825278900",
+      "email": "u2_1791825278900@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$cSG2QSoNPjb5XPAPnLySqOCSZ6Ijo2FpSYHY2M.Me9cQ90vD5390W",
+      "role": "user",
+      "createdAt": "2026-10-12T17:14:38.922Z"
     }
   ],
   "sessions": [
@@ -250,6 +316,102 @@
     }
   ],
   "conversations": [
+    {
+      "id": "conv_msgs_1791825278924",
+      "userId": "test_u1_1791825278867",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T17:14:38.924Z",
+      "updatedAt": "2026-10-12T17:14:38.924Z"
+    },
+    {
+      "id": "conv_1791825278923",
+      "userId": "test_u1_1791825278867",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T17:14:38.923Z",
+      "updatedAt": "2026-10-12T17:14:38.923Z"
+    },
+    {
+      "id": "conv_msgs_1791824884198",
+      "userId": "test_u1_1791824884145",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T17:08:04.198Z",
+      "updatedAt": "2026-10-12T17:08:04.198Z"
+    },
+    {
+      "id": "conv_1791824884197",
+      "userId": "test_u1_1791824884145",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T17:08:04.197Z",
+      "updatedAt": "2026-10-12T17:08:04.197Z"
+    },
+    {
+      "id": "conv_msgs_1791824859089",
+      "userId": "test_u1_1791824859026",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T17:07:39.089Z",
+      "updatedAt": "2026-10-12T17:07:39.089Z"
+    },
+    {
+      "id": "conv_1791824859087",
+      "userId": "test_u1_1791824859026",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T17:07:39.087Z",
+      "updatedAt": "2026-10-12T17:07:39.087Z"
+    },
+    {
+      "id": "conv_msgs_1791822995330",
+      "userId": "test_u1_1791822995250",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T16:36:35.330Z",
+      "updatedAt": "2026-10-12T16:36:35.330Z"
+    },
+    {
+      "id": "conv_1791822995327",
+      "userId": "test_u1_1791822995250",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T16:36:35.327Z",
+      "updatedAt": "2026-10-12T16:36:35.327Z"
+    },
     {
       "id": "conv_msgs_1791821648255",
       "userId": "test_u1_1791821648178",
@@ -871,6 +1033,38 @@
       "description": "Co-Work testing space",
       "createdAt": "2026-10-12T16:14:08.259Z",
       "updatedAt": "2026-10-12T16:14:08.259Z"
+    },
+    {
+      "id": "ws_test_1791822995334",
+      "userId": "test_u1_1791822995250",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T16:36:35.334Z",
+      "updatedAt": "2026-10-12T16:36:35.334Z"
+    },
+    {
+      "id": "ws_test_1791824859092",
+      "userId": "test_u1_1791824859026",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T17:07:39.092Z",
+      "updatedAt": "2026-10-12T17:07:39.092Z"
+    },
+    {
+      "id": "ws_test_1791824884202",
+      "userId": "test_u1_1791824884145",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T17:08:04.202Z",
+      "updatedAt": "2026-10-12T17:08:04.202Z"
+    },
+    {
+      "id": "ws_test_1791825278928",
+      "userId": "test_u1_1791825278867",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T17:14:38.928Z",
+      "updatedAt": "2026-10-12T17:14:38.928Z"
     }
   ],
   "artifacts": [
@@ -1060,6 +1254,50 @@
       "version": 1,
       "createdAt": "2026-10-12T16:14:08.259Z",
       "updatedAt": "2026-10-12T16:14:08.259Z"
+    },
+    {
+      "id": "art_1791822995335_5dxlc",
+      "workspaceId": "ws_test_1791822995334",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T16:36:35.335Z",
+      "updatedAt": "2026-10-12T16:36:35.335Z"
+    },
+    {
+      "id": "art_1791824859093_ssnur",
+      "workspaceId": "ws_test_1791824859092",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T17:07:39.093Z",
+      "updatedAt": "2026-10-12T17:07:39.093Z"
+    },
+    {
+      "id": "art_1791824884202_hfi2t",
+      "workspaceId": "ws_test_1791824884202",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T17:08:04.202Z",
+      "updatedAt": "2026-10-12T17:08:04.202Z"
+    },
+    {
+      "id": "art_1791825278928_mgq7j",
+      "workspaceId": "ws_test_1791825278928",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T17:14:38.928Z",
+      "updatedAt": "2026-10-12T17:14:38.928Z"
     }
   ],
   "tasks": [

@@ -30,6 +30,7 @@ export interface User {
   name: string;
   passwordHash: string;
   role: 'user' | 'admin';
+  avatar?: string;
   createdAt: string;
 }
 

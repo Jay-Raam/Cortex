@@ -34,6 +34,7 @@ In accordance with Phase 2 requirements, the application has been updated with f
 | **Desktop Notifications**| Light Themed Modal | 1440 × 900 px | **PASS** | ![Desktop Notification](screenshots/desktop-notification-light.png) |
 | **Desktop Co-Work** | Workspace & Engine | 1440 × 900 px | **PASS** | ![Desktop Co-Work](screenshots/desktop-cowork.png) |
 | **Desktop Docs** | Architecture View | 1440 × 900 px | **PASS** | ![Desktop Docs](screenshots/desktop-docs.png) |
+| **Desktop Profile** | Edit Profile Modal | 1440 × 900 px | **PASS** | ![Desktop Profile Modal](screenshots/desktop-profile-modal.png) |
 | **Tablet** | Tablets & Foldables | 768 × 1024 px | **PASS** | ![Tablet Chat](screenshots/tablet-chat.png) |
 | **Standard Mobile** | Modern Smartphones | 390 × 844 px | **PASS** | ![Mobile Chat](screenshots/mobile-chat.png) |
 | **Small Mobile** | Compact Devices | 320 × 568 px | **PASS** | ![Small Mobile Chat](screenshots/small-mobile-chat.png) |

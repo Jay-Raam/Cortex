@@ -15,6 +15,7 @@ import { KnowledgeModal } from './components/KnowledgeModal';
 import { TemplatesModal } from './components/TemplatesModal';
 import { ShareModal } from './components/ShareModal';
 import { AuthModal } from './components/AuthModal';
+import { ProfileModal } from './components/ProfileModal';
 import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser } from './lib/api';
 import {
   Conversation,
@@ -67,6 +68,7 @@ export default function App() {
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
@@ -526,6 +528,7 @@ export default function App() {
           onOpenTemplates={() => setIsTemplatesOpen(true)}
           onLogout={handleLogout}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
         />
 
         {/* Right Main Content Area */}
@@ -836,6 +839,16 @@ export default function App() {
         onLogin={handleLogin}
         onRegister={handleRegister}
         onSuccess={() => setIsAuthModalOpen(false)}
+      />
+
+      {/* User Profile Edit Modal */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        onProfileUpdated={(updatedUser) => {
+          setCurrentUser(updatedUser);
+        }}
       />
     </div>
   );

@@ -85,6 +85,22 @@ describe('Cortex AI Automated Test Suite', () => {
         );
       }, /Unauthorized/);
     });
+
+    it('updates user profile name and avatar correctly', () => {
+      const updated = db.updateUser(testUser1.id, {
+        name: 'Updated Name',
+        avatar: 'data:image/webp;base64,sampleAvatarData',
+      });
+
+      assert.ok(updated, 'Updated user must be returned');
+      assert.strictEqual(updated.name, 'Updated Name');
+      assert.strictEqual(updated.avatar, 'data:image/webp;base64,sampleAvatarData');
+
+      // Verify persistence in lookup
+      const retrieved = db.getUserById(testUser1.id);
+      assert.strictEqual(retrieved?.name, 'Updated Name');
+      assert.strictEqual(retrieved?.avatar, 'data:image/webp;base64,sampleAvatarData');
+    });
   });
 
   describe('2. Model Catalog & Free-First Routing', () => {

@@ -49,6 +49,20 @@ export async function logoutUser(): Promise<void> {
   });
 }
 
+export async function updateProfile(updates: { name?: string; avatar?: string | null }): Promise<User> {
+  const res = await fetch('/api/auth/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(updates),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update profile');
+  }
+  return data.user;
+}
+
 export async function fetchGraphQL<T = any>(query: string, variables: Record<string, any> = {}): Promise<T> {
   const res = await fetch('/graphql', {
     method: 'POST',

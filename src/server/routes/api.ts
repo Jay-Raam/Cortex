@@ -104,7 +104,7 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
     const { accessToken } = generateTokens(newUser, req.headers['user-agent']);
     setAuthCookie(res, accessToken);
 
-    const safeUser = { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role };
+    const safeUser = { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role, avatar: newUser.avatar };
     res.json({ success: true, user: safeUser });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -129,7 +129,7 @@ apiRouter.post('/auth/login', (req: Request, res: Response) => {
     const { accessToken } = generateTokens(user, req.headers['user-agent']);
     setAuthCookie(res, accessToken);
 
-    const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role };
+    const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role, avatar: user.avatar };
     res.json({ success: true, user: safeUser });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -144,8 +144,40 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
   if (!user) {
     return res.status(401).json({ authenticated: false, user: null });
   }
-  const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role };
+  const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role, avatar: user.avatar };
   res.json({ authenticated: true, user: safeUser });
+});
+
+/**
+ * REST Authentication: Update Profile (Name & Avatar)
+ */
+apiRouter.patch('/auth/profile', (req: Request, res: Response) => {
+  try {
+    const user = authenticateRequest(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required.' });
+    }
+
+    const { name, avatar } = req.body;
+    const updates: Partial<User> = {};
+
+    if (typeof name === 'string' && name.trim().length > 0) {
+      updates.name = name.trim();
+    }
+    if (avatar === null || typeof avatar === 'string') {
+      updates.avatar = avatar || undefined;
+    }
+
+    const updated = db.updateUser(user.id, updates);
+    if (!updated) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const safeUser = { id: updated.id, email: updated.email, name: updated.name, role: updated.role, avatar: updated.avatar };
+    res.json({ success: true, user: safeUser });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**

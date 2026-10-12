@@ -296,6 +296,14 @@ class Database {
     return user;
   }
 
+  updateUser(id: string, updates: Partial<User>): User | undefined {
+    const userIndex = this.data.users.findIndex((u) => u.id === id);
+    if (userIndex === -1) return undefined;
+    this.data.users[userIndex] = { ...this.data.users[userIndex], ...updates };
+    this.persist();
+    return this.data.users[userIndex];
+  }
+
   createSession(session: Session): Session {
     this.data.sessions = this.data.sessions.filter((s) => s.expiresAt > Date.now());
     this.data.sessions.push(session);
