@@ -13,6 +13,7 @@ import { CognivoLogo } from './components/CognivoLogo';
 import { ExploreModal } from './components/ExploreModal';
 import { KnowledgeModal } from './components/KnowledgeModal';
 import { TemplatesModal } from './components/TemplatesModal';
+import { ShareModal } from './components/ShareModal';
 import { fetchGraphQL, streamChat } from './lib/api';
 import {
   Conversation,
@@ -23,6 +24,7 @@ import {
   Workspace,
   NotificationItem,
   NotificationPreferences,
+  User,
 } from './server/types';
 import {
   Sparkles,
@@ -50,6 +52,7 @@ export default function App() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     userId: 'usr_dev_primary',
     emailEnabled: true,
@@ -61,6 +64,7 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
@@ -76,6 +80,13 @@ export default function App() {
     try {
       const data = await fetchGraphQL(`
         query GetInitialData {
+          me {
+            id
+            name
+            email
+            role
+            createdAt
+          }
           models {
             id
             providerId
@@ -139,6 +150,7 @@ export default function App() {
       `);
 
       if (data) {
+        if (data.me) setCurrentUser(data.me);
         if (data.models) setModels(data.models);
         if (data.skills) setSkills(data.skills);
         if (data.conversations) {
@@ -461,6 +473,7 @@ export default function App() {
         <Sidebar
           conversations={conversations}
           activeConversationId={activeConversationId}
+          currentUser={currentUser}
           onSelectConversation={(id) => setActiveConversationId(id)}
           onNewConversation={handleNewConversation}
           onDeleteConversation={handleDeleteConversation}
@@ -479,11 +492,13 @@ export default function App() {
           <TopNav
             currentView={currentView}
             onNavigate={(view) => setCurrentView(view)}
-            selectedModelName={activeModel?.displayName || 'Cognivo Core v1'}
+            selectedModelName={activeModel?.displayName || 'Cortex Core v1'}
             selectedMode={selectedMode}
             onOpenModelModal={() => setIsModelModalOpen(true)}
             onOpenNotifications={() => setIsNotificationsOpen(true)}
             onOpenShortcuts={() => setIsShortcutsOpen(true)}
+            onOpenShareModal={() => setIsShareModalOpen(true)}
+            onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             unreadNotificationsCount={unreadNotifications}
           />
 
@@ -620,7 +635,7 @@ export default function App() {
                     {/* Bottom Disclaimer and Language/Help Icons */}
                     <div className="w-full max-w-3xl px-4 flex items-center justify-between text-[11px] text-slate-400 mt-auto pt-4">
                       <div className="mx-auto text-center">
-                        <span>Cognivo can make mistakes. Check important info. </span>
+                        <span>Cortex can make mistakes. Check important info. </span>
                         <a href="#cookies" className="underline hover:text-slate-600 transition-colors">
                           See Cookie Preferences
                         </a>
@@ -728,6 +743,12 @@ export default function App() {
         notifications={notifications}
         preferences={preferences}
         onRefresh={loadInitialData}
+      />
+
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        conversationTitle={activeConversation?.title || 'Cortex AI Workspace Session'}
       />
 
       <ShortcutsModal

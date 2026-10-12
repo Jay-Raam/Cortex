@@ -135,21 +135,22 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         </div>
 
         {/* Toolbar Row */}
-        <div className="flex items-center justify-between px-3.5 pb-3 pt-0">
+        <div className="flex flex-wrap items-center justify-between gap-y-2 px-3 sm:px-3.5 pb-2.5 sm:pb-3 pt-0">
           {/* Left Toolbar */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* Deeper Research Pill */}
             <button
               type="button"
               onClick={() => setIsDeeperResearchActive(!isDeeperResearchActive)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                 isDeeperResearchActive
                   ? 'bg-[#FF6B00] text-white border border-[#FF6B00]'
                   : 'bg-[#FFF7ED] text-[#FF6B00] border border-[#FFEDD5] hover:bg-[#FFEDD5]'
               }`}
             >
               <Atom className="w-3.5 h-3.5" />
-              <span>Deeper Research</span>
+              <span className="hidden xs:inline">Deeper Research</span>
+              <span className="xs:hidden">Research</span>
             </button>
 
             {/* Media Upload Trigger */}
@@ -163,7 +164,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               title="Add Image / Media"
             >
               <ImageIcon className="w-4 h-4" />
@@ -176,7 +177,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 setText('Generate fresh ideas and brainstorm creative strategies for: ');
                 textareaRef.current?.focus();
               }}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               title="Ideate & Brainstorm"
             >
               <Lightbulb className="w-4 h-4" />
@@ -184,12 +185,12 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           </div>
 
           {/* Right Toolbar */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5 ml-auto">
             {/* Model Processor Toggle */}
             <button
               type="button"
               onClick={onOpenModelModal}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               title={`Active Model: ${selectedModelName}`}
             >
               <Cpu className="w-4 h-4" />
@@ -201,7 +202,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               onClick={() => {
                 setText((prev) => (prev.startsWith('[Web Search] ') ? prev.replace('[Web Search] ', '') : `[Web Search] ${prev}`));
               }}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               title="Web Search"
             >
               <Globe className="w-4 h-4" />
@@ -211,7 +212,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               title="Attach File"
             >
               <Paperclip className="w-4 h-4" />
@@ -221,10 +222,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             <button
               type="button"
               onClick={() => {
-                // Speech synthesis or voice placeholder
                 setText('Transcribing voice note...');
               }}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               title="Voice Input"
             >
               <Mic className="w-4 h-4" />
@@ -258,10 +258,12 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           </div>
         </div>
 
-        {/* Attached Bottom Banner: "Upgrade to connect all your tools to Cognivo" */}
-        <div className="border-t border-[#F1F3F5] px-4 py-2.5 bg-[#FAFBFB] rounded-b-2xl flex items-center justify-between text-xs text-slate-600 hover:bg-slate-100/60 transition-colors cursor-pointer select-none">
-          <span className="font-medium text-slate-700">Upgrade to connect all your tools to Cognivo</span>
-          <div className="flex items-center gap-2">
+        {/* Attached Bottom Banner: "Upgrade to connect all your tools to Cortex" */}
+        <div className="border-t border-[#F1F3F5] px-3.5 sm:px-4 py-2 sm:py-2.5 bg-[#FAFBFB] rounded-b-2xl flex items-center justify-between text-xs text-slate-600 hover:bg-slate-100/60 transition-colors cursor-pointer select-none">
+          <span className="font-medium text-slate-700 truncate pr-2">
+            Upgrade to connect all your tools to Cortex
+          </span>
+          <div className="flex items-center gap-2 shrink-0">
             {/* Overlapping Connected App Icons */}
             <div className="flex items-center -space-x-1.5">
               <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
