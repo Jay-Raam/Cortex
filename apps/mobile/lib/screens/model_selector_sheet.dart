@@ -15,7 +15,7 @@ class ModelSelectorSheet extends ConsumerWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: const BoxDecoration(
-        color: Color(0xFF0F1722),
+        color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.all(16),
@@ -27,16 +27,16 @@ class ModelSelectorSheet extends ConsumerWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white24,
+                color: const Color(0xFFE5E7EB),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: 16),
           const Text(
-            'Model Selector & Routing',
+            'Select Model',
             style: TextStyle(
-              color: Colors.white,
+              color: Color(0xFF111827),
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -58,91 +58,67 @@ class ModelSelectorSheet extends ConsumerWidget {
           // Models List
           Expanded(
             child: modelsAsync.when(
-              data: (models) => ListView.builder(
-                itemCount: models.length,
-                itemBuilder: (context, index) {
-                  final model = models[index];
-                  final isSelected = model.id == selectedModel;
-                  return InkWell(
-                    onTap: () {
-                      ref.read(selectedModelProvider.notifier).state = model.id;
-                      ref.read(selectedModeProvider.notifier).state = model.mode;
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFF13221B) : const Color(0xFF131B26),
-                        border: Border.all(
-                          color: isSelected ? const Color(0xFF10B981) : const Color(0xFF222E3F),
-                        ),
-                        borderRadius: BorderRadius.circular(10),
+              loading: () => const Center(child: CircularProgressIndicator(color: Colors.black)),
+              error: (err, stack) => Center(
+                child: Text('Failed to load models: $err', style: const TextStyle(color: Colors.red)),
+              ),
+              data: (models) {
+                return ListView.builder(
+                  itemCount: models.length,
+                  itemBuilder: (context, index) {
+                    final model = models[index];
+                    final isSelected = model.id == selectedModel;
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      tileColor: isSelected ? const Color(0xFFF3F4F6) : Colors.transparent,
+                      title: Row(
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      model.displayName,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    if (model.isFree) ...[
-                                      const SizedBox(width: 6),
-                                      const Text(
-                                        '· Free',
-                                        style: TextStyle(
-                                          color: Color(0xFF34D399),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  model.description,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                           Text(
-                            '${model.latencyMs}ms',
-                            style: const TextStyle(
-                              color: Colors.white38,
-                              fontFamily: 'monospace',
-                              fontSize: 11,
+                            model.displayName,
+                            style: TextStyle(
+                              color: const Color(0xFF111827),
+                              fontSize: 14,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
+                          if (model.isFree) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFECFDF5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'FREE',
+                                style: TextStyle(
+                                  color: Color(0xFF059669),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
-                    ),
-                  );
-                },
-              ),
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: Color(0xFF10B981)),
-              ),
-              error: (err, _) => Center(
-                child: Text('Error loading models: $err',
-                    style: const TextStyle(color: Colors.redAccent)),
-              ),
+                      subtitle: Text(
+                        model.provider,
+                        style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+                      ),
+                      trailing: isSelected
+                          ? const Icon(Icons.check, color: Colors.black, size: 18)
+                          : null,
+                      onTap: () {
+                        ref.read(selectedModelProvider.notifier).state = model.id;
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
@@ -150,9 +126,14 @@ class ModelSelectorSheet extends ConsumerWidget {
     );
   }
 
-  Widget _modeButton(BuildContext context, WidgetRef ref, String modeKey,
-      String label, String activeMode) {
-    final isSelected = activeMode == modeKey;
+  Widget _modeButton(
+    BuildContext context,
+    WidgetRef ref,
+    String modeKey,
+    String label,
+    String currentMode,
+  ) {
+    final isSelected = currentMode == modeKey;
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -161,17 +142,14 @@ class ModelSelectorSheet extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF13221B) : const Color(0xFF131B26),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF10B981) : const Color(0xFF222E3F),
-            ),
+            color: isSelected ? Colors.black : const Color(0xFFF3F4F6),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF34D399) : Colors.white70,
+                color: isSelected ? Colors.white : const Color(0xFF4B5563),
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),

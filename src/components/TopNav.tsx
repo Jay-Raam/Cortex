@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, User, Zap, Sparkles } from 'lucide-react';
+import { ChevronDown, MoreHorizontal, Link2, Share2, Sparkles, Layers, Wrench, FileText } from 'lucide-react';
 import { ModelMode } from '../server/types';
 
 interface TopNavProps {
@@ -21,125 +21,91 @@ export const TopNav: React.FC<TopNavProps> = ({
   onOpenModelModal,
   onOpenNotifications,
   onOpenShortcuts,
-  unreadNotificationsCount,
 }) => {
-  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-  const modKey = isMac ? '⌘' : 'Ctrl';
-
   return (
-    <header className="h-14 border-b border-[#1d2737] bg-[#090d12]/95 backdrop-blur-md px-5 flex items-center justify-between gap-8 shrink-0 z-30">
-      {/* Zone 1: Single text element wordmark */}
-      <div className="flex items-center gap-3 shrink-0">
-        <a
-          href="#home"
-          onClick={(e) => {
-            e.preventDefault();
-            onNavigate('chat');
-          }}
-          className="text-base font-bold tracking-tight text-white hover:text-emerald-400 transition-colors whitespace-nowrap shrink-0 flex items-center gap-2"
-        >
-          <div className="w-5 h-5 rounded bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-mono text-xs font-bold">
-            C
-          </div>
-          <span>Cortex</span>
-        </a>
-
-        {/* Quiet Model Indicator Button */}
+    <header className="h-14 px-6 flex items-center justify-between border-b border-[#F0F2F4] bg-white rounded-t-2xl shrink-0 z-10 select-none">
+      {/* Left: Model Selector Pill matching "Cognivo Core v1 ⌵" */}
+      <div className="flex items-center gap-3">
         <button
           onClick={onOpenModelModal}
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-300 bg-[#121a24] hover:bg-[#182330] border border-[#232f42] rounded-md transition-colors cursor-pointer"
-          title={`Open Model Catalog & Routing (${modKey}+M)`}
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer text-slate-800 text-sm font-semibold tracking-tight"
+          title="Select AI Model & Tier"
         >
-          <Zap className="w-3 h-3 text-emerald-400" />
-          <span className="font-medium text-white max-w-[140px] truncate">{selectedModelName}</span>
-          <span className="text-slate-500 font-mono text-[11px]">({selectedMode})</span>
+          <span>Cognivo Core v1</span>
+          <span className="text-[11px] font-normal text-slate-400 font-mono">({selectedModelName.split(' ')[0]})</span>
+          <ChevronDown className="w-4 h-4 text-slate-400" />
         </button>
+
+        {/* Quiet view tabs for Co-Work and Platform features */}
+        <div className="hidden lg:flex items-center gap-1 ml-4 pl-4 border-l border-slate-200">
+          <button
+            onClick={() => onNavigate('chat')}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              currentView === 'chat' ? 'text-[#FF6B00] bg-orange-50' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Chat
+          </button>
+          <button
+            onClick={() => onNavigate('cowork')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              currentView === 'cowork' ? 'text-[#FF6B00] bg-orange-50' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Co-Work</span>
+          </button>
+          <button
+            onClick={() => onNavigate('skills')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              currentView === 'skills' ? 'text-[#FF6B00] bg-orange-50' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            <span>Skills</span>
+          </button>
+          <button
+            onClick={() => onNavigate('docs')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              currentView === 'docs' ? 'text-[#FF6B00] bg-orange-50' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Docs</span>
+          </button>
+        </div>
       </div>
 
-      {/* Zone 2: 4-5 clean single-line text navigation links with shortcut hints */}
-      <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-400">
-        <button
-          onClick={() => onNavigate('chat')}
-          className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
-            currentView === 'chat' ? 'text-emerald-400 font-semibold' : ''
-          }`}
-          title={`Chat View (${modKey}+1)`}
-        >
-          <span>Chat</span>
-          <span className="text-[10px] font-mono text-slate-600 group-hover:text-slate-400">1</span>
-        </button>
-        <button
-          onClick={() => onNavigate('cowork')}
-          className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
-            currentView === 'cowork' ? 'text-emerald-400 font-semibold' : ''
-          }`}
-          title={`Co-Work Workspace (${modKey}+2)`}
-        >
-          <span>Co-Work</span>
-          <span className="text-[10px] font-mono text-slate-600 group-hover:text-slate-400">2</span>
-        </button>
-        <button
-          onClick={() => onNavigate('skills')}
-          className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
-            currentView === 'skills' ? 'text-emerald-400 font-semibold' : ''
-          }`}
-          title={`Skills & Personas (${modKey}+3)`}
-        >
-          <span>Skills</span>
-          <span className="text-[10px] font-mono text-slate-600 group-hover:text-slate-400">3</span>
-        </button>
-        <button
-          onClick={onOpenModelModal}
-          className="hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5"
-          title={`Model Catalog (${modKey}+M)`}
-        >
-          <span>Model Router</span>
-        </button>
-        <button
-          onClick={() => onNavigate('docs')}
-          className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
-            currentView === 'docs' ? 'text-emerald-400 font-semibold' : ''
-          }`}
-          title={`Architecture Docs (${modKey}+4)`}
-        >
-          <span>Architecture</span>
-          <span className="text-[10px] font-mono text-slate-600 group-hover:text-slate-400">4</span>
-        </button>
-      </nav>
-
-      {/* Zone 3: 1 primary action zone */}
-      <div className="flex items-center gap-2.5 shrink-0">
-        {/* Command palette / Shortcuts trigger button */}
+      {/* Right Controls: ••• | 🔗 | ↗ Share */}
+      <div className="flex items-center gap-2">
+        {/* More options button */}
         <button
           onClick={onOpenShortcuts}
-          className="hidden sm:flex items-center gap-1.5 px-2 py-1 text-xs text-slate-400 hover:text-white bg-[#121a24] hover:bg-[#182330] border border-[#232f42] rounded-md transition-colors cursor-pointer"
-          title={`Shortcuts & Command Palette (${modKey}+K)`}
+          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          title="Command Menu / Shortcuts (Ctrl+K)"
         >
-          <span className="text-[11px] font-medium">Shortcuts</span>
-          <kbd className="px-1 py-0.5 text-[10px] font-mono font-semibold text-slate-400 bg-[#090d12] rounded border border-[#212f42]">
-            {modKey}+K
-          </kbd>
+          <MoreHorizontal className="w-4 h-4" />
         </button>
 
+        {/* Copy Link button */}
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(window.location.href);
+          }}
+          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          title="Copy Link to Clipboard"
+        >
+          <Link2 className="w-4 h-4" />
+        </button>
+
+        {/* Share Button Pill */}
         <button
           onClick={onOpenNotifications}
-          className="relative p-2 text-slate-400 hover:text-white bg-[#121a24] hover:bg-[#182330] border border-[#232f42] rounded-md transition-colors cursor-pointer"
-          title="Notifications Center"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E7EB] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors cursor-pointer"
         >
-          <Bell className="w-3.5 h-3.5" />
-          {unreadNotificationsCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 text-[9px] font-bold text-black rounded-full flex items-center justify-center">
-              {unreadNotificationsCount}
-            </span>
-          )}
+          <Share2 className="w-3.5 h-3.5 text-slate-600" />
+          <span>Share</span>
         </button>
-
-        <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-slate-300 bg-[#121a24] border border-[#232f42] rounded-md">
-          <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold flex items-center justify-center">
-            A
-          </div>
-          <span className="hidden sm:inline font-medium">Architect</span>
-        </div>
       </div>
     </header>
   );

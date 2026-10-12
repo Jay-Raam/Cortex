@@ -9,6 +9,7 @@ import { SkillsDrawer } from './components/SkillsDrawer';
 import { NotificationModal } from './components/NotificationModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { DocsView } from './components/DocsView';
+import { CognivoLogo } from './components/CognivoLogo';
 import { fetchGraphQL, streamChat } from './lib/api';
 import {
   Conversation,
@@ -20,8 +21,15 @@ import {
   NotificationItem,
   NotificationPreferences,
 } from './server/types';
-import { Sparkles, Bot, Zap, Download, FileText, FileJson } from 'lucide-react';
-import { PromptTemplates } from './components/PromptTemplates';
+import {
+  Sparkles,
+  FileText,
+  FileJson,
+  PenLine,
+  Lightbulb,
+  HelpCircle,
+  Languages,
+} from 'lucide-react';
 import { exportConversationToMarkdown, exportConversationToJson } from './lib/export';
 
 export default function App() {
@@ -46,54 +54,31 @@ export default function App() {
     whatsappEnabled: false,
   });
 
-  // UI modal toggles
+  // UI state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
-  const [isSkillsOpen, setIsSkillsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  // Streaming state
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const stopStreamRef = useRef<(() => void) | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Initial load
-  const loadInitialData = async () => {
+  // Initial Load: Models, Skills, Conversations, Notifications
+  const loadInitialData = useCallback(async () => {
     try {
       const data = await fetchGraphQL(`
-        query InitPlatform {
+        query GetInitialData {
           models {
             id
             providerId
             displayName
             description
-            mode
-            isFree
-            pricingDescription
-            contextWindow
-            capabilities {
-              streaming
-              vision
-              toolCalling
-              reasoning
-            }
-            availability
-            lastChecked
-            latencyMs
-          }
-          conversations {
-            id
-            title
-            modelId
-            providerId
-            mode
-            skillId
-            isPinned
-            isArchived
-            createdAt
-            updatedAt
+            costTier
+            contextLength
+            strengths
+            isReasoning
           }
           skills {
             id
@@ -107,11 +92,23 @@ export default function App() {
             isSystem
             isEnabled
           }
+          conversations {
+            id
+            title
+            modelId
+            providerId
+            mode
+            skillId
+            isPinned
+            isArchived
+            createdAt
+            updatedAt
+          }
           workspaces {
             id
-            name
+            title
             description
-            createdAt
+            activeTaskId
             updatedAt
           }
           notifications {
@@ -123,88 +120,75 @@ export default function App() {
             read
             createdAt
           }
-          notificationPreferences {
-            userId
-            emailEnabled
-            pushEnabled
-            whatsappEnabled
-          }
         }
       `);
 
-      if (data.models) setModels(data.models);
-      if (data.conversations) {
-        setConversations(data.conversations);
-        if (data.conversations.length > 0 && !activeConversationId) {
-          setActiveConversationId(data.conversations[0].id);
+      if (data) {
+        if (data.models) setModels(data.models);
+        if (data.skills) setSkills(data.skills);
+        if (data.conversations) {
+          setConversations(data.conversations);
+          if (data.conversations.length > 0 && !activeConversationId) {
+            setActiveConversationId(data.conversations[0].id);
+          }
         }
+        if (data.workspaces) {
+          setWorkspaces(data.workspaces);
+          if (data.workspaces.length > 0 && !activeWorkspace) {
+            setActiveWorkspace(data.workspaces[0]);
+          }
+        }
+        if (data.notifications) setNotifications(data.notifications);
       }
-      if (data.skills) setSkills(data.skills);
-      if (data.workspaces && data.workspaces.length > 0) {
-        setWorkspaces(data.workspaces);
-        setActiveWorkspace(data.workspaces[0]);
-      }
-      if (data.notifications) setNotifications(data.notifications);
-      if (data.notificationPreferences) setPreferences(data.notificationPreferences);
     } catch (err) {
-      console.error('Failed to load initial platform data:', err);
+      console.error('[Cognivo Initial Load Error]', err);
     }
-  };
+  }, [activeConversationId, activeWorkspace]);
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [loadInitialData]);
 
-  // Fetch messages when active conversation changes
+  // Load messages when active conversation changes
   useEffect(() => {
     if (!activeConversationId) {
       setMessages([]);
       return;
     }
 
-    const fetchMessages = async () => {
+    const loadMessages = async () => {
       try {
-        const data = await fetchGraphQL(
-          `
-          query GetConv($id: ID!) {
-            conversation(id: $id) {
+        const data = await fetchGraphQL(`
+          query GetMessages($conversationId: ID!) {
+            messages(conversationId: $conversationId) {
               id
-              title
-              modelId
-              mode
-              skillId
-              messages {
+              conversationId
+              role
+              content
+              modelUsed
+              providerUsed
+              isError
+              attachments {
                 id
-                role
-                content
-                modelUsed
-                createdAt
-                attachments {
-                  id
-                  name
-                  size
-                  mimeType
-                  url
-                }
+                name
+                size
+                mimeType
+                url
               }
+              createdAt
             }
           }
-        `,
-          { id: activeConversationId }
-        );
+        `, { conversationId: activeConversationId });
 
-        if (data.conversation) {
-          setMessages(data.conversation.messages || []);
-          if (data.conversation.modelId) setSelectedModelId(data.conversation.modelId);
-          if (data.conversation.mode) setSelectedMode(data.conversation.mode as ModelMode);
-          if (data.conversation.skillId) setActiveSkillId(data.conversation.skillId);
+        if (data?.messages) {
+          setMessages(data.messages);
         }
       } catch (err) {
-        console.error('Failed to load messages for conversation:', err);
+        console.error('[Cognivo Messages Load Error]', err);
       }
     };
 
-    fetchMessages();
+    loadMessages();
   }, [activeConversationId]);
 
   // Scroll to bottom on new messages
@@ -212,240 +196,175 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
 
-  // Handle new conversation
-  const handleNewConversation = useCallback(async () => {
-    try {
-      const data = await fetchGraphQL(
-        `
-        mutation CreateConv($title: String!, $modelId: String!, $mode: String, $skillId: String) {
-          createConversation(title: $title, modelId: $modelId, mode: $mode, skillId: $skillId) {
-            id
-            title
-            modelId
-            mode
-            skillId
-            isPinned
-            isArchived
-            createdAt
-            updatedAt
-          }
-        }
-      `,
-        {
-          title: 'New Chat',
-          modelId: selectedModelId,
-          mode: selectedMode,
-          skillId: activeSkillId,
-        }
-      );
-
-      if (data.createConversation) {
-        setConversations((prev) => [data.createConversation, ...prev]);
-        setActiveConversationId(data.createConversation.id);
-        setMessages([]);
-      }
-    } catch (err: any) {
-      alert(`Failed to create conversation: ${err.message}`);
-    }
-  }, [selectedModelId, selectedMode, activeSkillId]);
-
-  // Global Keyboard Shortcuts Listener
+  // Keyboard Shortcuts (Ctrl+K, Ctrl+N, Ctrl+B, etc.)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMod = e.ctrlKey || e.metaKey;
-
-      // Escape closes modals
-      if (e.key === 'Escape') {
-        setIsModelModalOpen(false);
-        setIsShortcutsOpen(false);
-        setIsNotificationsOpen(false);
-        setIsSkillsOpen(false);
-        return;
-      }
-
-      // Modifier key shortcuts (Ctrl / Cmd)
-      if (isMod) {
-        // Ctrl+1: Switch to Chat view
-        if (e.key === '1') {
-          e.preventDefault();
-          setCurrentView('chat');
-          return;
-        }
-        // Ctrl+2: Switch to Co-Work view
-        if (e.key === '2') {
-          e.preventDefault();
-          setCurrentView('cowork');
-          return;
-        }
-        // Ctrl+3: Switch to Skills view
-        if (e.key === '3') {
-          e.preventDefault();
-          setCurrentView('skills');
-          return;
-        }
-        // Ctrl+4: Switch to Architecture / Docs view
-        if (e.key === '4') {
-          e.preventDefault();
-          setCurrentView('docs');
-          return;
-        }
-        // Ctrl+N: Start New Chat
-        if (e.key === 'n' || e.key === 'N') {
-          e.preventDefault();
-          handleNewConversation();
-          setCurrentView('chat');
-          return;
-        }
-        // Ctrl+M: Open Model Selector & Catalog
-        if (e.key === 'm' || e.key === 'M') {
-          e.preventDefault();
-          setIsModelModalOpen((prev) => !prev);
-          return;
-        }
-        // Ctrl+K: Open Command Palette / Shortcuts Modal
-        if (e.key === 'k' || e.key === 'K') {
-          e.preventDefault();
-          setIsShortcutsOpen((prev) => !prev);
-          return;
-        }
-        // Ctrl+B: Toggle Sidebar
-        if (e.key === 'b' || e.key === 'B') {
-          e.preventDefault();
-          setIsSidebarCollapsed((prev) => !prev);
-          return;
-        }
-      }
-
-      // Pressing '?' when not typing in an input opens the shortcuts modal
-      const targetTag = (e.target as HTMLElement)?.tagName;
-      if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes(targetTag)) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsShortcutsOpen(true);
+        setIsShortcutsOpen((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        handleNewConversation();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setIsSidebarCollapsed((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        setIsModelModalOpen((prev) => !prev);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNewConversation]);
+  }, []);
 
-  // Delete conversation
-  const handleDeleteConversation = async (id: string) => {
+  // Handlers
+  const handleNewConversation = async () => {
     try {
-      await fetchGraphQL(
-        `
-        mutation DelConv($id: ID!) {
-          deleteConversation(id: $id)
+      const data = await fetchGraphQL(`
+        mutation CreateConversation($input: CreateConversationInput!) {
+          createConversation(input: $input) {
+            id
+            title
+            modelId
+            providerId
+            mode
+            skillId
+            createdAt
+          }
         }
-      `,
-        { id }
-      );
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      if (activeConversationId === id) {
-        const remaining = conversations.filter((c) => c.id !== id);
-        setActiveConversationId(remaining.length > 0 ? remaining[0].id : null);
+      `, {
+        input: {
+          title: 'New Chat',
+          modelId: selectedModelId,
+          providerId: models.find((m) => m.id === selectedModelId)?.providerId || 'gemini',
+          mode: selectedMode,
+          skillId: activeSkillId,
+        },
+      });
+
+      if (data?.createConversation) {
+        setConversations((prev) => [data.createConversation, ...prev]);
+        setActiveConversationId(data.createConversation.id);
+        setMessages([]);
       }
-    } catch (err: any) {
-      alert(`Failed to delete conversation: ${err.message}`);
+    } catch (err) {
+      console.error('Failed to create conversation', err);
     }
   };
 
-  // Toggle Pin
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      const data = await fetchGraphQL(`
+        mutation DeleteConversation($id: ID!) {
+          deleteConversation(id: $id)
+        }
+      `, { id });
+
+      if (data?.deleteConversation) {
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+        if (activeConversationId === id) {
+          const remaining = conversations.filter((c) => c.id !== id);
+          setActiveConversationId(remaining.length > 0 ? remaining[0].id : null);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete conversation', err);
+    }
+  };
+
   const handleTogglePin = async (id: string, currentPin: boolean) => {
     try {
-      const data = await fetchGraphQL(
-        `
-        mutation PinConv($id: ID!, $isPinned: Boolean) {
-          updateConversation(id: $id, isPinned: $isPinned) {
+      const data = await fetchGraphQL(`
+        mutation UpdateConversation($id: ID!, $input: UpdateConversationInput!) {
+          updateConversation(id: $id, input: $input) {
             id
             isPinned
           }
         }
-      `,
-        { id, isPinned: !currentPin }
-      );
+      `, {
+        id,
+        input: { isPinned: !currentPin },
+      });
 
-      if (data.updateConversation) {
+      if (data?.updateConversation) {
         setConversations((prev) =>
           prev.map((c) => (c.id === id ? { ...c, isPinned: !currentPin } : c))
         );
       }
-    } catch (err: any) {
-      console.error(err);
+    } catch (err) {
+      console.error('Failed to toggle pin', err);
     }
   };
 
-  // Send message with streaming
   const handleSendMessage = async (content: string, attachments: any[]) => {
     if (!content.trim() && attachments.length === 0) return;
 
     let convId = activeConversationId;
-    // If no active conversation, create one first
     if (!convId) {
       try {
         const titleSnippet = content.substring(0, 30) || 'New Conversation';
-        const data = await fetchGraphQL(
-          `
-          mutation CreateConv($title: String!, $modelId: String!, $mode: String, $skillId: String) {
-            createConversation(title: $title, modelId: $modelId, mode: $mode, skillId: $skillId) {
+        const data = await fetchGraphQL(`
+          mutation CreateConversation($input: CreateConversationInput!) {
+            createConversation(input: $input) {
               id
               title
               modelId
+              providerId
               mode
-              skillId
-              isPinned
-              isArchived
               createdAt
-              updatedAt
             }
           }
-        `,
-          {
+        `, {
+          input: {
             title: titleSnippet,
             modelId: selectedModelId,
+            providerId: models.find((m) => m.id === selectedModelId)?.providerId || 'gemini',
             mode: selectedMode,
             skillId: activeSkillId,
-          }
-        );
-        convId = data.createConversation.id;
-        setActiveConversationId(convId);
-        setConversations((prev) => [data.createConversation, ...prev]);
-      } catch (err: any) {
-        alert(`Failed to create conversation: ${err.message}`);
+          },
+        });
+
+        if (data?.createConversation) {
+          convId = data.createConversation.id;
+          setConversations((prev) => [data.createConversation, ...prev]);
+          setActiveConversationId(convId);
+        }
+      } catch (err) {
+        console.error('Failed to auto-create conversation', err);
         return;
       }
     }
 
-    // Add optimistic user message to local state
     const userMsg: Message = {
-      id: `local_${Date.now()}`,
+      id: `msg_${Date.now()}_u`,
       conversationId: convId!,
       role: 'user',
       content,
       attachments,
       createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, userMsg]);
 
+    setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
     setStreamingContent('');
 
-    // Trigger SSE stream
     let accumulatedText = '';
+
     const stopFn = streamChat(
       {
         conversationId: convId!,
         content,
         modelId: selectedModelId,
-        mode: selectedMode,
         skillId: activeSkillId || undefined,
-        attachments,
+        attachments: attachments.map((a) => a.id),
       },
       (event) => {
         if (event.type === 'delta') {
           accumulatedText += event.payload.text;
           setStreamingContent(accumulatedText);
         } else if (event.type === 'fallback_notice') {
-          console.warn('[Nexa Router Fallback]', event.payload.reason);
+          console.warn('[Cognivo Router Fallback]', event.payload.reason);
         } else if (event.type === 'error') {
           setIsStreaming(false);
           const errorMsg: Message = {
@@ -526,115 +445,188 @@ export default function App() {
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#090d12] text-slate-100 font-sans">
-      {/* Top Bar (Strict 3-zone contract) */}
-      <TopNav
-        currentView={currentView}
-        onNavigate={(view) => setCurrentView(view)}
-        selectedModelName={activeModel?.displayName || 'Gemini 3.8 Flash'}
-        selectedMode={selectedMode}
-        onOpenModelModal={() => setIsModelModalOpen(true)}
-        onOpenNotifications={() => setIsNotificationsOpen(true)}
-        onOpenShortcuts={() => setIsShortcutsOpen(true)}
-        unreadNotificationsCount={unreadNotifications}
-      />
+    <div className="flex h-screen w-screen p-2 md:p-3 bg-[#F1F3F5] text-slate-900 font-sans overflow-hidden select-none">
+      {/* Outer Rounded Container Framing the Entire Application (Cognivo Aesthetic) */}
+      <div className="flex h-full w-full rounded-2xl border border-[#E5E7EB] bg-white overflow-hidden shadow-xs">
+        {/* Left Sidebar */}
+        <Sidebar
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={(id) => setActiveConversationId(id)}
+          onNewConversation={handleNewConversation}
+          onDeleteConversation={handleDeleteConversation}
+          onTogglePin={handleTogglePin}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onOpenSettings={() => setIsNotificationsOpen(true)}
+        />
 
-      {/* Main View Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {currentView === 'chat' && (
-          <>
-            {/* Sidebar for chat history & search */}
-            <Sidebar
-              conversations={conversations}
-              activeConversationId={activeConversationId}
-              onSelectConversation={(id) => setActiveConversationId(id)}
-              onNewConversation={handleNewConversation}
-              onDeleteConversation={handleDeleteConversation}
-              onTogglePin={handleTogglePin}
-              isCollapsed={isSidebarCollapsed}
-              onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            />
+        {/* Right Main Content Area */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-white relative">
+          {/* Top Bar Header */}
+          <TopNav
+            currentView={currentView}
+            onNavigate={(view) => setCurrentView(view)}
+            selectedModelName={activeModel?.displayName || 'Cognivo Core v1'}
+            selectedMode={selectedMode}
+            onOpenModelModal={() => setIsModelModalOpen(true)}
+            onOpenNotifications={() => setIsNotificationsOpen(true)}
+            onOpenShortcuts={() => setIsShortcutsOpen(true)}
+            unreadNotificationsCount={unreadNotifications}
+          />
 
-            {/* Central Chat View */}
-            <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#090d12] relative">
-              {/* Active Skill Notice (Quiet inline banner if skill active) */}
+          {/* View Routing */}
+          {currentView === 'chat' && (
+            <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-white">
+              {/* Active Skill Notice (Quiet inline banner) */}
               {activeSkill && (
-                <div className="px-6 py-2 bg-[#0e171f] border-b border-[#1b2636] flex items-center justify-between text-xs text-slate-300">
+                <div className="px-6 py-2 bg-orange-50/70 border-b border-orange-100 flex items-center justify-between text-xs text-orange-950">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <Sparkles className="w-3.5 h-3.5 text-[#FF6B00]" />
                     <span>
-                      Active Workflow Persona: <strong className="text-white">{activeSkill.name}</strong>
+                      Active Workflow Persona: <strong className="font-semibold text-slate-900">{activeSkill.name}</strong>
                     </span>
                     <span className="text-[11px] text-slate-500 font-mono">({activeSkill.category})</span>
                   </div>
                   <button
                     onClick={() => setActiveSkillId(null)}
-                    className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                    className="text-xs text-slate-600 hover:text-slate-900 underline cursor-pointer"
                   >
                     Deactivate
                   </button>
                 </div>
               )}
 
-              {/* Chat Header Actions Toolbar */}
+              {/* Chat Header Actions Toolbar (Visible when conversation has messages) */}
               {activeConversation && messages.length > 0 && (
-                <div className="px-6 py-2 border-b border-[#182333] flex items-center justify-between text-xs text-slate-400 bg-[#090d12]/80 shrink-0">
-                  <span className="font-medium text-slate-200 truncate max-w-[260px]">
+                <div className="px-6 py-2 border-b border-[#F0F2F4] flex items-center justify-between text-xs text-slate-500 bg-white shrink-0">
+                  <span className="font-semibold text-slate-800 truncate max-w-[280px]">
                     {activeConversation.title || 'Chat'}
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => exportConversationToMarkdown(activeConversation, messages)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#101722] hover:bg-[#162130] border border-[#233145] text-[11px] text-slate-300 hover:text-white transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-medium text-slate-700 transition-colors cursor-pointer"
                       title="Export conversation as Markdown"
                     >
-                      <FileText className="w-3 h-3 text-emerald-400" />
+                      <FileText className="w-3 h-3 text-[#FF6B00]" />
                       <span>Export .md</span>
                     </button>
                     <button
                       onClick={() => exportConversationToJson(activeConversation, messages)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#101722] hover:bg-[#162130] border border-[#233145] text-[11px] text-slate-300 hover:text-white transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-medium text-slate-700 transition-colors cursor-pointer"
                       title="Export conversation as JSON"
                     >
-                      <FileJson className="w-3 h-3 text-blue-400" />
+                      <FileJson className="w-3 h-3 text-blue-500" />
                       <span>Export JSON</span>
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Message List */}
-              <div className="flex-1 overflow-y-auto">
+              {/* Message List or Empty State */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 md:py-6 no-scrollbar">
                 {messages.length === 0 && !isStreaming ? (
-                  <div className="h-full flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-                    <div className="w-12 h-12 rounded-2xl bg-[#121c27] border border-[#233145] flex items-center justify-center text-emerald-400 mb-4 shadow-sm">
-                      <Bot className="w-6 h-6" />
+                  /* Cognivo Empty State matching Image 1 & 3 pixel-by-pixel */
+                  <div className="h-full flex flex-col items-center justify-center max-w-3xl mx-auto py-2">
+                    {/* Top Upgrade Plan Banner Pill */}
+                    <div className="mb-8">
+                      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#FFF9F3] border border-[#FFE8D6] text-xs font-semibold text-[#D97706] shadow-2xs hover:bg-[#FFF3E8] transition-colors cursor-pointer">
+                        <Sparkles className="w-3.5 h-3.5 text-[#FF6B00]" />
+                        <span>Upgrade free plan to full access</span>
+                      </div>
                     </div>
-                    <h2 className="text-lg font-semibold text-white tracking-tight">How can Cortex assist today?</h2>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      Select between <span className="text-slate-300 font-medium">Efficient</span>,{' '}
-                      <span className="text-slate-300 font-medium">Balanced</span>, and{' '}
-                      <span className="text-slate-300 font-medium">Powerful</span> modes, or launch an autonomous
-                      task in the <button onClick={() => setCurrentView('cowork')} className="text-emerald-400 font-medium underline">Co-Work workspace</button>.
-                    </p>
 
-                    <div className="grid grid-cols-2 gap-2 mt-6 w-full text-left text-xs">
+                    {/* Center Woven Logo & Headline */}
+                    <div className="flex flex-col items-center text-center mb-7">
+                      <CognivoLogo size={46} />
+                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 mt-4 font-sans">
+                        Let's start a smart conversation
+                      </h1>
+                    </div>
+
+                    {/* Composer Card inside Empty Hero */}
+                    <div className="w-full mb-6">
+                      <ChatComposer
+                        onSendMessage={handleSendMessage}
+                        isStreaming={isStreaming}
+                        onStopStreaming={handleStopStreaming}
+                        selectedModelName={activeModel?.displayName || 'Cognivo Core v1'}
+                        selectedMode={selectedMode}
+                        onOpenModelModal={() => setIsModelModalOpen(true)}
+                      />
+                    </div>
+
+                    {/* 3-Column Action Cards */}
+                    <div className="w-full max-w-3xl px-4 grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+                      {/* Card 1: Summarize Text */}
                       <button
-                        onClick={() => handleSendMessage('Explain the architecture of a multi-model AI router with fallback guarantees.', [])}
-                        className="p-3 rounded-lg bg-[#0e1620] hover:bg-[#14202e] border border-[#212f42] text-slate-300 transition-colors cursor-pointer"
+                        type="button"
+                        onClick={() => handleSendMessage('Summarize the key points of the following text in clean bullet points:\n\n', [])}
+                        className="p-3.5 rounded-xl border border-[#E5E7EB] bg-white hover:border-[#FF6B00]/60 hover:shadow-2xs transition-all text-left cursor-pointer group"
                       >
-                        Architecture of an AI model router
+                        <div className="flex items-center gap-2 mb-1.5 text-slate-800">
+                          <FileText className="w-4 h-4 text-slate-500 group-hover:text-[#FF6B00] transition-colors" />
+                          <span className="text-xs font-bold text-slate-900">Summarize Text</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Turn long articles into easy summaries.
+                        </p>
                       </button>
+
+                      {/* Card 2: Creative Writing */}
                       <button
-                        onClick={() => handleSendMessage('Review this code for security vulnerabilities, race conditions, and memory leaks.', [])}
-                        className="p-3 rounded-lg bg-[#0e1620] hover:bg-[#14202e] border border-[#212f42] text-slate-300 transition-colors cursor-pointer"
+                        type="button"
+                        onClick={() => handleSendMessage('Generate an engaging, creative story or article pitch about:\n\n', [])}
+                        className="p-3.5 rounded-xl border border-[#E5E7EB] bg-white hover:border-[#FF6B00]/60 hover:shadow-2xs transition-all text-left cursor-pointer group"
                       >
-                        Audit code for OWASP security
+                        <div className="flex items-center gap-2 mb-1.5 text-slate-800">
+                          <PenLine className="w-4 h-4 text-slate-500 group-hover:text-[#FF6B00] transition-colors" />
+                          <span className="text-xs font-bold text-slate-900">Creative Writing</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Generate stories, blog posts, or fresh content ideas in seconds.
+                        </p>
                       </button>
+
+                      {/* Card 3: Answer Questions */}
+                      <button
+                        type="button"
+                        onClick={() => handleSendMessage('Answer the following technical question with deep factual accuracy:\n\n', [])}
+                        className="p-3.5 rounded-xl border border-[#E5E7EB] bg-white hover:border-[#FF6B00]/60 hover:shadow-2xs transition-all text-left cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-2 mb-1.5 text-slate-800">
+                          <Lightbulb className="w-4 h-4 text-slate-500 group-hover:text-[#FF6B00] transition-colors" />
+                          <span className="text-xs font-bold text-slate-900">Answer Questions</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Ask me anything—from facts to advice—and get instant answers.
+                        </p>
+                      </button>
+                    </div>
+
+                    {/* Bottom Disclaimer and Language/Help Icons */}
+                    <div className="w-full max-w-3xl px-4 flex items-center justify-between text-[11px] text-slate-400 mt-auto pt-4">
+                      <div className="mx-auto text-center">
+                        <span>Cognivo can make mistakes. Check important info. </span>
+                        <a href="#cookies" className="underline hover:text-slate-600 transition-colors">
+                          See Cookie Preferences
+                        </a>
+                        .
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-400 shrink-0">
+                        <button className="p-1 hover:text-slate-700 transition-colors cursor-pointer" title="Languages">
+                          <Languages className="w-4 h-4" />
+                        </button>
+                        <button className="p-1 hover:text-slate-700 transition-colors cursor-pointer" title="Help">
+                          <HelpCircle className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div>
+                  /* Active Chat Stream */
+                  <div className="max-w-3xl mx-auto space-y-4 pb-4">
                     {messages.map((msg) => (
                       <ChatMessage
                         key={msg.id}
@@ -667,63 +659,57 @@ export default function App() {
                 )}
               </div>
 
-              {/* Developer Prompt Presets */}
-              <PromptTemplates onSelectTemplate={(prompt) => handleSendMessage(prompt, [])} />
-
-              {/* Chat Composer */}
-              <ChatComposer
-                onSendMessage={handleSendMessage}
-                isStreaming={isStreaming}
-                onStopStreaming={handleStopStreaming}
-                selectedModelName={activeModel?.displayName || 'Gemini 3.8 Flash'}
-                selectedMode={selectedMode}
-                onOpenModelModal={() => setIsModelModalOpen(true)}
-              />
+              {/* Chat Composer sticky at bottom when conversation is active */}
+              {messages.length > 0 && (
+                <div className="pt-2 pb-4 bg-white">
+                  <ChatComposer
+                    onSendMessage={handleSendMessage}
+                    isStreaming={isStreaming}
+                    onStopStreaming={handleStopStreaming}
+                    selectedModelName={activeModel?.displayName || 'Cognivo Core v1'}
+                    selectedMode={selectedMode}
+                    onOpenModelModal={() => setIsModelModalOpen(true)}
+                  />
+                  <div className="text-center text-[11px] text-slate-400 mt-2">
+                    Cognivo can make mistakes. Check important info.
+                  </div>
+                </div>
+              )}
             </main>
-          </>
-        )}
+          )}
 
-        {currentView === 'cowork' && (
-          <CoworkWorkspace
-            workspace={activeWorkspace}
-            onRefreshWorkspace={loadInitialData}
-          />
-        )}
+          {currentView === 'cowork' && (
+            <CoworkWorkspace
+              workspace={activeWorkspace}
+              onRefreshWorkspace={loadInitialData}
+            />
+          )}
 
-        {currentView === 'skills' && (
-          <div className="flex-1 overflow-hidden">
+          {currentView === 'skills' && (
             <SkillsDrawer
-              isOpen={true}
-              onClose={() => setCurrentView('chat')}
+              isOpen={currentView === 'skills'}
               skills={skills}
               activeSkillId={activeSkillId}
-              onSelectSkill={(id) => {
-                setActiveSkillId(id);
-                setCurrentView('chat');
-              }}
+              onSelectSkill={(id) => setActiveSkillId(id)}
+              onClose={() => setCurrentView('chat')}
             />
-          </div>
-        )}
+          )}
 
-        {currentView === 'docs' && <DocsView />}
+          {currentView === 'docs' && <DocsView />}
+        </div>
       </div>
 
-      {/* Model Selector Modal */}
+      {/* Modals & Dialogs */}
       <ModelSelectorModal
         isOpen={isModelModalOpen}
         onClose={() => setIsModelModalOpen(false)}
         models={models}
         selectedModelId={selectedModelId}
         selectedMode={selectedMode}
-        onSelectModel={(modelId, mode) => {
-          setSelectedModelId(modelId);
-          setSelectedMode(mode);
-          setIsModelModalOpen(false);
-        }}
+        onSelectModel={(id) => setSelectedModelId(id)}
         onSelectMode={(mode) => setSelectedMode(mode)}
       />
 
-      {/* Notification Center Modal */}
       <NotificationModal
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
@@ -732,21 +718,19 @@ export default function App() {
         onRefresh={loadInitialData}
       />
 
-      {/* Keyboard Shortcuts Command Palette */}
       <ShortcutsModal
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
-        onAction={(action) => {
-          if (action === 'chat') setCurrentView('chat');
-          if (action === 'cowork') setCurrentView('cowork');
-          if (action === 'skills') setCurrentView('skills');
-          if (action === 'docs') setCurrentView('docs');
-          if (action === 'new_chat') {
+        onAction={(act) => {
+          if (act === 'chat' || act === 'cowork' || act === 'skills' || act === 'docs') {
+            setCurrentView(act);
+          } else if (act === 'new_chat') {
             handleNewConversation();
-            setCurrentView('chat');
+          } else if (act === 'models') {
+            setIsModelModalOpen(true);
+          } else if (act === 'toggle_sidebar') {
+            setIsSidebarCollapsed(!isSidebarCollapsed);
           }
-          if (action === 'models') setIsModelModalOpen(true);
-          if (action === 'toggle_sidebar') setIsSidebarCollapsed((prev) => !prev);
         }}
       />
     </div>

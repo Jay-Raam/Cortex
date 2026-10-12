@@ -135,10 +135,90 @@
       "passwordHash": "$2b$08$x424foJK77NbnI8D4H4U/.EqLdL6aEHbjARXnVnsthyd40XB9Adwi",
       "role": "user",
       "createdAt": "2026-10-11T15:36:44.679Z"
+    },
+    {
+      "id": "test_u1_1791813069809",
+      "email": "u1_1791813069809@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$rnx3Ab5VYp5GnBArPwsBreub9lNE5..vabJV4Wyepi//Yxt38xgq6",
+      "role": "user",
+      "createdAt": "2026-10-12T13:51:09.841Z"
+    },
+    {
+      "id": "test_u2_1791813069841",
+      "email": "u2_1791813069841@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$qzAnM9k3UNH6HeQN5feipeZQX59CYrLeIcG43rSU86QkZ8mTrFSjG",
+      "role": "user",
+      "createdAt": "2026-10-12T13:51:09.866Z"
+    },
+    {
+      "id": "test_u1_1791813170653",
+      "email": "u1_1791813170653@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$Ka1AfwgfPuJg/247HbufjeaKyhq6HFGvrvLWaUqwDRTWEtQgQp9L2",
+      "role": "user",
+      "createdAt": "2026-10-12T13:52:50.684Z"
+    },
+    {
+      "id": "test_u2_1791813170684",
+      "email": "u2_1791813170684@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$Eg9GYGkshDlK0I1SrcL8JODBaiUXsXzgUi3ScXUYHk2PQogJm7fg2",
+      "role": "user",
+      "createdAt": "2026-10-12T13:52:50.708Z"
     }
   ],
   "sessions": [],
   "conversations": [
+    {
+      "id": "conv_msgs_1791813170711",
+      "userId": "test_u1_1791813170653",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T13:52:50.711Z",
+      "updatedAt": "2026-10-12T13:52:50.711Z"
+    },
+    {
+      "id": "conv_1791813170709",
+      "userId": "test_u1_1791813170653",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T13:52:50.709Z",
+      "updatedAt": "2026-10-12T13:52:50.709Z"
+    },
+    {
+      "id": "conv_msgs_1791813069868",
+      "userId": "test_u1_1791813069809",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T13:51:09.868Z",
+      "updatedAt": "2026-10-12T13:51:09.868Z"
+    },
+    {
+      "id": "conv_1791813069867",
+      "userId": "test_u1_1791813069809",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T13:51:09.867Z",
+      "updatedAt": "2026-10-12T13:51:09.867Z"
+    },
     {
       "id": "conv_msgs_1791733004683",
       "userId": "test_u1_1791733004595",
@@ -620,6 +700,22 @@
       "description": "Co-Work testing space",
       "createdAt": "2026-10-11T15:36:44.687Z",
       "updatedAt": "2026-10-11T15:36:44.687Z"
+    },
+    {
+      "id": "ws_test_1791813069873",
+      "userId": "test_u1_1791813069809",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T13:51:09.873Z",
+      "updatedAt": "2026-10-12T13:51:09.873Z"
+    },
+    {
+      "id": "ws_test_1791813170714",
+      "userId": "test_u1_1791813170653",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T13:52:50.714Z",
+      "updatedAt": "2026-10-12T13:52:50.714Z"
     }
   ],
   "artifacts": [
@@ -743,6 +839,28 @@
       "version": 1,
       "createdAt": "2026-10-11T15:36:44.688Z",
       "updatedAt": "2026-10-11T15:36:44.688Z"
+    },
+    {
+      "id": "art_1791813069874_zfzji",
+      "workspaceId": "ws_test_1791813069873",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T13:51:09.874Z",
+      "updatedAt": "2026-10-12T13:51:09.874Z"
+    },
+    {
+      "id": "art_1791813170715_ti59r",
+      "workspaceId": "ws_test_1791813170714",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T13:52:50.715Z",
+      "updatedAt": "2026-10-12T13:52:50.715Z"
     }
   ],
   "tasks": [

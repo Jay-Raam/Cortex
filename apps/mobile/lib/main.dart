@@ -3,25 +3,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/chat_screen.dart';
 
 void main() {
-  runApp(const ProviderScope(child: NexaAiApp()));
+  runApp(const ProviderScope(child: KrakenAiApp()));
 }
 
-class NexaAiApp extends StatelessWidget {
-  const NexaAiApp({super.key});
+class KrakenAiApp extends StatelessWidget {
+  const KrakenAiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Nexa AI',
+      title: 'Kraken',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF090D12),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF10B981),
-          secondary: Color(0xFF34D399),
-          surface: Color(0xFF0F1722),
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF7F7F5),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF111111),
+          secondary: Color(0xFF222222),
+          surface: Color(0xFFFFFFFF),
+          background: Color(0xFFF7F7F5),
         ),
+        fontFamily: 'sans-serif',
         useMaterial3: true,
       ),
       home: const ChatScreen(),

@@ -1,6 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowUp, Square, Paperclip, X, Zap, Sparkles } from 'lucide-react';
-import { uploadFile } from '../lib/api';
+import {
+  Atom,
+  Image as ImageIcon,
+  Lightbulb,
+  Cpu,
+  Globe,
+  Paperclip,
+  Mic,
+  ArrowUpRight,
+  Square,
+  X,
+  ChevronRight,
+} from 'lucide-react';
 import { ModelMode } from '../server/types';
 
 interface ChatComposerProps {
@@ -8,8 +19,8 @@ interface ChatComposerProps {
   isStreaming: boolean;
   onStopStreaming: () => void;
   selectedModelName: string;
-  selectedMode: ModelMode;
-  onOpenModelModal: () => void;
+  selectedMode?: ModelMode;
+  onOpenModelModal?: () => void;
 }
 
 export const ChatComposer: React.FC<ChatComposerProps> = ({
@@ -17,16 +28,15 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   isStreaming,
   onStopStreaming,
   selectedModelName,
-  selectedMode,
   onOpenModelModal,
 }) => {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeeperResearchActive, setIsDeeperResearchActive] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -43,7 +53,10 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
   const handleSubmit = () => {
     if ((!text.trim() && attachments.length === 0) || isStreaming) return;
-    onSendMessage(text.trim(), attachments);
+    const finalContent = isDeeperResearchActive
+      ? `[Deeper Research Mode]\n${text.trim()}`
+      : text.trim();
+    onSendMessage(finalContent, attachments);
     setText('');
     setAttachments([]);
     if (textareaRef.current) {
@@ -58,10 +71,20 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
     setIsUploading(true);
     try {
       const file = files[0];
-      const uploaded = await uploadFile(file);
-      setAttachments((prev) => [...prev, uploaded]);
-    } catch (err: any) {
-      alert(`File upload failed: ${err.message}`);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const uploaded = await res.json();
+        setAttachments((prev) => [...prev, uploaded]);
+      }
+    } catch (err) {
+      console.error('Upload failed', err);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -73,20 +96,21 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 pb-5 pt-2">
-      <div className="relative rounded-xl border border-[#233145] bg-[#0d141d] focus-within:border-emerald-500/60 shadow-lg transition-colors">
-        {/* Attachments preview list */}
+    <div className="w-full max-w-3xl mx-auto px-4">
+      {/* Outer Composer Card */}
+      <div className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm hover:border-[#D1D5DB] transition-all">
+        {/* Uploaded attachments preview */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 p-3 pb-0">
             {attachments.map((att) => (
               <div
                 key={att.id}
-                className="flex items-center gap-1.5 px-2.5 py-1 bg-[#141e2b] border border-[#26374d] rounded-md text-xs text-slate-300"
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-700"
               >
                 <span className="truncate max-w-[140px]">{att.name}</span>
                 <button
                   onClick={() => removeAttachment(att.id)}
-                  className="p-0.5 hover:text-red-400 text-slate-500 rounded"
+                  className="p-0.5 hover:text-red-500 text-slate-400 rounded cursor-pointer"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -95,23 +119,40 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           </div>
         )}
 
-        {/* Text Input */}
-        <textarea
-          id="chat-composer-input"
-          name="chat-composer-input"
-          ref={textareaRef}
-          rows={1}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask Cortex anything, analyze code, or create tasks..."
-          className="w-full p-3.5 bg-transparent text-sm text-slate-100 placeholder-slate-500 resize-none focus:outline-none max-h-44"
-        />
+        {/* Text Input Area */}
+        <div className="p-3.5 pb-2">
+          <textarea
+            id="chat-composer-input"
+            name="chat-composer-input"
+            ref={textareaRef}
+            rows={2}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask me anything..."
+            className="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 resize-none focus:outline-none min-h-[56px] max-h-44 leading-relaxed font-sans"
+          />
+        </div>
 
-        {/* Action Toolbar */}
-        <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
-          {/* Left: Attachment & Model Trigger */}
+        {/* Toolbar Row */}
+        <div className="flex items-center justify-between px-3.5 pb-3 pt-0">
+          {/* Left Toolbar */}
           <div className="flex items-center gap-2">
+            {/* Deeper Research Pill */}
+            <button
+              type="button"
+              onClick={() => setIsDeeperResearchActive(!isDeeperResearchActive)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                isDeeperResearchActive
+                  ? 'bg-[#FF6B00] text-white border border-[#FF6B00]'
+                  : 'bg-[#FFF7ED] text-[#FF6B00] border border-[#FFEDD5] hover:bg-[#FFEDD5]'
+              }`}
+            >
+              <Atom className="w-3.5 h-3.5" />
+              <span>Deeper Research</span>
+            </button>
+
+            {/* Media Upload Trigger */}
             <input
               ref={fileInputRef}
               type="file"
@@ -119,49 +160,124 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               className="hidden"
             />
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-[#162333] rounded-md transition-colors cursor-pointer"
-              title="Attach File or Code"
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Add Image / Media"
+            >
+              <ImageIcon className="w-4 h-4" />
+            </button>
+
+            {/* Idea / Prompt Suggestions */}
+            <button
+              type="button"
+              onClick={() => {
+                setText('Generate fresh ideas and brainstorm creative strategies for: ');
+                textareaRef.current?.focus();
+              }}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Ideate & Brainstorm"
+            >
+              <Lightbulb className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Right Toolbar */}
+          <div className="flex items-center gap-1.5">
+            {/* Model Processor Toggle */}
+            <button
+              type="button"
+              onClick={onOpenModelModal}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              title={`Active Model: ${selectedModelName}`}
+            >
+              <Cpu className="w-4 h-4" />
+            </button>
+
+            {/* Web Search Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setText((prev) => (prev.startsWith('[Web Search] ') ? prev.replace('[Web Search] ', '') : `[Web Search] ${prev}`));
+              }}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Web Search"
+            >
+              <Globe className="w-4 h-4" />
+            </button>
+
+            {/* Paperclip Attachment */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Attach File"
             >
               <Paperclip className="w-4 h-4" />
             </button>
 
+            {/* Voice Audio Mic */}
             <button
-              onClick={onOpenModelModal}
-              className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-400 hover:text-slate-200 hover:bg-[#162333] border border-[#213045] rounded-md transition-colors cursor-pointer"
-              title="Change active model or mode"
+              type="button"
+              onClick={() => {
+                // Speech synthesis or voice placeholder
+                setText('Transcribing voice note...');
+              }}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Voice Input"
             >
-              <Zap className="w-3 h-3 text-emerald-400" />
-              <span className="max-w-[120px] truncate font-medium text-slate-300">{selectedModelName}</span>
-              <span className="text-[10px] text-slate-500 font-mono">({selectedMode})</span>
+              <Mic className="w-4 h-4" />
             </button>
-          </div>
 
-          {/* Right: Send or Stop Button */}
-          <div>
+            {/* Send / Stop Circular Orange Button */}
             {isStreaming ? (
               <button
+                type="button"
                 onClick={onStopStreaming}
-                className="p-2 text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors cursor-pointer"
-                title="Stop generation"
+                className="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs ml-1"
+                title="Stop response"
               >
-                <Square className="w-3.5 h-3.5 fill-current" />
+                <Square className="w-3 h-3 fill-current" />
               </button>
             ) : (
               <button
+                type="button"
                 onClick={handleSubmit}
                 disabled={!text.trim() && attachments.length === 0}
-                className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                className={`w-7 h-7 rounded-full text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs ml-1 ${
                   text.trim() || attachments.length > 0
-                    ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold'
-                    : 'bg-[#182333] text-slate-600 cursor-not-allowed'
+                    ? 'bg-[#FF6B00] hover:bg-[#E86000] active:scale-95'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 }`}
-                title="Send message (Enter)"
+                title="Send message"
               >
-                <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Attached Bottom Banner: "Upgrade to connect all your tools to Cognivo" */}
+        <div className="border-t border-[#F1F3F5] px-4 py-2.5 bg-[#FAFBFB] rounded-b-2xl flex items-center justify-between text-xs text-slate-600 hover:bg-slate-100/60 transition-colors cursor-pointer select-none">
+          <span className="font-medium text-slate-700">Upgrade to connect all your tools to Cognivo</span>
+          <div className="flex items-center gap-2">
+            {/* Overlapping Connected App Icons */}
+            <div className="flex items-center -space-x-1.5">
+              <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
+                N
+              </span>
+              <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
+                S
+              </span>
+              <span className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
+                G
+              </span>
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
+                D
+              </span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400" />
           </div>
         </div>
       </div>
