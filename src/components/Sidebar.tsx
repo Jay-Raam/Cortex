@@ -24,6 +24,9 @@ interface SidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onOpenSettings?: () => void;
+  onOpenExplore?: () => void;
+  onOpenKnowledge?: () => void;
+  onOpenTemplates?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,6 +39,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   onToggleCollapse,
   onOpenSettings,
+  onOpenExplore,
+  onOpenKnowledge,
+  onOpenTemplates,
 }) => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
@@ -142,30 +148,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Secondary Navigation Links */}
         <div className="space-y-0.5 pt-1">
-          <a
-            href="#explore"
-            onClick={(e) => e.preventDefault()}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-colors"
+          <button
+            type="button"
+            onClick={onOpenExplore}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-colors text-left cursor-pointer"
           >
             <Globe className="w-4 h-4 text-slate-500" />
-            <span>Explore Cognivo AI</span>
-          </a>
-          <a
-            href="#knowledge"
-            onClick={(e) => e.preventDefault()}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-colors"
+            <span>Explore Cortex AI</span>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenKnowledge}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-colors text-left cursor-pointer"
           >
             <Scissors className="w-4 h-4 text-slate-500" />
             <span>Knowledge Base</span>
-          </a>
-          <a
-            href="#templates"
-            onClick={(e) => e.preventDefault()}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-colors"
+          </button>
+          <button
+            type="button"
+            onClick={onOpenTemplates}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-colors text-left cursor-pointer"
           >
             <LayoutGrid className="w-4 h-4 text-slate-500" />
             <span>Templates</span>
-          </a>
+          </button>
         </div>
 
         {/* Chronological History Groups */}
