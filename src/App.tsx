@@ -626,6 +626,7 @@ export default function App() {
                         selectedModelName={activeModel?.displayName || 'Cognivo Core v1'}
                         selectedMode={selectedMode}
                         onOpenModelModal={() => setIsModelModalOpen(true)}
+                        showUpgradeBanner={true}
                       />
                     </div>
 
@@ -733,7 +734,7 @@ export default function App() {
 
               {/* Chat Composer pinned cleanly at bottom when conversation is active */}
               {messages.length > 0 && (
-                <div className="shrink-0 pt-2 pb-3 bg-white border-t border-[#F0F2F4]">
+                <div className="shrink-0 pt-1.5 pb-2 bg-white border-t border-[#F0F2F4]">
                   <ChatComposer
                     onSendMessage={handleSendMessage}
                     isStreaming={isStreaming}
@@ -742,7 +743,7 @@ export default function App() {
                     selectedMode={selectedMode}
                     onOpenModelModal={() => setIsModelModalOpen(true)}
                   />
-                  <div className="text-center text-[11px] text-slate-400 mt-1.5">
+                  <div className="text-center text-[11px] text-slate-400 mt-1">
                     Cortex can make mistakes. Check important info.
                   </div>
                 </div>

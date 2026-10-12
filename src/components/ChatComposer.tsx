@@ -21,6 +21,7 @@ interface ChatComposerProps {
   selectedModelName: string;
   selectedMode?: ModelMode;
   onOpenModelModal?: () => void;
+  showUpgradeBanner?: boolean;
 }
 
 export const ChatComposer: React.FC<ChatComposerProps> = ({
@@ -29,6 +30,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   onStopStreaming,
   selectedModelName,
   onOpenModelModal,
+  showUpgradeBanner = false,
 }) => {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<any[]>([]);
@@ -120,22 +122,22 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         )}
 
         {/* Text Input Area */}
-        <div className="p-3.5 pb-2">
+        <div className="px-3.5 pt-2.5 pb-1 sm:px-4 sm:pt-3">
           <textarea
             id="chat-composer-input"
             name="chat-composer-input"
             ref={textareaRef}
-            rows={2}
+            rows={1}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask me anything..."
-            className="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 resize-none focus:outline-none min-h-[56px] max-h-44 leading-relaxed font-sans"
+            className="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 resize-none focus:outline-none min-h-[44px] sm:min-h-[48px] max-h-40 leading-relaxed font-sans"
           />
         </div>
 
         {/* Toolbar Row */}
-        <div className="flex flex-wrap items-center justify-between gap-y-2 px-3 sm:px-3.5 pb-2.5 sm:pb-3 pt-0">
+        <div className="flex flex-wrap items-center justify-between gap-y-1.5 px-3 sm:px-3.5 pb-2 sm:pb-2.5 pt-0">
           {/* Left Toolbar */}
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Deeper Research Pill */}
@@ -258,30 +260,32 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           </div>
         </div>
 
-        {/* Attached Bottom Banner: "Upgrade to connect all your tools to Cortex" */}
-        <div className="border-t border-[#F1F3F5] px-3.5 sm:px-4 py-2 sm:py-2.5 bg-[#FAFBFB] rounded-b-2xl flex items-center justify-between text-xs text-slate-600 hover:bg-slate-100/60 transition-colors cursor-pointer select-none">
-          <span className="font-medium text-slate-700 truncate pr-2">
-            Upgrade to connect all your tools to Cortex
-          </span>
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Overlapping Connected App Icons */}
-            <div className="flex items-center -space-x-1.5">
-              <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
-                N
-              </span>
-              <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
-                S
-              </span>
-              <span className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
-                G
-              </span>
-              <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
-                D
-              </span>
+        {/* Attached Bottom Banner: "Upgrade to connect all your tools to Cortex" (optional, for empty hero) */}
+        {showUpgradeBanner && (
+          <div className="border-t border-[#F1F3F5] px-3.5 sm:px-4 py-2 bg-[#FAFBFB] rounded-b-2xl flex items-center justify-between text-xs text-slate-600 hover:bg-slate-100/60 transition-colors cursor-pointer select-none">
+            <span className="font-medium text-slate-700 truncate pr-2">
+              Upgrade to connect all your tools to Cortex
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Overlapping Connected App Icons */}
+              <div className="flex items-center -space-x-1.5">
+                <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
+                  N
+                </span>
+                <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
+                  S
+                </span>
+                <span className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
+                  G
+                </span>
+                <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-[9px] ring-2 ring-white">
+                  D
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

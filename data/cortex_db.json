@@ -6,7 +6,8 @@
       "name": "Jay Raam",
       "passwordHash": "$2b$10$kn8PZEdiTLGKDQdqg581hOFGlulAx/4wqixm0bdTXkyG/1yEkAAri",
       "role": "admin",
-      "createdAt": "2026-10-11T06:26:54.822Z"
+      "createdAt": "2026-10-11T06:26:54.822Z",
+      "avatar": "data:image/webp;base64,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"
     },
     {
       "id": "test_u1_1791700014991",
@@ -280,23 +281,6 @@
       "passwordHash": "$2b$08$mgOw06OFfwO6TJ8dHfKtS.hdNCYxc2D3rGgtuKn/4Iw8q19j7nyQS",
       "role": "user",
       "createdAt": "2026-10-12T17:08:04.196Z"
-    },
-    {
-      "id": "test_u1_1791825562784",
-      "email": "u1_1791825562784@nexa.ai",
-      "name": "Updated Name",
-      "passwordHash": "$2b$08$np.W7kncChLs3VyAyVdpKOhlk0vYcJ6lr9xvLP74sI9dQyvlLf53u",
-      "role": "user",
-      "createdAt": "2026-10-12T17:19:22.816Z",
-      "avatar": "data:image/webp;base64,sampleAvatarData"
-    },
-    {
-      "id": "test_u2_1791825562817",
-      "email": "u2_1791825562817@nexa.ai",
-      "name": "Test Engineer 2",
-      "passwordHash": "$2b$08$U5ywCOXpgSrPE3814n21QOfWqRhu9VdLnOGSfGXVejDYKiyww.cNO",
-      "role": "user",
-      "createdAt": "2026-10-12T17:19:22.839Z"
     }
   ],
   "sessions": [
@@ -316,30 +300,6 @@
     }
   ],
   "conversations": [
-    {
-      "id": "conv_msgs_1791825562842",
-      "userId": "test_u1_1791825562784",
-      "title": "User 1 Private Thread",
-      "modelId": "gemini-3.8-flash",
-      "providerId": "gemini",
-      "mode": "balanced",
-      "isPinned": false,
-      "isArchived": false,
-      "createdAt": "2026-10-12T17:19:22.842Z",
-      "updatedAt": "2026-10-12T17:19:22.842Z"
-    },
-    {
-      "id": "conv_1791825562840",
-      "userId": "test_u1_1791825562784",
-      "title": "Secret Project Alpha",
-      "modelId": "gemini-3.8-flash",
-      "providerId": "gemini",
-      "mode": "balanced",
-      "isPinned": false,
-      "isArchived": false,
-      "createdAt": "2026-10-12T17:19:22.840Z",
-      "updatedAt": "2026-10-12T17:19:22.840Z"
-    },
     {
       "id": "conv_1791825449734_texo8",
       "userId": "usr_dev_primary",
@@ -1066,14 +1026,6 @@
       "description": "Co-Work testing space",
       "createdAt": "2026-10-12T17:08:04.202Z",
       "updatedAt": "2026-10-12T17:08:04.202Z"
-    },
-    {
-      "id": "ws_test_1791825562846",
-      "userId": "test_u1_1791825562784",
-      "name": "Test Sandbox",
-      "description": "Co-Work testing space",
-      "createdAt": "2026-10-12T17:19:22.846Z",
-      "updatedAt": "2026-10-12T17:19:22.846Z"
     }
   ],
   "artifacts": [
@@ -1296,17 +1248,6 @@
       "version": 1,
       "createdAt": "2026-10-12T17:08:04.202Z",
       "updatedAt": "2026-10-12T17:08:04.202Z"
-    },
-    {
-      "id": "art_1791825562846_onb2e",
-      "workspaceId": "ws_test_1791825562846",
-      "title": "Config Map",
-      "fileName": "config.json",
-      "language": "json",
-      "content": "{\"env\": \"test\"}",
-      "version": 1,
-      "createdAt": "2026-10-12T17:19:22.846Z",
-      "updatedAt": "2026-10-12T17:19:22.846Z"
     }
   ],
   "tasks": [

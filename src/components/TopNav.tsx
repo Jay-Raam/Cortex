@@ -50,7 +50,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   };
 
   return (
-    <header className="h-14 px-3 sm:px-4 md:px-6 flex items-center justify-between border-b border-[#F0F2F4] bg-white rounded-t-2xl shrink-0 z-10 select-none">
+    <header className="h-14 px-3 sm:px-4 md:px-6 flex items-center justify-between border-b border-[#F0F2F4] bg-white shrink-0 z-10 select-none">
       {/* Left: Mobile hamburger + Model Selector Pill matching "Cortex Core v1 ⌵" */}
       <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
         {onToggleSidebar && (
