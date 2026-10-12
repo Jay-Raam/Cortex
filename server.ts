@@ -6,6 +6,7 @@ try {
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createYoga } from 'graphql-yoga';
 import { schema } from './src/server/graphql/schema';
@@ -19,7 +20,11 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
-  app.use(cors());
+  app.use(cors({
+    origin: true,
+    credentials: true,
+  }));
+  app.use(cookieParser());
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
@@ -35,19 +40,17 @@ async function startServer() {
     schema,
     graphqlEndpoint: '/graphql',
     context: async ({ request }) => {
-      // Extract Bearer token from headers
+      // Extract Bearer token or HTTP-only cookie
       const authHeader = request.headers.get('authorization');
-      let user = null;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7).trim();
-        // Extract userId if present
-        const reqObj = { headers: { authorization: authHeader } } as any;
-        user = authenticateRequest(reqObj);
-      }
-      if (!user) {
-        // Fallback to dev user in local dev mode
-        user = db.getUserById('usr_dev_primary');
-      }
+      const cookieHeader = request.headers.get('cookie');
+      const reqObj = {
+        headers: {
+          authorization: authHeader || undefined,
+          cookie: cookieHeader || undefined,
+        },
+      } as any;
+
+      const user = authenticateRequest(reqObj);
       return { user };
     },
   });

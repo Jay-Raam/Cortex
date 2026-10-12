@@ -1,17 +1,61 @@
-import { ModelInfo, Conversation, Message, Skill, Workspace, WorkspaceArtifact, AgentTask, NotificationItem } from '../server/types';
+import { ModelInfo, Conversation, Message, Skill, Workspace, WorkspaceArtifact, AgentTask, NotificationItem, User } from '../server/types';
+
+export async function loginUser(email: string, password: string): Promise<User> {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to sign in');
+  }
+  return data.user;
+}
+
+export async function registerUser(email: string, name: string, password: string): Promise<User> {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, name, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create account');
+  }
+  return data.user;
+}
+
+export async function checkAuth(): Promise<User | null> {
+  try {
+    const res = await fetch('/api/auth/me', {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.authenticated ? data.user : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function logoutUser(): Promise<void> {
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
 
 export async function fetchGraphQL<T = any>(query: string, variables: Record<string, any> = {}): Promise<T> {
-  const token = localStorage.getItem('nexa_auth_token');
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
   const res = await fetch('/graphql', {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
     body: JSON.stringify({ query, variables }),
   });
 
@@ -40,19 +84,14 @@ export function streamChat(
   onEvent: (event: StreamEvent) => void,
   onError: (err: Error) => void
 ): () => void {
-  const token = localStorage.getItem('nexa_auth_token');
   const controller = new AbortController();
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   fetch('/api/chat/stream', {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
     body: JSON.stringify(params),
     signal: controller.signal,
   })

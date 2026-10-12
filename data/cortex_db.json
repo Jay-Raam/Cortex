@@ -4,7 +4,7 @@
       "id": "usr_dev_primary",
       "email": "developer@nexa.ai",
       "name": "Nexa Lead Architect",
-      "passwordHash": "$2b$10$eOyjnU8Y42b.zcywGmeFXuUPEvJ26yZT9P8bAFmB1tZNfwcf/EJ2C",
+      "passwordHash": "$2b$10$kn8PZEdiTLGKDQdqg581hOFGlulAx/4wqixm0bdTXkyG/1yEkAAri",
       "role": "admin",
       "createdAt": "2026-10-11T06:26:54.822Z"
     },
@@ -185,50 +185,97 @@
       "createdAt": "2026-10-12T14:11:50.059Z"
     },
     {
-      "id": "test_u1_1791815648184",
-      "email": "u1_1791815648184@nexa.ai",
+      "id": "test_u1_1791820772807",
+      "email": "u1_1791820772807@nexa.ai",
       "name": "Test Engineer 1",
-      "passwordHash": "$2b$08$8nzPZ0BvbJv8PI9RUJTn.u57C5ijGd8I6FE2mvIWNPqIBjD1f9Hiy",
+      "passwordHash": "$2b$08$KmDiyl9PTLzuZSPtzq7AduVYnrwDBqlZE1Awwu.dzb6Y6z0kDDPE2",
       "role": "user",
-      "createdAt": "2026-10-12T14:34:08.264Z"
+      "createdAt": "2026-10-12T15:59:32.850Z"
     },
     {
-      "id": "test_u2_1791815648264",
-      "email": "u2_1791815648264@nexa.ai",
+      "id": "test_u2_1791820772851",
+      "email": "u2_1791820772851@nexa.ai",
       "name": "Test Engineer 2",
-      "passwordHash": "$2b$08$BW3GpZrXYmxKfYjezIkqYeuQJdXsi8V8mCAcn6y8quVhl99dqfQaG",
+      "passwordHash": "$2b$08$CaFoMqcHSTFHnor/GsXXmO2Qapm9xUOSfu0yP1hauyxDffBDK8MAS",
       "role": "user",
-      "createdAt": "2026-10-12T14:34:08.314Z"
+      "createdAt": "2026-10-12T15:59:32.882Z"
+    },
+    {
+      "id": "test_u1_1791821195617",
+      "email": "u1_1791821195617@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$jUUAGRl.54/YN/ROtrbFmOq93Odhzw.qc.2M4eTjy4xLb7luy420O",
+      "role": "user",
+      "createdAt": "2026-10-12T16:06:35.656Z"
+    },
+    {
+      "id": "test_u2_1791821195656",
+      "email": "u2_1791821195656@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$GcSEyWK/8qmkbqFh9inwOe0PvRV.p.9hi3a10.EnQNQEOvc.RPkB6",
+      "role": "user",
+      "createdAt": "2026-10-12T16:06:35.690Z"
+    },
+    {
+      "id": "test_u1_1791821648178",
+      "email": "u1_1791821648178@nexa.ai",
+      "name": "Test Engineer 1",
+      "passwordHash": "$2b$08$.oiertQWe.WFEyn3T32CRuP10.p7/ANRG7Fdb6PfhA9Ni6AIL5Uh2",
+      "role": "user",
+      "createdAt": "2026-10-12T16:14:08.220Z"
+    },
+    {
+      "id": "test_u2_1791821648220",
+      "email": "u2_1791821648220@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$WvqVfYG1BLS7dz8tfTW66.mtxd1xL9Vd6xKoNbVTw69wzylW7fx3u",
+      "role": "user",
+      "createdAt": "2026-10-12T16:14:08.250Z"
     }
   ],
-  "sessions": [],
+  "sessions": [
+    {
+      "id": "sess_1791821502950_b1cat",
+      "userId": "usr_dev_primary",
+      "refreshTokenHash": "$2b$08$06Bh/QKJG.OkZ8nUIc34jeEz8Nus6o6YaxOzcARm0O9mmID4gEvN.",
+      "expiresAt": 1794413502950,
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.9444"
+    },
+    {
+      "id": "sess_1791821541434_qxk33",
+      "userId": "usr_dev_primary",
+      "refreshTokenHash": "$2b$08$t7VwJLC6F44iqPJGm9zEweKaBbyEaF8lI9etrtL5f.8BbOIA7D6FG",
+      "expiresAt": 1794413541434,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+    }
+  ],
   "conversations": [
     {
-      "id": "conv_msgs_1791815648319",
-      "userId": "test_u1_1791815648184",
+      "id": "conv_msgs_1791821648255",
+      "userId": "test_u1_1791821648178",
       "title": "User 1 Private Thread",
       "modelId": "gemini-3.8-flash",
       "providerId": "gemini",
       "mode": "balanced",
       "isPinned": false,
       "isArchived": false,
-      "createdAt": "2026-10-12T14:34:08.319Z",
-      "updatedAt": "2026-10-12T14:34:08.319Z"
+      "createdAt": "2026-10-12T16:14:08.255Z",
+      "updatedAt": "2026-10-12T16:14:08.255Z"
     },
     {
-      "id": "conv_1791815648316",
-      "userId": "test_u1_1791815648184",
+      "id": "conv_1791821648251",
+      "userId": "test_u1_1791821648178",
       "title": "Secret Project Alpha",
       "modelId": "gemini-3.8-flash",
       "providerId": "gemini",
       "mode": "balanced",
       "isPinned": false,
       "isArchived": false,
-      "createdAt": "2026-10-12T14:34:08.316Z",
-      "updatedAt": "2026-10-12T14:34:08.316Z"
+      "createdAt": "2026-10-12T16:14:08.251Z",
+      "updatedAt": "2026-10-12T16:14:08.251Z"
     },
     {
-      "id": "conv_1791815140049_066ad",
+      "id": "conv_1791821554780_5hl3t",
       "userId": "usr_dev_primary",
       "title": "New Chat",
       "modelId": "gemini-3.8-flash",
@@ -237,21 +284,56 @@
       "skillId": null,
       "isPinned": false,
       "isArchived": false,
-      "createdAt": "2026-10-12T14:25:40.049Z",
-      "updatedAt": "2026-10-12T14:28:26.552Z"
+      "createdAt": "2026-10-12T16:12:34.780Z",
+      "updatedAt": "2026-10-12T16:12:34.780Z"
     },
     {
-      "id": "conv_1791814450504_p104y",
-      "userId": "usr_dev_primary",
-      "title": "New Chat",
+      "id": "conv_msgs_1791821195694",
+      "userId": "test_u1_1791821195617",
+      "title": "User 1 Private Thread",
       "modelId": "gemini-3.8-flash",
       "providerId": "gemini",
       "mode": "balanced",
-      "skillId": null,
       "isPinned": false,
       "isArchived": false,
-      "createdAt": "2026-10-12T14:14:10.504Z",
-      "updatedAt": "2026-10-12T14:14:34.714Z"
+      "createdAt": "2026-10-12T16:06:35.694Z",
+      "updatedAt": "2026-10-12T16:06:35.694Z"
+    },
+    {
+      "id": "conv_1791821195692",
+      "userId": "test_u1_1791821195617",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T16:06:35.692Z",
+      "updatedAt": "2026-10-12T16:06:35.692Z"
+    },
+    {
+      "id": "conv_msgs_1791820772887",
+      "userId": "test_u1_1791820772807",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T15:59:32.887Z",
+      "updatedAt": "2026-10-12T15:59:32.887Z"
+    },
+    {
+      "id": "conv_1791820772884",
+      "userId": "test_u1_1791820772807",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T15:59:32.884Z",
+      "updatedAt": "2026-10-12T15:59:32.885Z"
     },
     {
       "id": "conv_msgs_1791814310062",
@@ -398,19 +480,6 @@
       "updatedAt": "2026-10-11T14:58:52.824Z"
     },
     {
-      "id": "conv_1791730076433_u1nxm",
-      "userId": "usr_dev_primary",
-      "title": "hiii",
-      "modelId": "gemini-3.8-flash",
-      "providerId": "gemini",
-      "mode": "balanced",
-      "skillId": null,
-      "isPinned": false,
-      "isArchived": false,
-      "createdAt": "2026-10-11T14:47:56.433Z",
-      "updatedAt": "2026-10-11T14:51:10.631Z"
-    },
-    {
       "id": "conv_msgs_1791729670716",
       "userId": "test_u1_1791729670639",
       "title": "User 1 Private Thread",
@@ -531,93 +600,7 @@
       "updatedAt": "2026-10-11T06:26:55.039Z"
     }
   ],
-  "messages": [
-    {
-      "id": "msg_1791730076441_u",
-      "conversationId": "conv_1791730076433_u1nxm",
-      "role": "user",
-      "content": "hiii",
-      "attachments": [],
-      "createdAt": "2026-10-11T14:47:56.441Z"
-    },
-    {
-      "id": "msg_1791730079178_a",
-      "conversationId": "conv_1791730076433_u1nxm",
-      "role": "assistant",
-      "content": "Hello! How can I help you today? 😊",
-      "modelUsed": "nvidia/nemotron-3.5-lightning:free",
-      "providerUsed": "openrouter",
-      "createdAt": "2026-10-11T14:47:59.178Z"
-    },
-    {
-      "id": "msg_1791730202710_u",
-      "conversationId": "conv_1791730076433_u1nxm",
-      "role": "user",
-      "content": "i need to change this resume to next level what will i change ?",
-      "attachments": [
-        {
-          "id": "att_1791730171827_1pfbe",
-          "name": "Jayasriraam S- Full Stack Developer.pdf",
-          "size": 302476,
-          "mimeType": "application/pdf",
-          "url": "/uploads/1791730171818-Jayasriraam_S-_Full_Stack_Developer.pdf",
-          "createdAt": "2026-10-11T14:49:31.827Z"
-        }
-      ],
-      "createdAt": "2026-10-11T14:50:02.710Z"
-    },
-    {
-      "id": "msg_1791730246492_u",
-      "conversationId": "conv_1791730076433_u1nxm",
-      "role": "user",
-      "content": "now tell",
-      "attachments": [],
-      "createdAt": "2026-10-11T14:50:46.492Z"
-    },
-    {
-      "id": "msg_1791730270631_a",
-      "conversationId": "conv_1791730076433_u1nxm",
-      "role": "assistant",
-      "content": "To give you the best advice, I need to see your current resume. Since I don't have it yet, I can give you a comprehensive checklist of the \"next level\" upgrades you can make.\n\nHowever, if you paste your resume here, I can give you specific feedback.\n\nIn the meantime, here is the **Resume Upgrade Framework**—the specific things that move a resume from \"basic\" to \"next level\":\n\n### 1. Quantify Everything (The Biggest Upgrade)\nMost people list duties; \"next level\" resumes list achievements with numbers.\n*   **Before:** \"Responsible for sales and customer service.\"\n*   **After:** \"Increased sales revenue by 20% year-over-year and maintained a 98% customer satisfaction rating.\"\n*   **What to add:** Percentages, dollar amounts, time saved, number of people managed, etc.\n\n### 2. Replace \"Responsibilities\" with \"Accomplishments\"\nJob descriptions often just list what you were *supposed* to do. You need to show what you *actually* achieved.\n*   **Action Verbs:** Start every bullet point with a strong verb (e.g., *Spearheaded, Optimized, Launched, Spearheaded*).\n*   **The \"So What?\" Test:** After writing a bullet point, ask yourself: \"So what? Why does this matter?\"\n\n### 3. Optimize for ATS (Applicant Tracking Systems)\nMany resumes are rejected by robots before a human ever sees them.\n*   **Keywords:** Mirror the language from the job description. If they ask for \"Project Management\" and \"Budgeting,\" make sure those exact words appear in your skills section and experience.\n*   **Formatting:** Avoid columns, graphics, or weird fonts. Use standard headings (Experience, Education, Skills).\n\n### 4. The \"Summary\" Section (Instead of Objective)\nOld resumes start with \"Objective: Seeking a position...\" New resumes start with a **Professional Summary**.\n*   **What it is:** 3-4 lines at the top highlighting your years of experience, key skills, and what you bring to the table.\n*   **Example:** \"Results-oriented Marketing Manager with 10+ years of experience in digital strategy and brand growth. Proven track record of increasing online engagement by 150%.\"\n\n### 5. Skills Section: Be Specific\nDon't just list \"Microsoft Office.\" List the specific tools you use.\n*   **Before:** \"Excel, Word, PowerPoint.\"\n*   **After:** \"Advanced Excel (Pivot Tables, VLOOKUP), Adobe Creative Suite (Photoshop, InDesign), CRM Software (Salesforce).\"\n\n### 6. Clean Up the Design\nA \"next level\" resume looks modern and easy to read.\n*   **Font:** Use clean, modern fonts like Helvetica, Calibri, or Garamond.\n*   **White Space:** Don't cram everything in. Use margins and spacing to make it breathe.\n*   **Length:** 1 page for < 10 years experience; 2 pages is acceptable for senior-level roles.\n\n---\n\n**Ready to level up?**\n**Paste your current resume below**, and I will:\n1. Rewrite your bullet points with quantifiable achievements.\n2. Write a strong Professional Summary for you.\n3. Optimize it for keywords based on a job you want.\n\n*What is your current job/industry?* (This helps me tailor the advice better).",
-      "modelUsed": "nvidia/nemotron-3.5-lightning:free",
-      "providerUsed": "openrouter",
-      "createdAt": "2026-10-11T14:51:10.631Z"
-    },
-    {
-      "id": "msg_1791814472496_u",
-      "conversationId": "conv_1791814450504_p104y",
-      "role": "user",
-      "content": "Hello Cognivo, tell me 3 concise productivity tips",
-      "attachments": [],
-      "createdAt": "2026-10-12T14:14:32.496Z"
-    },
-    {
-      "id": "msg_1791814474714_a",
-      "conversationId": "conv_1791814450504_p104y",
-      "role": "assistant",
-      "content": "Here are 3 concise productivity tips:\n\n1.  **The Two-Minute Rule:** If a task takes less than two minutes to complete, do it immediately instead of putting it on a to-do list.\n2.  **Time Blocking:** Schedule specific blocks of time for specific tasks, rather than working from an open-ended to-do list.\n3.  **The \"Eat the Frog\" Method:** Tackle your most difficult and important task first thing in the morning to build momentum for the rest of the day.",
-      "modelUsed": "nvidia/nemotron-3.5-lightning:free",
-      "providerUsed": "openrouter",
-      "createdAt": "2026-10-12T14:14:34.714Z"
-    },
-    {
-      "id": "msg_1791815294759_u",
-      "conversationId": "conv_1791815140049_066ad",
-      "role": "user",
-      "content": "Answer the following technical question with deep factual accuracy:\n\n",
-      "attachments": [],
-      "createdAt": "2026-10-12T14:28:14.759Z"
-    },
-    {
-      "id": "msg_1791815306552_a",
-      "conversationId": "conv_1791815140049_066ad",
-      "role": "assistant",
-      "content": "Here are several tools and methods that can be used to analyze system performance and identify root causes of performance issues:\n\n**Monitoring and Metrics**\n- **Prometheus**: A monitoring system and time-series database that collects metrics from configured targets at specified intervals.\n- **Grafana**: A visualization platform that can display metrics from various sources, including Prometheus, to create dashboards.\n- **Telegraf**: A plugin-driven server agent for collecting and reporting metrics, often used with InfluxDB or Prometheus.\n\n**Log Analysis**\n- **ELK Stack**: Comprises Elasticsearch, Logstash, and Kibana for centralized logging, searching, and visualization.\n- **Splunk**: A platform for searching, monitoring, and analyzing machine-generated big data, including logs.\n\n**Tracing**\n- **OpenTelemetry**: A set of APIs, libraries, agents, and instrumentation to capture distributed traces and metrics.\n- **Jaeger**: A distributed tracing system used for monitoring and troubleshooting transactions in micro-service architectures.\n- **Zipkin**: Another distributed tracing system that helps gather timing data needed to troubleshoot latency problems in service architectures.\n\n**CPU and Memory Profiling**\n- ** perf**: A performance measuring tool in Linux that can analyze CPU usage, cache misses, and more.\n- **Valgrind**: A programming tool for memory debugging, memory leak detection, and profiling.\n- **gprof**: A profiler program for the GNU family of languages that shows where time is spent in a program.\n\n**I/O and Disk Analysis**\n- **iostat**: A system statistics tool that reports Central Processing Unit (CPU) utilization and I/O statistics for devices and partitions.\n- **iotop**: A top-like utility that displays I/O usage information for processes.\n- **fio**: A versatile I/O benchmarking tool that can test different I/O patterns and workloads.\n\n**Network Analysis**\n- **Wireshark**: A network protocol analyzer that lets you interactively browse through captured network data.\n- **tcpdump**: A command-line packet analyzer that captures and displays TCP/IP and other packets being transmitted or received over a network.\n- **nethogs**: A small command-line tool that shows per-process network bandwidth usage.\n\n**Application Performance Monitoring (APM)**\n- **New Relic**: A SaaS-based platform for monitoring application performance, infrastructure, and user experience.\n- **Datadog**: A monitoring and analytics platform for cloud-scale applications, providing monitoring of servers, databases, tools, and services.\n- **AppDynamics**: An application performance management (APM) tool that provides end-to-end visibility into application code and infrastructure.\n\n**Benchmarking and Load Testing**\n- **JMeter**: A pure Java application designed to load functional behavior and measure performance.\n- **Locust**: A user-friendly, distributed, load testing tool used to determine the breaking point of a system.\n- **k6**: A developer-centric load testing tool, using JavaScript as its scripting language.\n\n**Specific Performance Indicators to Monitor**\nWhen analyzing performance, the following metrics are typically tracked:\n- **Latency**: The time it takes to serve a request.\n- **Throughput**: The number of requests processed per unit of time.\n- **Error Rates**: The percentage of requests that fail.\n- **Resource Utilization**: CPU, memory, disk I/O, and network utilization percentages.\n- **Queue Lengths**: The number of pending requests waiting to be processed.\n\n**Diagnostic Approach**\nA typical performance analysis workflow follows these steps:\n1. **Identify the symptom**: Determine what is slow or failing.\n2. **Establish a baseline**: Capture normal operating metrics.\n3. **Collect data**: Use monitoring tools during the issue window.\n4. **Analyze correlations**: Look for patterns between resource usage and performance degradation.\n5. **Isolate the root cause**: Narrow down to specific code paths, configurations, or infrastructure components.\n6. **Implement and verify**: Apply fixes and confirm resolution through testing.\n\nThe choice of tools often depends on the technology stack, whether the environment is on-premises or cloud-based, and the specific nature of the performance issue being investigated.",
-      "modelUsed": "nvidia/nemotron-3.5-lightning:free",
-      "providerUsed": "openrouter",
-      "createdAt": "2026-10-12T14:28:26.552Z"
-    }
-  ],
+  "messages": [],
   "skills": [
     {
       "id": "skill-software-engineer",
@@ -866,12 +849,28 @@
       "updatedAt": "2026-10-12T14:11:50.066Z"
     },
     {
-      "id": "ws_test_1791815648330",
-      "userId": "test_u1_1791815648184",
+      "id": "ws_test_1791820772890",
+      "userId": "test_u1_1791820772807",
       "name": "Test Sandbox",
       "description": "Co-Work testing space",
-      "createdAt": "2026-10-12T14:34:08.330Z",
-      "updatedAt": "2026-10-12T14:34:08.330Z"
+      "createdAt": "2026-10-12T15:59:32.890Z",
+      "updatedAt": "2026-10-12T15:59:32.890Z"
+    },
+    {
+      "id": "ws_test_1791821195699",
+      "userId": "test_u1_1791821195617",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T16:06:35.699Z",
+      "updatedAt": "2026-10-12T16:06:35.699Z"
+    },
+    {
+      "id": "ws_test_1791821648259",
+      "userId": "test_u1_1791821648178",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T16:14:08.259Z",
+      "updatedAt": "2026-10-12T16:14:08.259Z"
     }
   ],
   "artifacts": [
@@ -1030,15 +1029,37 @@
       "updatedAt": "2026-10-12T14:11:50.066Z"
     },
     {
-      "id": "art_1791815648330_7jz6t",
-      "workspaceId": "ws_test_1791815648330",
+      "id": "art_1791820772891_l87uy",
+      "workspaceId": "ws_test_1791820772890",
       "title": "Config Map",
       "fileName": "config.json",
       "language": "json",
       "content": "{\"env\": \"test\"}",
       "version": 1,
-      "createdAt": "2026-10-12T14:34:08.330Z",
-      "updatedAt": "2026-10-12T14:34:08.330Z"
+      "createdAt": "2026-10-12T15:59:32.891Z",
+      "updatedAt": "2026-10-12T15:59:32.891Z"
+    },
+    {
+      "id": "art_1791821195700_dne74",
+      "workspaceId": "ws_test_1791821195699",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T16:06:35.700Z",
+      "updatedAt": "2026-10-12T16:06:35.700Z"
+    },
+    {
+      "id": "art_1791821648259_9usl6",
+      "workspaceId": "ws_test_1791821648259",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T16:14:08.259Z",
+      "updatedAt": "2026-10-12T16:14:08.259Z"
     }
   ],
   "tasks": [
@@ -1245,7 +1266,7 @@
       "userId": "usr_dev_primary",
       "emailEnabled": true,
       "pushEnabled": true,
-      "whatsappEnabled": false
+      "whatsappEnabled": true
     }
   ]
 }

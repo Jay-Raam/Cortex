@@ -47,13 +47,34 @@ export function verifyAccessToken(token: string): TokenPayload | null {
   }
 }
 
-export function authenticateRequest(req: Request): User | null {
+export function extractToken(req: Request): string | null {
+  // 1. Check Bearer Authorization header
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7).trim();
   }
 
-  const token = authHeader.substring(7).trim();
+  // 2. Check parsed cookies
+  if ((req as any).cookies && (req as any).cookies.cortex_access_token) {
+    return (req as any).cookies.cortex_access_token;
+  }
+
+  // 3. Fallback: Parse raw Cookie header string if cookies middleware not applied
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const match = cookieHeader.match(/cortex_access_token=([^;]+)/);
+    if (match) {
+      return decodeURIComponent(match[1]);
+    }
+  }
+
+  return null;
+}
+
+export function authenticateRequest(req: Request): User | null {
+  const token = extractToken(req);
+  if (!token) return null;
+
   const payload = verifyAccessToken(token);
   if (!payload) return null;
 

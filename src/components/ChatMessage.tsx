@@ -53,7 +53,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           {/* Metadata header */}
           <div className="flex items-center gap-2 mb-1.5 text-xs text-slate-400">
             <span className="font-semibold text-slate-900">
-              {isAssistant ? 'Cognivo' : 'You'}
+              {isAssistant ? 'Cortex' : 'You'}
             </span>
             {message.modelUsed && (
               <>

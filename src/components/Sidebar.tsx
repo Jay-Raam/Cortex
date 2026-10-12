@@ -10,6 +10,7 @@ import {
   Pin,
   Trash2,
   Plus,
+  LogOut,
 } from 'lucide-react';
 import { Conversation, User } from '../server/types';
 import { CognivoLogo } from './CognivoLogo';
@@ -28,6 +29,8 @@ interface SidebarProps {
   onOpenExplore?: () => void;
   onOpenKnowledge?: () => void;
   onOpenTemplates?: () => void;
+  onLogout?: () => void;
+  onOpenAuth?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -44,13 +47,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenExplore,
   onOpenKnowledge,
   onOpenTemplates,
+  onLogout,
+  onOpenAuth,
 }) => {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
   const modKey = isMac ? '⌘' : 'Ctrl';
 
-  // Group conversations into Today, Yesterday, and Older
+  // Group real conversations into Today, Yesterday, and Older
   const now = new Date();
   const isToday = (d: string) => {
     const date = new Date(d);
@@ -65,23 +69,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const todayConversations = conversations.filter((c) => isToday(c.createdAt));
   const yesterdayConversations = conversations.filter((c) => isYesterday(c.createdAt));
   const olderConversations = conversations.filter((c) => !isToday(c.createdAt) && !isYesterday(c.createdAt));
-
-  // Default sample items if user has few conversations (matches the reference design exactly)
-  const sampleToday = [
-    { id: 's_t1', title: 'Summarize the Key Insights from the 202...' },
-    { id: 's_t2', title: 'Draft a Polite and Professional Follow-U...' },
-  ];
-  const sampleYesterday = [
-    { id: 's_y1', title: 'Generate Creative Ideas for an Eco-Frien...' },
-    { id: 's_y2', title: 'Step-by-Step Troubleshooting Guide for...' },
-  ];
-  const samplePrevious7Days = [
-    { id: 's_p1', title: 'Write a Compelling Bio for a Freelance D...' },
-    { id: 's_p2', title: 'Brainstorm Unique and Catchy Domain N...' },
-    { id: 's_p3', title: 'Create a Comprehensive Onboarding Ch...' },
-    { id: 's_p4', title: 'Develop a 30-Day Social Media Content...' },
-    { id: 's_p5', title: 'Draft a Professional Job Offer Letter fo...' },
-  ];
 
   // User details with safe fallback
   const userName = currentUser?.name || 'Cortex Architect';
@@ -196,69 +183,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Conversation History Groupings */}
+        {/* Conversation History Groupings (Only Real User Data) */}
         <div className="space-y-4 pt-1">
           {/* Today Group */}
-          <div>
-            <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Today
-            </div>
-            <div className="space-y-0.5">
-              {(todayConversations.length > 0 ? todayConversations : sampleToday).map((item) => {
-                const isReal = todayConversations.some((c) => c.id === item.id);
-                const isActive = activeConversationId === item.id;
-                return (
-                  <div
-                    key={item.id}
-                    onMouseEnter={() => setHoveredId(item.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    onClick={() => {
-                      if (isReal) onSelectConversation(item.id);
-                    }}
-                    className={`group relative flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-normal transition-colors cursor-pointer ${
-                      isActive
-                        ? 'bg-white shadow-2xs font-semibold text-slate-900 border border-slate-200/70'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{item.title}</span>
-                    {isReal && hoveredId === item.id && (
+          {todayConversations.length > 0 && (
+            <div>
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Today
+              </div>
+              <div className="space-y-0.5">
+                {todayConversations.map((item) => {
+                  const isActive = activeConversationId === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => onSelectConversation(item.id)}
+                      className={`group relative flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-normal transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-white shadow-2xs font-semibold text-slate-900 border border-slate-200/70'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{item.title}</span>
                       <div
                         className="flex items-center gap-1 shrink-0"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
                           onClick={() => onDeleteConversation(item.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded"
+                          className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded cursor-pointer"
+                          title="Delete chat"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Yesterday Group */}
-          <div>
-            <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Yesterday
-            </div>
-            <div className="space-y-0.5">
-              {(yesterdayConversations.length > 0 ? yesterdayConversations : sampleYesterday).map(
-                (item) => {
-                  const isReal = yesterdayConversations.some((c) => c.id === item.id);
+          {yesterdayConversations.length > 0 && (
+            <div>
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Yesterday
+              </div>
+              <div className="space-y-0.5">
+                {yesterdayConversations.map((item) => {
                   const isActive = activeConversationId === item.id;
                   return (
                     <div
                       key={item.id}
-                      onMouseEnter={() => setHoveredId(item.id)}
-                      onMouseLeave={() => setHoveredId(null)}
-                      onClick={() => {
-                        if (isReal) onSelectConversation(item.id);
-                      }}
+                      onClick={() => onSelectConversation(item.id)}
                       className={`group relative flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-normal transition-colors cursor-pointer ${
                         isActive
                           ? 'bg-white shadow-2xs font-semibold text-slate-900 border border-slate-200/70'
@@ -266,44 +244,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <span className="truncate pr-2">{item.title}</span>
-                      {isReal && hoveredId === item.id && (
-                        <div
-                          className="flex items-center gap-1 shrink-0"
-                          onClick={(e) => e.stopPropagation()}
+                      <div
+                        className="flex items-center gap-1 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => onDeleteConversation(item.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded cursor-pointer"
+                          title="Delete chat"
                         >
-                          <button
-                            onClick={() => onDeleteConversation(item.id)}
-                            className="p-1 text-slate-400 hover:text-red-600 rounded"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   );
-                }
-              )}
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Previous 7 Days Group */}
-          <div>
-            <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Previous 7 Days
-            </div>
-            <div className="space-y-0.5">
-              {(olderConversations.length > 0 ? olderConversations : samplePrevious7Days).map(
-                (item) => {
-                  const isReal = olderConversations.some((c) => c.id === item.id);
+          {olderConversations.length > 0 && (
+            <div>
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Previous 7 Days
+              </div>
+              <div className="space-y-0.5">
+                {olderConversations.map((item) => {
                   const isActive = activeConversationId === item.id;
                   return (
                     <div
                       key={item.id}
-                      onMouseEnter={() => setHoveredId(item.id)}
-                      onMouseLeave={() => setHoveredId(null)}
-                      onClick={() => {
-                        if (isReal) onSelectConversation(item.id);
-                      }}
+                      onClick={() => onSelectConversation(item.id)}
                       className={`group relative flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-normal transition-colors cursor-pointer ${
                         isActive
                           ? 'bg-white shadow-2xs font-semibold text-slate-900 border border-slate-200/70'
@@ -311,25 +283,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <span className="truncate pr-2">{item.title}</span>
-                      {isReal && hoveredId === item.id && (
-                        <div
-                          className="flex items-center gap-1 shrink-0"
-                          onClick={(e) => e.stopPropagation()}
+                      <div
+                        className="flex items-center gap-1 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => onDeleteConversation(item.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded cursor-pointer"
+                          title="Delete chat"
                         >
-                          <button
-                            onClick={() => onDeleteConversation(item.id)}
-                            className="p-1 text-slate-400 hover:text-red-600 rounded"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   );
-                }
-              )}
+                })}
+              </div>
             </div>
-          </div>
+          )}
+
+          {conversations.length === 0 && (
+            <div className="px-3 py-6 text-center text-xs text-slate-400">
+              No conversations yet. Start a new chat above!
+            </div>
+          )}
         </div>
       </div>
 
@@ -343,22 +320,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Settings</span>
         </button>
 
-        {/* Authenticated User Card with Initials Fallback */}
-        <div
-          onClick={onOpenSettings}
-          className="flex items-center justify-between p-2 rounded-xl bg-white border border-[#E5E7EB] shadow-2xs hover:border-slate-300 transition-colors cursor-pointer"
-          title={`Signed in as ${userName} (${currentUser?.email || 'authenticated'})`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-[#FF6B00]/10 border border-orange-200 text-[#FF6B00] flex items-center justify-center text-xs font-bold shrink-0">
-              {userInitial}
+        {/* Authenticated User Card with Initials Fallback & Account Menu */}
+        <div className="relative">
+          <div
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center justify-between p-2 rounded-xl bg-white border border-[#E5E7EB] shadow-2xs hover:border-slate-300 transition-colors cursor-pointer"
+            title={`Signed in as ${userName} (${currentUser?.email || 'authenticated'})`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-[#FF6B00]/10 border border-orange-200 text-[#FF6B00] flex items-center justify-center text-xs font-bold shrink-0">
+                {userInitial}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-900 truncate">{userName}</div>
+                <div className="text-[10px] text-slate-400 font-medium">{userRole}</div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-slate-900 truncate">{userName}</div>
-              <div className="text-[10px] text-slate-400 font-medium">{userRole}</div>
-            </div>
+            <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           </div>
-          <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+
+          {/* User Account Popover */}
+          {showUserMenu && (
+            <div className="absolute bottom-full left-0 w-full mb-1 p-1 bg-white border border-slate-200 rounded-xl shadow-lg animate-in fade-in zoom-in-95 z-30">
+              <div className="px-2.5 py-1.5 border-b border-slate-100">
+                <div className="text-xs font-semibold text-slate-900 truncate">{userName}</div>
+                <div className="text-[10px] text-slate-400 truncate">{currentUser?.email}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserMenu(false);
+                  if (onLogout) onLogout();
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer text-left"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </aside>

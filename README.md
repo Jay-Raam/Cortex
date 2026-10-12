@@ -24,16 +24,36 @@
 
 Experience Cortex running in production with verified responsive UI workflows:
 
-### 1. Unified Light-Theme Workspace & Smart Conversation Canvas
-Pixel-consistent design using established project tokens (`#FFFFFF`, `#F1F3F5`, `#FF6B00` brand accent), authenticated user profile with uppercase initials avatar fallback, and responsive action prompt cards.
+### 1. Secure Authentication & Onboarding (Zero Storage Leakage)
+Production-grade authentication featuring seamless Sign In / Register modes, strictly bound to HTTP-only secure cookie tokens (`cortex_access_token`). Conforms strictly to zero `localStorage` or `sessionStorage` token leakage:
 
 <div align="center">
-  <img src="docs/qa/screenshots/desktop-chat.png" alt="Cortex Real-time Chat & Markdown" width="95%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
+  <table width="100%">
+    <tr>
+      <td width="50%" align="center">
+        <strong>Login Portal (HTTP-only Session)</strong><br />
+        <img src="docs/qa/screenshots/desktop-auth-login.png" alt="Cortex Login Modal" width="100%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
+      </td>
+      <td width="50%" align="center">
+        <strong>Register Portal (Zero LocalStorage)</strong><br />
+        <img src="docs/qa/screenshots/desktop-auth-register.png" alt="Cortex Register Modal" width="100%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
+      </td>
+    </tr>
+  </table>
 </div>
 
 <br />
 
-### 2. Multi-Device Responsive Architecture (Mobile, Tablet & Desktop)
+### 2. Unified Light-Theme Workspace & Real-Data Smart Canvas
+Pixel-consistent design using established project tokens (`#FFFFFF`, `#F1F3F5`, `#FF6B00` brand accent), strictly real user conversations with permanent conversation delete actions, and authenticated profile initials avatar:
+
+<div align="center">
+  <img src="docs/qa/screenshots/desktop-chat-real-data.png" alt="Cortex Real-time Chat & Markdown" width="95%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
+</div>
+
+<br />
+
+### 3. Multi-Device Responsive Architecture (Mobile, Tablet & Desktop)
 Seamless layout adaptation across standard mobile (390px), small mobile (320px), tablet (768px), and desktop (1440px) with sliding drawer navigation and responsive composer wrapping:
 
 <div align="center">
@@ -53,7 +73,7 @@ Seamless layout adaptation across standard mobile (390px), small mobile (320px),
 
 <br />
 
-### 3. Dedicated Workspace Sharing & Access Permissions
+### 4. Dedicated Workspace Sharing & Access Permissions
 Modal sharing control featuring native `navigator.share` integration, one-click clipboard copying, and configurable collaborator access scopes (`Anyone with the link` vs. `Public & Discoverable`):
 
 <div align="center">
@@ -62,7 +82,7 @@ Modal sharing control featuring native `navigator.share` integration, one-click 
 
 <br />
 
-### 4. Multichannel Notification Center (Redesigned Light Theme)
+### 5. Multichannel Notification Center (Redesigned Light Theme)
 Real-time delivery channel configuration (In-App, SMTP Email, FCM Push, WhatsApp Cloud API) with live verification dispatching and activity event logs matching project design tokens:
 
 <div align="center">
@@ -71,7 +91,7 @@ Real-time delivery channel configuration (In-App, SMTP Email, FCM Push, WhatsApp
 
 <br />
 
-### 5. Autonomous Agentic Co-Work Workspace
+### 6. Autonomous Agentic Co-Work Workspace
 Multi-step goal decomposition state machine (`pending` → `running` → `completed`), bounded tool execution, and inspectable artifact diffing:
 
 <div align="center">
@@ -80,7 +100,7 @@ Multi-step goal decomposition state machine (`pending` → `running` → `comple
 
 <br />
 
-### 6. System Topology & Operational Architecture
+### 7. System Topology & Operational Architecture
 Interactive architecture documentation detailing client tiers, Express/Yoga service boundaries, bounded tool safety gates, and multi-tenant persistence layers:
 
 <div align="center">

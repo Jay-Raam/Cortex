@@ -75,10 +75,17 @@ In accordance with Phase 2 requirements, the application has been updated with f
   ```
 - **Automated Tests** (`npm test`):
   ```
-  ✔ 1. Multi-Tenant Data Isolation (2.7261ms)
-  ✔ 2. Model Catalog & Free-First Routing (1.0851ms)
-  ✔ 3. Co-Work Engine & Bounded Tools (1.279ms)
-  ✔ Cortex AI Automated Test Suite (62.1136ms)
+  ✔ 1. Multi-Tenant Data Isolation
+  ✔ 2. Model Catalog & Free-First Routing
+  ✔ 3. Co-Work Engine & Bounded Tools
+  ✔ Cortex AI Automated Test Suite
   tests: 7 passed, 0 failed
   ```
+- **GitHub Actions CI/CD Pipeline** (`.github/workflows/ci.yml`):
+  - Added multi-job automated CI pipeline for validation (`npm run lint`, `npm test`) and build verification (`npm run build`) on all PRs and pushes to `main`.
+- **Zero Local/Session Storage Security Enforcement**:
+  - Replaced client-side storage tokens with secure HTTP-only cookies (`cortex_access_token`) issued via `cookie-parser` and `bcrypt` auth routes (`/api/auth/login`, `/api/auth/register`, `/api/auth/me`, `/api/auth/logout`).
+- **Real-Data Only & Always-Visible Delete Controls**:
+  - Removed all mock/sample conversations from `Sidebar.tsx`.
+  - Delete conversation action (`Trash2`) permanently visible on all conversation history cards.
 - **Live Server Status**: Dev server running stably on `http://localhost:3000`.

@@ -14,7 +14,8 @@ import { ExploreModal } from './components/ExploreModal';
 import { KnowledgeModal } from './components/KnowledgeModal';
 import { TemplatesModal } from './components/TemplatesModal';
 import { ShareModal } from './components/ShareModal';
-import { fetchGraphQL, streamChat } from './lib/api';
+import { AuthModal } from './components/AuthModal';
+import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser } from './lib/api';
 import {
   Conversation,
   Message,
@@ -53,6 +54,7 @@ export default function App() {
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     userId: 'usr_dev_primary',
     emailEnabled: true,
@@ -74,6 +76,44 @@ export default function App() {
   const stopStreamRef = useRef<(() => void) | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check authentication session on mount
+  useEffect(() => {
+    checkAuth().then((user) => {
+      if (user) {
+        setCurrentUser(user);
+        setIsAuthModalOpen(false);
+      } else {
+        setCurrentUser(null);
+        setIsAuthModalOpen(true);
+      }
+    });
+  }, []);
+
+  const handleLogin = async (email: string, pass: string) => {
+    const user = await loginUser(email, pass);
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+    await loadInitialData();
+    return user;
+  };
+
+  const handleRegister = async (email: string, name: string, pass: string) => {
+    const user = await registerUser(email, name, pass);
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+    await loadInitialData();
+    return user;
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+    setCurrentUser(null);
+    setConversations([]);
+    setActiveConversationId(null);
+    setMessages([]);
+    setIsAuthModalOpen(true);
+  };
 
   // Initial Load: Models, Skills, Conversations, Notifications
   const loadInitialData = useCallback(async () => {
@@ -484,6 +524,8 @@ export default function App() {
           onOpenExplore={() => setIsExploreOpen(true)}
           onOpenKnowledge={() => setIsKnowledgeOpen(true)}
           onOpenTemplates={() => setIsTemplatesOpen(true)}
+          onLogout={handleLogout}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
         />
 
         {/* Right Main Content Area */}
@@ -693,12 +735,12 @@ export default function App() {
                     onSendMessage={handleSendMessage}
                     isStreaming={isStreaming}
                     onStopStreaming={handleStopStreaming}
-                    selectedModelName={activeModel?.displayName || 'Cognivo Core v1'}
+                    selectedModelName={activeModel?.displayName || 'Cortex Core v1'}
                     selectedMode={selectedMode}
                     onOpenModelModal={() => setIsModelModalOpen(true)}
                   />
                   <div className="text-center text-[11px] text-slate-400 mt-1.5">
-                    Cognivo can make mistakes. Check important info.
+                    Cortex can make mistakes. Check important info.
                   </div>
                 </div>
               )}
@@ -786,6 +828,14 @@ export default function App() {
         onSelectPrompt={(prompt) => {
           handleSendMessage(prompt, []);
         }}
+      />
+
+      {/* Secure Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        onSuccess={() => setIsAuthModalOpen(false)}
       />
     </div>
   );

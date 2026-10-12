@@ -2,13 +2,17 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import bcrypt from 'bcryptjs';
 import { db } from '../db/database';
 import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
-import { authenticateRequest } from '../auth/auth';
+import { authenticateRequest, generateTokens } from '../auth/auth';
 import { Message, User } from '../types';
 
 export const apiRouter = express.Router();
+
+const COOKIE_NAME = 'cortex_access_token';
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -47,12 +51,115 @@ const upload = multer({
   },
 });
 
-// Helper to get authenticated user or dev fallback
+// Helper to set HTTP-only authentication cookie
+function setAuthCookie(res: Response, token: string) {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: 'lax',
+    maxAge: 2 * 60 * 60 * 1000, // 2 hours
+    path: '/',
+  });
+}
+
+/**
+ * REST Authentication: Register with HTTP-Only Cookie
+ */
+apiRouter.post('/auth/register', (req: Request, res: Response) => {
+  try {
+    const { email, name, password } = req.body;
+    if (!email || !name || !password) {
+      return res.status(400).json({ error: 'Email, name, and password are required.' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    }
+
+    const existing = db.getUserByEmail(email);
+    if (existing) {
+      return res.status(400).json({ error: 'An account with this email already exists.' });
+    }
+
+    const newUser: User = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      email,
+      name,
+      passwordHash: bcrypt.hashSync(password, 10),
+      role: 'user',
+      createdAt: new Date().toISOString(),
+    };
+
+    db.createUser(newUser);
+
+    // Default workspace for new user
+    db.createWorkspace({
+      id: `ws_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      userId: newUser.id,
+      name: 'Primary Workspace',
+      description: 'Default personal workspace for tasks, documents, and code artifacts.',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const { accessToken } = generateTokens(newUser, req.headers['user-agent']);
+    setAuthCookie(res, accessToken);
+
+    const safeUser = { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role };
+    res.json({ success: true, user: safeUser });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * REST Authentication: Login with HTTP-Only Cookie
+ */
+apiRouter.post('/auth/login', (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    const user = db.getUserByEmail(email);
+    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    const { accessToken } = generateTokens(user, req.headers['user-agent']);
+    setAuthCookie(res, accessToken);
+
+    const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role };
+    res.json({ success: true, user: safeUser });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * REST Authentication: Get Current Authenticated User
+ */
+apiRouter.get('/auth/me', (req: Request, res: Response) => {
+  const user = authenticateRequest(req);
+  if (!user) {
+    return res.status(401).json({ authenticated: false, user: null });
+  }
+  const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role };
+  res.json({ authenticated: true, user: safeUser });
+});
+
+/**
+ * REST Authentication: Logout and Clear Cookie
+ */
+apiRouter.post('/auth/logout', (_req: Request, res: Response) => {
+  res.clearCookie(COOKIE_NAME, { path: '/' });
+  res.json({ success: true });
+});
+
+// Helper to get authenticated user strictly (no fallback)
 function getReqUser(req: Request): User {
   const user = authenticateRequest(req);
   if (user) return user;
-  const devUser = db.getUserById('usr_dev_primary');
-  if (devUser) return devUser;
   throw new Error('Authentication required');
 }
 
