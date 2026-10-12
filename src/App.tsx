@@ -75,10 +75,19 @@ export default function App() {
             providerId
             displayName
             description
-            costTier
-            contextLength
-            strengths
-            isReasoning
+            mode
+            isFree
+            pricingDescription
+            contextWindow
+            capabilities {
+              streaming
+              vision
+              toolCalling
+              reasoning
+            }
+            availability
+            lastChecked
+            latencyMs
           }
           skills {
             id
@@ -106,9 +115,9 @@ export default function App() {
           }
           workspaces {
             id
-            title
+            name
             description
-            activeTaskId
+            createdAt
             updatedAt
           }
           notifications {
@@ -222,8 +231,8 @@ export default function App() {
   const handleNewConversation = async () => {
     try {
       const data = await fetchGraphQL(`
-        mutation CreateConversation($input: CreateConversationInput!) {
-          createConversation(input: $input) {
+        mutation CreateConversation($title: String!, $modelId: String!, $mode: String, $skillId: String) {
+          createConversation(title: $title, modelId: $modelId, mode: $mode, skillId: $skillId) {
             id
             title
             modelId
@@ -234,13 +243,10 @@ export default function App() {
           }
         }
       `, {
-        input: {
-          title: 'New Chat',
-          modelId: selectedModelId,
-          providerId: models.find((m) => m.id === selectedModelId)?.providerId || 'gemini',
-          mode: selectedMode,
-          skillId: activeSkillId,
-        },
+        title: 'New Chat',
+        modelId: selectedModelId,
+        mode: selectedMode,
+        skillId: activeSkillId,
       });
 
       if (data?.createConversation) {
@@ -276,15 +282,15 @@ export default function App() {
   const handleTogglePin = async (id: string, currentPin: boolean) => {
     try {
       const data = await fetchGraphQL(`
-        mutation UpdateConversation($id: ID!, $input: UpdateConversationInput!) {
-          updateConversation(id: $id, input: $input) {
+        mutation UpdateConversation($id: ID!, $isPinned: Boolean) {
+          updateConversation(id: $id, isPinned: $isPinned) {
             id
             isPinned
           }
         }
       `, {
         id,
-        input: { isPinned: !currentPin },
+        isPinned: !currentPin,
       });
 
       if (data?.updateConversation) {
@@ -305,8 +311,8 @@ export default function App() {
       try {
         const titleSnippet = content.substring(0, 30) || 'New Conversation';
         const data = await fetchGraphQL(`
-          mutation CreateConversation($input: CreateConversationInput!) {
-            createConversation(input: $input) {
+          mutation CreateConversation($title: String!, $modelId: String!, $mode: String, $skillId: String) {
+            createConversation(title: $title, modelId: $modelId, mode: $mode, skillId: $skillId) {
               id
               title
               modelId
@@ -316,13 +322,10 @@ export default function App() {
             }
           }
         `, {
-          input: {
-            title: titleSnippet,
-            modelId: selectedModelId,
-            providerId: models.find((m) => m.id === selectedModelId)?.providerId || 'gemini',
-            mode: selectedMode,
-            skillId: activeSkillId,
-          },
+          title: titleSnippet,
+          modelId: selectedModelId,
+          mode: selectedMode,
+          skillId: activeSkillId,
         });
 
         if (data?.createConversation) {

@@ -167,6 +167,7 @@ export const schema = createSchema({
       models: [ModelInfo!]!
       conversations(search: String, limit: Int): [Conversation!]!
       conversation(id: ID!): Conversation
+      messages(conversationId: ID!): [Message!]!
       skills: [Skill!]!
       skill(id: ID!): Skill
       workspaces: [Workspace!]!
@@ -213,6 +214,10 @@ export const schema = createSchema({
       conversation: (_: any, args: { id: string }, context: { user: User }) => {
         if (!context.user) return null;
         return db.getConversationById(args.id, context.user.id) || null;
+      },
+      messages: (_: any, args: { conversationId: string }, context: { user: User }) => {
+        if (!context.user) return [];
+        return db.getMessages(args.conversationId, context.user.id);
       },
       skills: () => {
         return db.getSkills();
