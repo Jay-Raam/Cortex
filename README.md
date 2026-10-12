@@ -24,65 +24,67 @@
 
 Experience Cortex running in production with verified responsive UI workflows:
 
-### 1. High-Velocity Streaming Chat & Rich Markdown
-Real-time token streaming with sub-second latency, developer prompt presets, formatted GFM tables, syntax-highlighted code blocks, and one-click `.md` / `.json` conversation export.
+### 1. Unified Light-Theme Workspace & Smart Conversation Canvas
+Pixel-consistent design using established project tokens (`#FFFFFF`, `#F1F3F5`, `#FF6B00` brand accent), authenticated user profile with uppercase initials avatar fallback, and responsive action prompt cards.
 
 <div align="center">
-  <img src="docs/screenshots/01-cortex-chat-interface.png" alt="Cortex Real-time Chat & Markdown" width="95%" style="border-radius: 8px; border: 1px solid #233145;" />
+  <img src="docs/qa/screenshots/desktop-chat.png" alt="Cortex Real-time Chat & Markdown" width="95%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
 </div>
 
 <br />
 
-### 2. Autonomous Agentic Co-Work Workspace
-Multi-step goal decomposition state machine (`pending` → `running` → `completed`), bounded tool execution, and inspectable artifact diffing.
+### 2. Multi-Device Responsive Architecture (Mobile, Tablet & Desktop)
+Seamless layout adaptation across standard mobile (390px), small mobile (320px), tablet (768px), and desktop (1440px) with sliding drawer navigation and responsive composer wrapping:
 
 <div align="center">
-  <img src="docs/screenshots/02-cortex-cowork-workspace.png" alt="Cortex Co-Work Agentic Workspace" width="95%" style="border-radius: 8px; border: 1px solid #233145;" />
+  <table width="100%">
+    <tr>
+      <td width="50%" align="center">
+        <strong>Standard Mobile (390 × 844 px)</strong><br />
+        <img src="docs/qa/screenshots/mobile-chat.png" alt="Mobile Viewport Proof" width="100%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
+      </td>
+      <td width="50%" align="center">
+        <strong>Tablet (768 × 1024 px)</strong><br />
+        <img src="docs/qa/screenshots/tablet-chat.png" alt="Tablet Viewport Proof" width="100%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
+      </td>
+    </tr>
+  </table>
 </div>
 
 <br />
 
-### 3. Curated Personas & Workflow Skills
-Specialized system personas including **Software Engineer**, **Code Reviewer**, **Technical Researcher**, and **Document Analyst** equipped with bounded workspace toolsets.
+### 3. Dedicated Workspace Sharing & Access Permissions
+Modal sharing control featuring native `navigator.share` integration, one-click clipboard copying, and configurable collaborator access scopes (`Anyone with the link` vs. `Public & Discoverable`):
 
 <div align="center">
-  <img src="docs/screenshots/03-cortex-skills-and-personas.png" alt="Cortex Skills & Personas" width="95%" style="border-radius: 8px; border: 1px solid #233145;" />
+  <img src="docs/qa/screenshots/desktop-share-modal.png" alt="Cortex Share Modal" width="95%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
 </div>
 
 <br />
 
-### 4. Multi-Provider Dynamic Model Router
-Intelligent routing across **Google Gemini**, **OpenRouter**, **Groq LPUs**, and **NVIDIA NIM** with Free-First zero-cost cost optimization and seamless fallback.
+### 4. Multichannel Notification Center (Redesigned Light Theme)
+Real-time delivery channel configuration (In-App, SMTP Email, FCM Push, WhatsApp Cloud API) with live verification dispatching and activity event logs matching project design tokens:
 
 <div align="center">
-  <img src="docs/screenshots/04-cortex-model-router.png" alt="Cortex Model Selector Modal" width="95%" style="border-radius: 8px; border: 1px solid #233145;" />
+  <img src="docs/qa/screenshots/desktop-notification-light.png" alt="Cortex Notification Center Light" width="95%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
 </div>
 
 <br />
 
-### 5. System Topology & Operational Architecture
-Interactive architecture documentation detailing client tiers, Express/Yoga service boundaries, bounded tool safety gates, and multi-tenant persistence layers.
+### 5. Autonomous Agentic Co-Work Workspace
+Multi-step goal decomposition state machine (`pending` → `running` → `completed`), bounded tool execution, and inspectable artifact diffing:
 
 <div align="center">
-  <img src="docs/screenshots/05-cortex-architecture-and-docs.png" alt="Cortex System Architecture & Ops" width="95%" style="border-radius: 8px; border: 1px solid #233145;" />
+  <img src="docs/qa/screenshots/desktop-cowork.png" alt="Cortex Co-Work Agentic Workspace" width="95%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
 </div>
 
 <br />
 
-### 6. Command Palette & Keyboard Shortcuts
-Global modal navigation (`Ctrl+K` / `⌘K`) for rapid context switching, new conversation creation, and view hopping.
+### 6. System Topology & Operational Architecture
+Interactive architecture documentation detailing client tiers, Express/Yoga service boundaries, bounded tool safety gates, and multi-tenant persistence layers:
 
 <div align="center">
-  <img src="docs/screenshots/06-cortex-keyboard-shortcuts.png" alt="Cortex Keyboard Shortcuts" width="95%" style="border-radius: 8px; border: 1px solid #233145;" />
-</div>
-
-<br />
-
-### 7. Multichannel Notification Center
-Real-time preference controls and audit trail across in-app toasts, email alerts, push notifications, and webhook channels.
-
-<div align="center">
-  <img src="docs/screenshots/07-cortex-notification-center.png" alt="Cortex Notification Center" width="95%" style="border-radius: 8px; border: 1px solid #233145;" />
+  <img src="docs/qa/screenshots/desktop-docs.png" alt="Cortex System Architecture & Ops" width="95%" style="border-radius: 8px; border: 1px solid #E5E7EB;" />
 </div>
 
 ---
