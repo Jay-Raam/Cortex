@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://cortex-tfot.onrender.com/api/$1"
+    },
+    {
+      "source": "/graphql",
+      "destination": "https://cortex-tfot.onrender.com/graphql"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "https://cortex-tfot.onrender.com/uploads/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

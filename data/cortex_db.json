@@ -281,6 +281,23 @@
       "passwordHash": "$2b$08$mgOw06OFfwO6TJ8dHfKtS.hdNCYxc2D3rGgtuKn/4Iw8q19j7nyQS",
       "role": "user",
       "createdAt": "2026-10-12T17:08:04.196Z"
+    },
+    {
+      "id": "test_u1_1791826784126",
+      "email": "u1_1791826784126@nexa.ai",
+      "name": "Updated Name",
+      "passwordHash": "$2b$08$j000PMVo7.59o8LTzJoICeFQ.EY41anIgbh5WxOsbfyYX5ddeE6de",
+      "role": "user",
+      "createdAt": "2026-10-12T17:39:44.168Z",
+      "avatar": "data:image/webp;base64,sampleAvatarData"
+    },
+    {
+      "id": "test_u2_1791826784168",
+      "email": "u2_1791826784168@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$HPUBgk7NpkGS7Pzxj5nGeeOzJ.7a3z95s6L7nbIj8ThvrO.5Dte.q",
+      "role": "user",
+      "createdAt": "2026-10-12T17:39:44.200Z"
     }
   ],
   "sessions": [
@@ -301,17 +318,28 @@
   ],
   "conversations": [
     {
-      "id": "conv_1791825449734_texo8",
-      "userId": "usr_dev_primary",
-      "title": "New Chat",
+      "id": "conv_msgs_1791826784206",
+      "userId": "test_u1_1791826784126",
+      "title": "User 1 Private Thread",
       "modelId": "gemini-3.8-flash",
       "providerId": "gemini",
       "mode": "balanced",
-      "skillId": null,
       "isPinned": false,
       "isArchived": false,
-      "createdAt": "2026-10-12T17:17:29.734Z",
-      "updatedAt": "2026-10-12T17:18:11.324Z"
+      "createdAt": "2026-10-12T17:39:44.206Z",
+      "updatedAt": "2026-10-12T17:39:44.206Z"
+    },
+    {
+      "id": "conv_1791826784203",
+      "userId": "test_u1_1791826784126",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-12T17:39:44.203Z",
+      "updatedAt": "2026-10-12T17:39:44.203Z"
     },
     {
       "id": "conv_msgs_1791824884198",
@@ -722,16 +750,7 @@
       "updatedAt": "2026-10-11T06:26:55.039Z"
     }
   ],
-  "messages": [
-    {
-      "id": "msg_1791825491324_u",
-      "conversationId": "conv_1791825449734_texo8",
-      "role": "user",
-      "content": "Help me plan and scaffold a complete full-stack web feature with automated tests.",
-      "attachments": [],
-      "createdAt": "2026-10-12T17:18:11.324Z"
-    }
-  ],
+  "messages": [],
   "skills": [
     {
       "id": "skill-software-engineer",
@@ -1026,6 +1045,14 @@
       "description": "Co-Work testing space",
       "createdAt": "2026-10-12T17:08:04.202Z",
       "updatedAt": "2026-10-12T17:08:04.202Z"
+    },
+    {
+      "id": "ws_test_1791826784212",
+      "userId": "test_u1_1791826784126",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-12T17:39:44.212Z",
+      "updatedAt": "2026-10-12T17:39:44.212Z"
     }
   ],
   "artifacts": [
@@ -1248,6 +1275,17 @@
       "version": 1,
       "createdAt": "2026-10-12T17:08:04.202Z",
       "updatedAt": "2026-10-12T17:08:04.202Z"
+    },
+    {
+      "id": "art_1791826784212_5bauo",
+      "workspaceId": "ws_test_1791826784212",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-12T17:39:44.212Z",
+      "updatedAt": "2026-10-12T17:39:44.212Z"
     }
   ],
   "tasks": [
