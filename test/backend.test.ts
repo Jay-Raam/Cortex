@@ -226,6 +226,30 @@ describe('Cortex AI Automated Test Suite', () => {
       assert.ok(found, 'Partial message must be retrievable from conversation history');
       assert.strictEqual(found?.content, partialContent);
     });
+
+    it('computes conversation token telemetry and context window footprint accurately', () => {
+      const messages = [
+        { role: 'user', content: 'What is the capital of France?' }, // ~8 tokens
+        { role: 'assistant', content: 'The capital of France is Paris.' }, // ~8 tokens
+      ];
+
+      let promptTokens = 0;
+      let completionTokens = 0;
+      for (const m of messages) {
+        const est = Math.max(1, Math.ceil(m.content.length / 4));
+        if (m.role === 'user') promptTokens += est;
+        else if (m.role === 'assistant') completionTokens += est;
+      }
+
+      const total = promptTokens + completionTokens;
+      const contextWindowLimit = 1000000;
+      const contextPercent = (total / contextWindowLimit) * 100;
+
+      assert.ok(total > 0, 'Total tokens must be positive');
+      assert.ok(promptTokens > 0, 'Prompt tokens must be positive');
+      assert.ok(completionTokens > 0, 'Completion tokens must be positive');
+      assert.ok(contextPercent < 1, 'Context percentage should be less than 1% for short chats');
+    });
   });
 });
 

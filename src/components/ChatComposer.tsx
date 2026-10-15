@@ -3,6 +3,7 @@ import {
   Atom,
   Image as ImageIcon,
   Lightbulb,
+  Activity,
   Cpu,
   Globe,
   Paperclip,
@@ -21,6 +22,7 @@ interface ChatComposerProps {
   selectedModelName: string;
   selectedMode?: ModelMode;
   onOpenModelModal?: () => void;
+  onOpenUsageModal?: () => void;
   showUpgradeBanner?: boolean;
 }
 
@@ -30,6 +32,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   onStopStreaming,
   selectedModelName,
   onOpenModelModal,
+  onOpenUsageModal,
   showUpgradeBanner = false,
 }) => {
   const [text, setText] = useState('');
@@ -240,6 +243,16 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               title="Ideate & Brainstorm"
             >
               <Lightbulb className="w-4 h-4" />
+            </button>
+
+            {/* View Token & Model Usage (Antigravity Telemetry) */}
+            <button
+              type="button"
+              onClick={onOpenUsageModal}
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-[#FF6B00] rounded-md hover:bg-orange-50 transition-colors cursor-pointer"
+              title="View Token & Model Usage"
+            >
+              <Activity className="w-4 h-4" />
             </button>
           </div>
 

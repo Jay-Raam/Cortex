@@ -16,6 +16,7 @@ import { TemplatesModal } from './components/TemplatesModal';
 import { ShareModal } from './components/ShareModal';
 import { AuthPage } from './components/AuthPage';
 import { ProfileModal } from './components/ProfileModal';
+import { UsageModal } from './components/UsageModal';
 import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser, renameConversationApi } from './lib/api';
 import {
   Conversation,
@@ -73,6 +74,7 @@ export default function App() {
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+  const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const stopStreamRef = useRef<(() => void) | null>(null);
@@ -688,6 +690,7 @@ export default function App() {
                         selectedModelName={activeModel?.displayName || 'Cognivo Core v1'}
                         selectedMode={selectedMode}
                         onOpenModelModal={() => setIsModelModalOpen(true)}
+                        onOpenUsageModal={() => setIsUsageModalOpen(true)}
                         showUpgradeBanner={true}
                       />
                     </div>
@@ -804,6 +807,7 @@ export default function App() {
                     selectedModelName={activeModel?.displayName || 'Cortex Core v1'}
                     selectedMode={selectedMode}
                     onOpenModelModal={() => setIsModelModalOpen(true)}
+                    onOpenUsageModal={() => setIsUsageModalOpen(true)}
                   />
                   <div className="text-center text-[11px] text-slate-400 mt-1">
                     Cortex can make mistakes. Check important info.
@@ -905,6 +909,18 @@ export default function App() {
         onProfileUpdated={(updatedUser) => {
           setCurrentUser(updatedUser);
         }}
+      />
+
+      {/* Antigravity-Style View Usage & Telemetry Modal */}
+      <UsageModal
+        isOpen={isUsageModalOpen}
+        onClose={() => setIsUsageModalOpen(false)}
+        activeConversationTitle={activeConversation?.title || 'Current Conversation'}
+        activeModelName={activeModel?.displayName || 'Gemini 3.8 Flash'}
+        contextWindowLimit={activeModel?.contextWindow || 1000000}
+        messages={messages}
+        selectedMode={selectedMode}
+        onSelectMode={(mode) => setSelectedMode(mode)}
       />
     </div>
   );
