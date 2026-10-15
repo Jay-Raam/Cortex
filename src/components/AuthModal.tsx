@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, Sparkles, CheckCircle2, X } from 'lucide-react';
 import { CognivoLogo } from './CognivoLogo';
 
 interface AuthModalProps {
@@ -7,6 +7,7 @@ interface AuthModalProps {
   onSuccess: (user: any) => void;
   onLogin: (email: string, pass: string) => Promise<any>;
   onRegister: (email: string, name: string, pass: string) => Promise<any>;
+  onDismiss?: () => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -14,6 +15,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess,
   onLogin,
   onRegister,
+  onDismiss,
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -60,6 +62,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-orange-400/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="p-7 sm:p-8 relative">
+          {/* Close button if optional dismissal is enabled */}
+          {onDismiss && (
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer z-10"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
           {/* Top Brand Logo & Welcome Headline */}
           <div className="flex flex-col items-center text-center mb-6">
             <div className="w-12 h-12 rounded-2xl bg-[#FFF9F3] border border-[#FFE8D6] flex items-center justify-center shadow-xs mb-3">

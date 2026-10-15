@@ -14,7 +14,7 @@ import { ExploreModal } from './components/ExploreModal';
 import { KnowledgeModal } from './components/KnowledgeModal';
 import { TemplatesModal } from './components/TemplatesModal';
 import { ShareModal } from './components/ShareModal';
-import { AuthModal } from './components/AuthModal';
+import { AuthPage } from './components/AuthPage';
 import { ProfileModal } from './components/ProfileModal';
 import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser } from './lib/api';
 import {
@@ -55,7 +55,7 @@ export default function App() {
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     userId: 'usr_dev_primary',
     emailEnabled: true,
@@ -81,21 +81,22 @@ export default function App() {
 
   // Check authentication session on mount
   useEffect(() => {
-    checkAuth().then((user) => {
-      if (user) {
-        setCurrentUser(user);
-        setIsAuthModalOpen(false);
-      } else {
-        setCurrentUser(null);
-        setIsAuthModalOpen(true);
-      }
-    });
+    checkAuth()
+      .then((user) => {
+        if (user) {
+          setCurrentUser(user);
+        } else {
+          setCurrentUser(null);
+        }
+      })
+      .finally(() => {
+        setIsAuthChecking(false);
+      });
   }, []);
 
   const handleLogin = async (email: string, pass: string) => {
     const user = await loginUser(email, pass);
     setCurrentUser(user);
-    setIsAuthModalOpen(false);
     await loadInitialData();
     return user;
   };
@@ -103,7 +104,6 @@ export default function App() {
   const handleRegister = async (email: string, name: string, pass: string) => {
     const user = await registerUser(email, name, pass);
     setCurrentUser(user);
-    setIsAuthModalOpen(false);
     await loadInitialData();
     return user;
   };
@@ -114,7 +114,6 @@ export default function App() {
     setConversations([]);
     setActiveConversationId(null);
     setMessages([]);
-    setIsAuthModalOpen(true);
   };
 
   // Initial Load: Models, Skills, Conversations, Notifications
@@ -507,6 +506,29 @@ export default function App() {
   const activeSkill = skills.find((s) => s.id === activeSkillId);
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
+  // 1. Loading state while checking authentication session
+  if (isAuthChecking) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white text-slate-800">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-orange-200 border-t-[#FF6B00] rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-slate-400">Loading Cortex...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Dedicated Full-Page Login & Registration Screen if not authenticated
+  if (!currentUser) {
+    return (
+      <AuthPage
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        onSuccess={() => {}}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen bg-white text-slate-900 font-sans overflow-hidden select-none">
       {/* Full-width, full-height Application Container */}
@@ -527,7 +549,6 @@ export default function App() {
           onOpenKnowledge={() => setIsKnowledgeOpen(true)}
           onOpenTemplates={() => setIsTemplatesOpen(true)}
           onLogout={handleLogout}
-          onOpenAuth={() => setIsAuthModalOpen(true)}
           onOpenProfile={() => setIsProfileModalOpen(true)}
         />
 
@@ -834,13 +855,6 @@ export default function App() {
         }}
       />
 
-      {/* Secure Authentication Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
-        onSuccess={() => setIsAuthModalOpen(false)}
-      />
 
       {/* User Profile Edit Modal */}
       <ProfileModal
