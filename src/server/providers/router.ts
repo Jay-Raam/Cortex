@@ -128,6 +128,11 @@ export class ModelRouter {
     });
 
     let completedText = '';
+    let accumulatedText = '';
+    const handleDelta = (text: string) => {
+      accumulatedText += text;
+      onEvent({ type: 'delta', payload: { text } });
+    };
 
     try {
       if (model.providerId === 'gemini') {
@@ -136,7 +141,7 @@ export class ModelRouter {
           req.messages,
           req.systemInstruction,
           {
-            onDelta: (text) => onEvent({ type: 'delta', payload: { text } }),
+            onDelta: handleDelta,
             onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
           },
           signal
@@ -156,7 +161,7 @@ export class ModelRouter {
           req.messages,
           req.systemInstruction,
           {
-            onDelta: (text) => onEvent({ type: 'delta', payload: { text } }),
+            onDelta: handleDelta,
             onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
           },
           signal
@@ -173,7 +178,7 @@ export class ModelRouter {
           req.messages,
           req.systemInstruction,
           {
-            onDelta: (text) => onEvent({ type: 'delta', payload: { text } }),
+            onDelta: handleDelta,
             onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
           },
           signal
@@ -190,7 +195,7 @@ export class ModelRouter {
           req.messages,
           req.systemInstruction,
           {
-            onDelta: (text) => onEvent({ type: 'delta', payload: { text } }),
+            onDelta: handleDelta,
             onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
           },
           signal
@@ -205,7 +210,7 @@ export class ModelRouter {
           req.messages,
           req.systemInstruction,
           {
-            onDelta: (text) => onEvent({ type: 'delta', payload: { text } }),
+            onDelta: handleDelta,
             onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
           },
           signal
@@ -213,7 +218,7 @@ export class ModelRouter {
       }
 
       return {
-        text: completedText,
+        text: completedText || accumulatedText,
         modelUsed: model.id,
         providerUsed: model.providerId,
       };
@@ -221,70 +226,82 @@ export class ModelRouter {
       if (signal?.aborted) {
         throw err;
       }
-      // If Gemini failed, attempt automatic fallback to OpenRouter free model if available
-      if (model.providerId === 'gemini' && process.env.OPENROUTER_API_KEY) {
-        const fallbackModelId = 'nvidia/nemotron-3.5-lightning:free';
-        onEvent({
-          type: 'fallback_notice',
-          payload: {
-            originalModel: model.id,
-            fallbackModel: fallbackModelId,
-            reason: `Gemini service encountered an issue (${err.message}). Automatically switched to ${fallbackModelId}.`,
-          },
-        });
-        const apiKey = process.env.OPENROUTER_API_KEY;
-        completedText = await streamOpenAICompatibleResponse(
-          {
-            baseUrl: 'https://openrouter.ai/api/v1',
-            apiKey,
-            defaultHeaders: {
-              'HTTP-Referer': 'https://cortex.ai',
-              'X-Title': 'Cortex AI Platform',
+      // Only attempt fallback if no tokens have been streamed yet to avoid splicing or duplicating responses
+      if (accumulatedText.length === 0) {
+        // If Gemini failed, attempt automatic fallback to OpenRouter free model if available
+        if (model.providerId === 'gemini' && process.env.OPENROUTER_API_KEY) {
+          const fallbackModelId = 'nvidia/nemotron-3.5-lightning:free';
+          onEvent({
+            type: 'fallback_notice',
+            payload: {
+              originalModel: model.id,
+              fallbackModel: fallbackModelId,
+              reason: `Gemini service encountered an issue (${err.message}). Automatically switched to ${fallbackModelId}.`,
             },
-          },
-          fallbackModelId,
-          req.messages,
-          req.systemInstruction,
-          {
-            onDelta: (text) => onEvent({ type: 'delta', payload: { text } }),
-            onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
-          },
-          signal
-        );
-        return {
-          text: completedText,
-          modelUsed: fallbackModelId,
-          providerUsed: 'openrouter',
-        };
+          });
+          const apiKey = process.env.OPENROUTER_API_KEY;
+          completedText = await streamOpenAICompatibleResponse(
+            {
+              baseUrl: 'https://openrouter.ai/api/v1',
+              apiKey,
+              defaultHeaders: {
+                'HTTP-Referer': 'https://cortex.ai',
+                'X-Title': 'Cortex AI Platform',
+              },
+            },
+            fallbackModelId,
+            req.messages,
+            req.systemInstruction,
+            {
+              onDelta: handleDelta,
+              onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
+            },
+            signal
+          );
+          return {
+            text: completedText || accumulatedText,
+            modelUsed: fallbackModelId,
+            providerUsed: 'openrouter',
+          };
+        }
+        // If non-Gemini provider failed, attempt fallback to Gemini if configured
+        if (model.providerId !== 'gemini' && process.env.GEMINI_API_KEY) {
+          onEvent({
+            type: 'fallback_notice',
+            payload: {
+              originalModel: model.id,
+              fallbackModel: 'gemini-3.8-flash',
+              reason: `Primary provider error (${err.message}). Recovering with Gemini fallback.`,
+            },
+          });
+          completedText = await streamGeminiResponse(
+            'gemini-3.8-flash',
+            req.messages,
+            req.systemInstruction,
+            {
+              onDelta: handleDelta,
+              onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
+            },
+            signal
+          );
+          return {
+            text: completedText || accumulatedText,
+            modelUsed: 'gemini-3.8-flash',
+            providerUsed: 'gemini',
+          };
+        }
       }
-      // If non-Gemini provider failed, attempt fallback to Gemini if configured
-      if (model.providerId !== 'gemini' && process.env.GEMINI_API_KEY) {
-        onEvent({
-          type: 'fallback_notice',
-          payload: {
-            originalModel: model.id,
-            fallbackModel: 'gemini-3.8-flash',
-            reason: `Primary provider error (${err.message}). Recovering with Gemini fallback.`,
-          },
-        });
-        completedText = await streamGeminiResponse(
-          'gemini-3.8-flash',
-          req.messages,
-          req.systemInstruction,
-          {
-            onDelta: (text) => onEvent({ type: 'delta', payload: { text } }),
-            onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
-          },
-          signal
-        );
-        return {
-          text: completedText,
-          modelUsed: 'gemini-3.8-flash',
-          providerUsed: 'gemini',
-        };
-      }
-      onEvent({ type: 'error', payload: { message: err.message || 'Stream generation failed' } });
-      throw err;
+
+      onEvent({
+        type: 'error',
+        payload: {
+          message: err.message || 'Stream generation failed',
+          partialText: accumulatedText || undefined,
+        },
+      });
+      const streamErr = new Error(err.message || 'Stream generation failed');
+      (streamErr as any).partialText = accumulatedText;
+      throw streamErr;
     }
   }
 }

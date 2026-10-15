@@ -284,6 +284,8 @@ apiRouter.post('/chat/stream', async (req: Request, res: Response) => {
     }
   };
 
+  let accumulatedText = '';
+
   try {
     const result = await modelRouter.stream(
       {
@@ -294,6 +296,9 @@ apiRouter.post('/chat/stream', async (req: Request, res: Response) => {
         systemInstruction,
       },
       (event) => {
+        if (event.type === 'delta' && event.payload?.text) {
+          accumulatedText += event.payload.text;
+        }
         sendEvent(event);
       },
       abortController.signal
@@ -322,10 +327,30 @@ apiRouter.post('/chat/stream', async (req: Request, res: Response) => {
 
     res.end();
   } catch (err: any) {
+    const partial = (accumulatedText || err.partialText || '').trim();
+    if (partial.length > 0) {
+      try {
+        const partialMessage: Message = {
+          id: `msg_${Date.now()}_a`,
+          conversationId,
+          role: 'assistant',
+          content: partial,
+          modelUsed: modelId || conversation.modelId,
+          createdAt: new Date().toISOString(),
+        };
+        db.addMessage(partialMessage, user.id);
+      } catch {
+        // ignore db error on partial save
+      }
+    }
+
     if (!res.writableEnded) {
       sendEvent({
         type: 'error',
-        payload: { message: err.message || 'Stream processing failed' },
+        payload: {
+          message: err.message || 'Stream processing failed',
+          partialText: partial || undefined,
+        },
       });
       res.end();
     }

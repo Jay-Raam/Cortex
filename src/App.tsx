@@ -440,15 +440,30 @@ export default function App() {
           console.warn('[Cognivo Router Fallback]', event.payload.reason);
         } else if (event.type === 'error') {
           setIsStreaming(false);
-          const errorMsg: Message = {
-            id: `err_${Date.now()}`,
-            conversationId: convId!,
-            role: 'assistant',
-            content: `Generation failed: ${event.payload?.message || 'Stream processing failed'}`,
-            isError: true,
-            createdAt: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, errorMsg]);
+          const errorReason = event.payload?.message || 'Stream processing failed';
+          const partialText = (accumulatedText || event.payload?.partialText || '').trim();
+
+          if (partialText.length > 0) {
+            const partialMsg: Message = {
+              id: `asst_${Date.now()}`,
+              conversationId: convId!,
+              role: 'assistant',
+              content: `${partialText}\n\n*(Generation interrupted: ${errorReason})*`,
+              modelUsed: selectedModelId,
+              createdAt: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, partialMsg]);
+          } else {
+            const errorMsg: Message = {
+              id: `err_${Date.now()}`,
+              conversationId: convId!,
+              role: 'assistant',
+              content: `Generation failed: ${errorReason}`,
+              isError: true,
+              createdAt: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, errorMsg]);
+          }
           setStreamingContent('');
         } else if (event.type === 'completed') {
           setIsStreaming(false);
@@ -476,15 +491,29 @@ export default function App() {
       },
       (err) => {
         setIsStreaming(false);
-        const errorMsg: Message = {
-          id: `err_${Date.now()}`,
-          conversationId: convId!,
-          role: 'assistant',
-          content: `Generation failed: ${err.message}`,
-          isError: true,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, errorMsg]);
+        const errorReason = err?.message || 'Stream processing failed';
+        const partialText = accumulatedText.trim();
+        if (partialText.length > 0) {
+          const partialMsg: Message = {
+            id: `asst_${Date.now()}`,
+            conversationId: convId!,
+            role: 'assistant',
+            content: `${partialText}\n\n*(Generation interrupted: ${errorReason})*`,
+            modelUsed: selectedModelId,
+            createdAt: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, partialMsg]);
+        } else {
+          const errorMsg: Message = {
+            id: `err_${Date.now()}`,
+            conversationId: convId!,
+            role: 'assistant',
+            content: `Generation failed: ${errorReason}`,
+            isError: true,
+            createdAt: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        }
         setStreamingContent('');
       }
     );

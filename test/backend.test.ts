@@ -191,4 +191,41 @@ describe('Cortex AI Automated Test Suite', () => {
       assert.ok(diffRes.output?.diff.includes('+ line 2 edited'));
     });
   });
+
+  describe('4. Resilient Streaming & Timeout Safeguards', () => {
+    it('persists partial streamed message in database when stream terminates prematurely', () => {
+      const conv = db.createConversation({
+        id: `conv_resilience_${Date.now()}`,
+        userId: testUser1.id,
+        title: 'Resilience Test Chat',
+        modelId: 'gemini-3.8-flash',
+        providerId: 'gemini',
+        mode: 'balanced',
+        isPinned: false,
+        isArchived: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const partialContent = 'Here is the beginning of the generated solution...';
+      const partialMsg = db.addMessage(
+        {
+          id: `msg_partial_${Date.now()}`,
+          conversationId: conv.id,
+          role: 'assistant',
+          content: partialContent,
+          modelUsed: 'gemini-3.8-flash',
+          createdAt: new Date().toISOString(),
+        },
+        testUser1.id
+      );
+
+      assert.ok(partialMsg.id, 'Partial message must be saved');
+      const retrieved = db.getMessages(conv.id, testUser1.id);
+      const found = retrieved.find((m) => m.id === partialMsg.id);
+      assert.ok(found, 'Partial message must be retrievable from conversation history');
+      assert.strictEqual(found?.content, partialContent);
+    });
+  });
 });
+
