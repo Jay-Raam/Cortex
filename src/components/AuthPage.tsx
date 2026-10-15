@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, Sparkles, CheckCircle2, Bot, Layers, Wrench, ArrowUpRight } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, Sparkles, CheckCircle2, Bot, Layers, Wrench } from 'lucide-react';
 import { CognivoLogo } from './CognivoLogo';
 
 interface AuthPageProps {
@@ -45,14 +45,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Demo credential autofill helper
-  const handleFillDemo = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('password123');
-    setMode('login');
-    setError(null);
   };
 
   return (
@@ -281,21 +273,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </button>
           </form>
 
-          {/* Quick Demo Autofill Pill */}
-          <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-400 font-medium">Quick Demo:</span>
-            <button
-              type="button"
-              onClick={() => handleFillDemo('developer@nexa.ai')}
-              className="px-2.5 py-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-[#FF6B00] font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <span>developer@nexa.ai</span>
-              <ArrowUpRight className="w-3 h-3" />
-            </button>
-          </div>
-
           {/* Security & Non-Storage Policy Notice */}
-          <div className="mt-4 pt-3 flex items-start gap-2 text-[11px] text-slate-400 leading-relaxed">
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-start gap-2 text-[11px] text-slate-400 leading-relaxed">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <span>
               Protected by secure <strong>HTTP-Only session cookies</strong>. No sensitive tokens in unencrypted local storage.
