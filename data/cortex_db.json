@@ -315,23 +315,6 @@
       "passwordHash": "$2b$08$0PK4rTyYcgvUQwDjeQXaP.Lb7b5V4x4iyPRXXCT6WHZkd/qnacAO2",
       "role": "user",
       "createdAt": "2026-10-15T16:12:36.870Z"
-    },
-    {
-      "id": "test_u1_1792081191961",
-      "email": "u1_1792081191961@nexa.ai",
-      "name": "Updated Name",
-      "passwordHash": "$2b$08$vS84sX0TS2V6I8sGGlQb9.kcCFcEJ2ip2mZ6PV6baAxW2I1AOc/Vy",
-      "role": "user",
-      "createdAt": "2026-10-15T16:19:51.991Z",
-      "avatar": "data:image/webp;base64,sampleAvatarData"
-    },
-    {
-      "id": "test_u2_1792081191991",
-      "email": "u2_1792081191991@nexa.ai",
-      "name": "Test Engineer 2",
-      "passwordHash": "$2b$08$v1/THl/G8vxmaNqb0wkZS.Bgb.Wulw94SW3YgxrQpvHrE69FHgh1C",
-      "role": "user",
-      "createdAt": "2026-10-15T16:19:52.015Z"
     }
   ],
   "sessions": [
@@ -355,33 +338,16 @@
       "refreshTokenHash": "$2b$08$NTYthqK21novh.nab8XnkeezavrPbTyw0MnF9Zh1sP4C3NYTAAiEa",
       "expiresAt": 1794672916399,
       "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "sess_1792084081819_zio8w",
+      "userId": "usr_dev_primary",
+      "refreshTokenHash": "$2b$08$TPWUSZ9B0VFcHsnWewCoTu77UV5eQjkQf23bfADhT0NYtYbHAxTqK",
+      "expiresAt": 1794676081819,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
     }
   ],
   "conversations": [
-    {
-      "id": "conv_msgs_1792081192017",
-      "userId": "test_u1_1792081191961",
-      "title": "User 1 Private Thread",
-      "modelId": "gemini-3.8-flash",
-      "providerId": "gemini",
-      "mode": "balanced",
-      "isPinned": false,
-      "isArchived": false,
-      "createdAt": "2026-10-15T16:19:52.017Z",
-      "updatedAt": "2026-10-15T16:19:52.017Z"
-    },
-    {
-      "id": "conv_1792081192016",
-      "userId": "test_u1_1792081191961",
-      "title": "Secret Project Alpha",
-      "modelId": "gemini-3.8-flash",
-      "providerId": "gemini",
-      "mode": "balanced",
-      "isPinned": false,
-      "isArchived": false,
-      "createdAt": "2026-10-15T16:19:52.016Z",
-      "updatedAt": "2026-10-15T16:19:52.016Z"
-    },
     {
       "id": "conv_msgs_1792080756873",
       "userId": "test_u1_1792080756798",
@@ -1150,14 +1116,6 @@
       "description": "Co-Work testing space",
       "createdAt": "2026-10-15T16:12:36.879Z",
       "updatedAt": "2026-10-15T16:12:36.879Z"
-    },
-    {
-      "id": "ws_test_1792081192022",
-      "userId": "test_u1_1792081191961",
-      "name": "Test Sandbox",
-      "description": "Co-Work testing space",
-      "createdAt": "2026-10-15T16:19:52.022Z",
-      "updatedAt": "2026-10-15T16:19:52.022Z"
     }
   ],
   "artifacts": [
@@ -1402,17 +1360,6 @@
       "version": 1,
       "createdAt": "2026-10-15T16:12:36.880Z",
       "updatedAt": "2026-10-15T16:12:36.880Z"
-    },
-    {
-      "id": "art_1792081192023_btu86",
-      "workspaceId": "ws_test_1792081192022",
-      "title": "Config Map",
-      "fileName": "config.json",
-      "language": "json",
-      "content": "{\"env\": \"test\"}",
-      "version": 1,
-      "createdAt": "2026-10-15T16:19:52.023Z",
-      "updatedAt": "2026-10-15T16:19:52.023Z"
     }
   ],
   "tasks": [

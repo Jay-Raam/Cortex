@@ -63,6 +63,22 @@ export async function updateProfile(updates: { name?: string; avatar?: string | 
   return data.user;
 }
 
+export async function renameConversationApi(id: string, title: string): Promise<Conversation> {
+  const data = await fetchGraphQL<{ updateConversation: Conversation }>(
+    `
+    mutation RenameConversation($id: ID!, $title: String!) {
+      updateConversation(id: $id, title: $title) {
+        id
+        title
+        updatedAt
+      }
+    }
+  `,
+    { id, title }
+  );
+  return data.updateConversation;
+}
+
 export async function fetchGraphQL<T = any>(query: string, variables: Record<string, any> = {}): Promise<T> {
   const res = await fetch('/graphql', {
     method: 'POST',

@@ -16,7 +16,7 @@ import { TemplatesModal } from './components/TemplatesModal';
 import { ShareModal } from './components/ShareModal';
 import { AuthPage } from './components/AuthPage';
 import { ProfileModal } from './components/ProfileModal';
-import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser } from './lib/api';
+import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser, renameConversationApi } from './lib/api';
 import {
   Conversation,
   Message,
@@ -362,6 +362,17 @@ export default function App() {
     }
   };
 
+  const handleRenameConversation = async (id: string, newTitle: string) => {
+    try {
+      await renameConversationApi(id, newTitle);
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c))
+      );
+    } catch (err) {
+      console.error('Failed to rename conversation', err);
+    }
+  };
+
   const handleSendMessage = async (content: string, attachments: any[]) => {
     if (!content.trim() && attachments.length === 0) return;
 
@@ -541,6 +552,7 @@ export default function App() {
           onSelectConversation={(id) => setActiveConversationId(id)}
           onNewConversation={handleNewConversation}
           onDeleteConversation={handleDeleteConversation}
+          onRenameConversation={handleRenameConversation}
           onTogglePin={handleTogglePin}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}

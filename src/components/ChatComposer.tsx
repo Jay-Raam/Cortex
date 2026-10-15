@@ -36,8 +36,65 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeeperResearchActive, setIsDeeperResearchActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize SpeechRecognition safely
+  const toggleSpeechRecognition = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript) {
+          setText((prev) => (prev ? `${prev.trim()} ${transcript}` : transcript));
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.error('Speech recognition exception:', e);
+      setIsListening(false);
+    }
+  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -223,11 +280,13 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             {/* Voice Audio Mic */}
             <button
               type="button"
-              onClick={() => {
-                setText('Transcribing voice note...');
-              }}
-              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Voice Input"
+              onClick={toggleSpeechRecognition}
+              className={`p-1 sm:p-1.5 rounded-md transition-all cursor-pointer ${
+                isListening
+                  ? 'bg-red-50 text-red-600 ring-2 ring-red-400 animate-pulse'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+              }`}
+              title={isListening ? 'Listening... click to stop' : 'Voice Input (Speech to text)'}
             >
               <Mic className="w-4 h-4" />
             </button>

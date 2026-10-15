@@ -12,6 +12,9 @@ import {
   Plus,
   LogOut,
   UserCircle,
+  Search,
+  Edit2,
+  Check,
 } from 'lucide-react';
 import { Conversation, User } from '../server/types';
 import { CognivoLogo } from './CognivoLogo';
@@ -23,6 +26,7 @@ interface SidebarProps {
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
   onDeleteConversation: (id: string) => void;
+  onRenameConversation?: (id: string, newTitle: string) => void;
   onTogglePin: (id: string, currentPin: boolean) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -42,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectConversation,
   onNewConversation,
   onDeleteConversation,
+  onRenameConversation,
   onTogglePin,
   isCollapsed,
   onToggleCollapse,
@@ -54,8 +59,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenProfile,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
   const modKey = isMac ? '⌘' : 'Ctrl';
+
+  const handleStartRename = (id: string, currentTitle: string) => {
+    setEditingId(id);
+    setEditingTitle(currentTitle);
+  };
+
+  const handleSaveRename = (id: string) => {
+    if (editingTitle.trim() && onRenameConversation) {
+      onRenameConversation(id, editingTitle.trim());
+    }
+    setEditingId(null);
+  };
+
+  // Filter conversations by search query
+  const filteredConversations = conversations.filter((c) =>
+    searchQuery.trim() === ''
+      ? true
+      : c.title.toLowerCase().includes(searchQuery.toLowerCase().trim())
+  );
 
   // Group real conversations into Today, Yesterday, and Older
   const now = new Date();
@@ -69,9 +96,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return new Date(d).toDateString() === yesterday.toDateString();
   };
 
-  const todayConversations = conversations.filter((c) => isToday(c.createdAt));
-  const yesterdayConversations = conversations.filter((c) => isYesterday(c.createdAt));
-  const olderConversations = conversations.filter((c) => !isToday(c.createdAt) && !isYesterday(c.createdAt));
+  const todayConversations = filteredConversations.filter((c) => isToday(c.createdAt));
+  const yesterdayConversations = filteredConversations.filter((c) => isYesterday(c.createdAt));
+  const olderConversations = filteredConversations.filter((c) => !isToday(c.createdAt) && !isYesterday(c.createdAt));
 
   // User details with safe fallback
   const userName = currentUser?.name || 'Cortex Architect';
@@ -186,6 +213,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
+        {/* Search Conversations Input */}
+        <div className="relative pt-0.5">
+          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+            <Search className="w-3.5 h-3.5" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search chats..."
+            className="w-full pl-8 pr-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/60 focus:bg-white border border-transparent focus:border-[#FF6B00]/40 focus:ring-1 focus:ring-[#FF6B00]/20 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none transition-all"
+          />
+        </div>
+
         {/* Conversation History Groupings (Only Real User Data) */}
         <div className="space-y-4 pt-1">
           {/* Today Group */}
@@ -197,29 +238,68 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="space-y-0.5">
                 {todayConversations.map((item) => {
                   const isActive = activeConversationId === item.id;
+                  const isEditing = editingId === item.id;
                   return (
                     <div
                       key={item.id}
-                      onClick={() => onSelectConversation(item.id)}
+                      onClick={() => !isEditing && onSelectConversation(item.id)}
                       className={`group relative flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-normal transition-colors cursor-pointer ${
                         isActive
                           ? 'bg-white shadow-2xs font-semibold text-slate-900 border border-slate-200/70'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                       }`}
                     >
-                      <span className="truncate pr-2">{item.title}</span>
-                      <div
-                        className="flex items-center gap-1 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={() => onDeleteConversation(item.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded cursor-pointer"
-                          title="Delete chat"
+                      {isEditing ? (
+                        <div
+                          className="flex items-center gap-1.5 w-full pr-1"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                          <input
+                            type="text"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveRename(item.id);
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                            autoFocus
+                            className="flex-1 px-1.5 py-0.5 bg-white border border-[#FF6B00] rounded text-xs text-slate-900 outline-none font-medium"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveRename(item.id)}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                            title="Save"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="truncate pr-2">{item.title}</span>
+                          <div
+                            className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleStartRename(item.id, item.title)}
+                              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors rounded cursor-pointer"
+                              title="Rename chat"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteConversation(item.id)}
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded cursor-pointer"
+                              title="Delete chat"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -236,29 +316,68 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="space-y-0.5">
                 {yesterdayConversations.map((item) => {
                   const isActive = activeConversationId === item.id;
+                  const isEditing = editingId === item.id;
                   return (
                     <div
                       key={item.id}
-                      onClick={() => onSelectConversation(item.id)}
+                      onClick={() => !isEditing && onSelectConversation(item.id)}
                       className={`group relative flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-normal transition-colors cursor-pointer ${
                         isActive
                           ? 'bg-white shadow-2xs font-semibold text-slate-900 border border-slate-200/70'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                       }`}
                     >
-                      <span className="truncate pr-2">{item.title}</span>
-                      <div
-                        className="flex items-center gap-1 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={() => onDeleteConversation(item.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded cursor-pointer"
-                          title="Delete chat"
+                      {isEditing ? (
+                        <div
+                          className="flex items-center gap-1.5 w-full pr-1"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                          <input
+                            type="text"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveRename(item.id);
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                            autoFocus
+                            className="flex-1 px-1.5 py-0.5 bg-white border border-[#FF6B00] rounded text-xs text-slate-900 outline-none font-medium"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveRename(item.id)}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                            title="Save"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="truncate pr-2">{item.title}</span>
+                          <div
+                            className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleStartRename(item.id, item.title)}
+                              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors rounded cursor-pointer"
+                              title="Rename chat"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteConversation(item.id)}
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded cursor-pointer"
+                              title="Delete chat"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -275,29 +394,68 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="space-y-0.5">
                 {olderConversations.map((item) => {
                   const isActive = activeConversationId === item.id;
+                  const isEditing = editingId === item.id;
                   return (
                     <div
                       key={item.id}
-                      onClick={() => onSelectConversation(item.id)}
+                      onClick={() => !isEditing && onSelectConversation(item.id)}
                       className={`group relative flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-normal transition-colors cursor-pointer ${
                         isActive
                           ? 'bg-white shadow-2xs font-semibold text-slate-900 border border-slate-200/70'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                       }`}
                     >
-                      <span className="truncate pr-2">{item.title}</span>
-                      <div
-                        className="flex items-center gap-1 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={() => onDeleteConversation(item.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded cursor-pointer"
-                          title="Delete chat"
+                      {isEditing ? (
+                        <div
+                          className="flex items-center gap-1.5 w-full pr-1"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                          <input
+                            type="text"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveRename(item.id);
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                            autoFocus
+                            className="flex-1 px-1.5 py-0.5 bg-white border border-[#FF6B00] rounded text-xs text-slate-900 outline-none font-medium"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveRename(item.id)}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                            title="Save"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="truncate pr-2">{item.title}</span>
+                          <div
+                            className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleStartRename(item.id, item.title)}
+                              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors rounded cursor-pointer"
+                              title="Rename chat"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteConversation(item.id)}
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded cursor-pointer"
+                              title="Delete chat"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -308,6 +466,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {conversations.length === 0 && (
             <div className="px-3 py-6 text-center text-xs text-slate-400">
               No conversations yet. Start a new chat above!
+            </div>
+          )}
+
+          {conversations.length > 0 && filteredConversations.length === 0 && (
+            <div className="px-3 py-6 text-center text-xs text-slate-400">
+              No chats found matching "{searchQuery}"
             </div>
           )}
         </div>

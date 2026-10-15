@@ -271,19 +271,32 @@ const CodeSnippet: React.FC<{ code: string; language: string }> = ({ code, langu
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const displayLang = language && language !== 'code' ? language.toUpperCase() : 'TEXT';
+
   return (
-    <div className="my-3 rounded-xl border border-slate-200 bg-[#0F172A] overflow-hidden shadow-xs">
-      <div className="flex items-center justify-between px-3.5 py-2 bg-[#1E293B] border-b border-slate-700/60 text-xs text-slate-300">
-        <span className="font-mono text-[11px] text-[#F97316] font-semibold">{language}</span>
+    <div className="my-3.5 rounded-xl border border-slate-700/60 bg-[#0F172A] overflow-hidden shadow-md">
+      <div className="flex items-center justify-between px-4 py-2 bg-[#1E293B] border-b border-slate-800 text-xs text-slate-300">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-600 inline-block" />
+          <span className="font-mono text-[11px] text-[#FF8533] font-bold tracking-wider">
+            {displayLang}
+          </span>
+        </div>
         <button
+          type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-white transition-colors cursor-pointer"
+          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+            copied
+              ? 'text-emerald-400 bg-emerald-950/40 border border-emerald-500/30'
+              : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+          }`}
+          title="Copy code to clipboard"
         >
-          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-          <span>{copied ? 'Copied' : 'Copy'}</span>
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          <span>{copied ? 'Copied!' : 'Copy Code'}</span>
         </button>
       </div>
-      <pre className="p-3.5 text-xs font-mono text-slate-100 overflow-x-auto leading-relaxed">
+      <pre className="p-4 text-xs font-mono text-slate-100 overflow-x-auto leading-relaxed selection:bg-orange-500/30">
         <code>{code}</code>
       </pre>
     </div>
