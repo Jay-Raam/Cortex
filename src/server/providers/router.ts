@@ -10,6 +10,7 @@ export interface RouteRequest {
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
   systemInstruction?: string;
   allowPaidInference?: boolean;
+  attachments?: Array<{ id: string; name: string; mimeType: string; url: string }>;
 }
 
 export interface StreamEvent {
@@ -19,17 +20,32 @@ export interface StreamEvent {
 
 export class ModelRouter {
   /**
-   * Determine the best model based on mode, requested model, and free-first policies.
+   * Determine the best model based on mode, requested model, vision needs, and free-first policies.
    */
   resolveModel(req: RouteRequest): { model: ModelInfo; isFallback: boolean; fallbackReason?: string } {
     const catalog = modelCatalog.getModels();
     const mode = req.mode || 'balanced';
     const forceFree = req.forceFree !== false; // Default: true (Zero-cost prioritized)
+    const hasImageAttachments = req.attachments?.some((a) => a.mimeType?.startsWith('image/'));
 
     // 1. If explicit model requested
     if (req.requestedModelId) {
       const explicit = catalog.find((m) => m.id === req.requestedModelId);
       if (explicit) {
+        // If image attachments exist but explicit model is text-only, auto-route to Gemini Vision
+        if (hasImageAttachments && !explicit.capabilities.vision) {
+          const visionFallback =
+            catalog.find((m) => m.id === 'gemini-3.8-flash' && m.availability === 'available') ||
+            catalog.find((m) => m.capabilities.vision && m.availability === 'available');
+          if (visionFallback) {
+            return {
+              model: visionFallback,
+              isFallback: true,
+              fallbackReason: `Selected model (${explicit.displayName}) is text-only. Automatically switched to ${visionFallback.displayName} for multi-modal vision analysis.`,
+            };
+          }
+        }
+
         // If explicit model is paid but allowPaidInference is false and forceFree is true
         if (!explicit.isFree && !req.allowPaidInference && forceFree) {
           throw new Error(
@@ -53,7 +69,15 @@ export class ModelRouter {
     }
 
     // 2. Intelligent mode routing with Free-First policy
-    const eligibleByMode = catalog.filter((m) => m.mode === mode && m.availability === 'available');
+    let eligibleByMode = catalog.filter((m) => m.mode === mode && m.availability === 'available');
+
+    // If image attachments exist, ensure model supports vision
+    if (hasImageAttachments) {
+      const visionOnly = eligibleByMode.filter((m) => m.capabilities.vision);
+      if (visionOnly.length > 0) {
+        eligibleByMode = visionOnly;
+      }
+    }
 
     // Prefer free models first
     if (forceFree) {
@@ -144,7 +168,8 @@ export class ModelRouter {
             onDelta: handleDelta,
             onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
           },
-          signal
+          signal,
+          req.attachments
         );
       } else if (model.providerId === 'openrouter') {
         const apiKey = process.env.OPENROUTER_API_KEY || '';
@@ -282,7 +307,8 @@ export class ModelRouter {
               onDelta: handleDelta,
               onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
             },
-            signal
+            signal,
+            req.attachments
           );
           return {
             text: completedText || accumulatedText,

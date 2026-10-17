@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, RefreshCw, FileText, User } from 'lucide-react';
+import { Copy, Check, RefreshCw, FileText, User, Maximize2, X, Download } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -18,6 +18,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onRegenerate,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const isAssistant = message.role === 'assistant';
 
   const handleCopy = () => {
@@ -69,19 +70,46 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
           {/* Attachments (if any) */}
           {message.attachments && message.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {message.attachments.map((att) => (
-                <div
-                  key={att.id}
-                  className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs text-slate-700"
-                >
-                  <FileText className="w-3.5 h-3.5 text-[#FF6B00]" />
-                  <span className="truncate max-w-[180px]">{att.name}</span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    ({(att.size / 1024).toFixed(0)} KB)
-                  </span>
-                </div>
-              ))}
+            <div className="flex flex-wrap gap-2.5 mb-3">
+              {message.attachments.map((att) => {
+                const isImage = att.mimeType?.startsWith('image/') || att.name.match(/\.(png|jpe?g|webp|gif|svg)$/i);
+                if (isImage) {
+                  return (
+                    <div
+                      key={att.id}
+                      onClick={() => setSelectedImage(att.url)}
+                      className="group relative rounded-xl overflow-hidden border border-slate-200 bg-white hover:border-[#FF6B00] transition-all cursor-pointer shadow-2xs max-w-[260px]"
+                    >
+                      <img
+                        src={att.url}
+                        alt={att.name}
+                        className="max-h-48 w-auto object-cover rounded-xl"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <span className="p-1.5 rounded-full bg-white/90 text-slate-800 shadow-xs">
+                          <Maximize2 className="w-4 h-4" />
+                        </span>
+                      </div>
+                      <div className="p-1.5 bg-white/95 border-t border-slate-100 text-[11px] text-slate-600 truncate px-2 font-medium">
+                        {att.name}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={att.id}
+                    className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs text-slate-700"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-[#FF6B00]" />
+                    <span className="truncate max-w-[180px]">{att.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      ({(att.size / 1024).toFixed(0)} KB)
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -125,6 +153,43 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
         </div>
       </div>
+
+      {/* Lightbox Modal for Image Zoom */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute -top-10 right-0 flex items-center gap-2">
+              <a
+                href={selectedImage}
+                download
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Download Image"
+              >
+                <Download className="w-5 h-5" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setSelectedImage(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={selectedImage}
+              alt="Enlarged attachment"
+              className="max-h-[85vh] max-w-full object-contain rounded-xl shadow-2xl border border-white/10"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

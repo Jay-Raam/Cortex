@@ -163,21 +163,47 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
       <div className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm hover:border-[#D1D5DB] transition-all">
         {/* Uploaded attachments preview */}
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 p-3 pb-0">
-            {attachments.map((att) => (
-              <div
-                key={att.id}
-                className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-700"
-              >
-                <span className="truncate max-w-[140px]">{att.name}</span>
-                <button
-                  onClick={() => removeAttachment(att.id)}
-                  className="p-0.5 hover:text-red-500 text-slate-400 rounded cursor-pointer"
+          <div className="flex flex-wrap items-center gap-2.5 p-3 pb-0">
+            {attachments.map((att) => {
+              const isImage = att.mimeType?.startsWith('image/') || att.name.match(/\.(png|jpe?g|webp|gif|svg)$/i);
+              if (isImage) {
+                return (
+                  <div
+                    key={att.id}
+                    className="relative group rounded-lg overflow-hidden border border-slate-200 bg-slate-50 w-14 h-14 shrink-0 shadow-2xs"
+                  >
+                    <img
+                      src={att.url}
+                      alt={att.name}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(att.id)}
+                      className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-slate-900/70 hover:bg-red-500 text-white transition-colors cursor-pointer"
+                      title="Remove image"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={att.id}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-700"
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+                  <span className="truncate max-w-[140px]">{att.name}</span>
+                  <button
+                    onClick={() => removeAttachment(att.id)}
+                    className="p-0.5 hover:text-red-500 text-slate-400 rounded cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 

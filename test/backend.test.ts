@@ -251,5 +251,46 @@ describe('Cortex AI Automated Test Suite', () => {
       assert.ok(contextPercent < 1, 'Context percentage should be less than 1% for short chats');
     });
   });
+
+  describe('5. Multi-Modal Vision Routing & Processing', () => {
+    it('auto-switches text-only models to Gemini 3.8 Flash when image attachments are present', () => {
+      const resolved = modelRouter.resolveModel({
+        requestedModelId: 'nvidia/nemotron-3.5-lightning:free', // Text-only model (vision: false)
+        messages: [{ role: 'user', content: 'Describe this diagram' }],
+        attachments: [
+          {
+            id: 'att_sample_1',
+            name: 'architecture.png',
+            mimeType: 'image/png',
+            url: '/uploads/architecture.png',
+          },
+        ],
+      });
+
+      assert.strictEqual(resolved.isFallback, true, 'Must trigger vision fallback');
+      assert.strictEqual(resolved.model.id, 'gemini-3.8-flash', 'Must auto-route to Gemini 3.8 Flash');
+      assert.strictEqual(resolved.model.capabilities.vision, true, 'Fallback model must support vision');
+      assert.ok(resolved.fallbackReason?.includes('multi-modal vision analysis'));
+    });
+
+    it('keeps explicit vision model without fallback when image attachments are present', () => {
+      const resolved = modelRouter.resolveModel({
+        requestedModelId: 'gemini-3.8-flash',
+        messages: [{ role: 'user', content: 'Analyze this photo' }],
+        attachments: [
+          {
+            id: 'att_sample_2',
+            name: 'photo.jpg',
+            mimeType: 'image/jpeg',
+            url: '/uploads/photo.jpg',
+          },
+        ],
+      });
+
+      assert.strictEqual(resolved.isFallback, false, 'Vision-enabled model should not trigger fallback');
+      assert.strictEqual(resolved.model.id, 'gemini-3.8-flash');
+      assert.strictEqual(resolved.model.capabilities.vision, true);
+    });
+  });
 });
 

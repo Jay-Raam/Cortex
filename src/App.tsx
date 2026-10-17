@@ -432,7 +432,7 @@ export default function App() {
         content,
         modelId: selectedModelId,
         skillId: activeSkillId || undefined,
-        attachments: attachments.map((a) => a.id),
+        attachments: attachments,
       },
       (event) => {
         if (event.type === 'delta') {

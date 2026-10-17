@@ -294,6 +294,7 @@ apiRouter.post('/chat/stream', async (req: Request, res: Response) => {
         forceFree: forceFree !== false,
         messages: history,
         systemInstruction,
+        attachments,
       },
       (event) => {
         if (event.type === 'delta' && event.payload?.text) {
