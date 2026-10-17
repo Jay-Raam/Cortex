@@ -300,8 +300,12 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               onClick={() => {
                 setText((prev) => (prev.startsWith('[Web Search] ') ? prev.replace('[Web Search] ', '') : `[Web Search] ${prev}`));
               }}
-              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Web Search"
+              className={`p-1 sm:p-1.5 rounded-md transition-colors cursor-pointer ${
+                text.startsWith('[Web Search] ')
+                  ? 'bg-orange-50 text-[#FF6B00] ring-1 ring-[#FF6B00]/40'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+              }`}
+              title={text.startsWith('[Web Search] ') ? 'Live Web Search Active' : 'Toggle Live Web Search'}
             >
               <Globe className="w-4 h-4" />
             </button>

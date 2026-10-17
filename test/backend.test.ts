@@ -9,6 +9,7 @@ import { modelCatalog } from '../src/server/providers/catalog';
 import { modelRouter } from '../src/server/providers/router';
 import { coworkEngine } from '../src/server/cowork/engine';
 import { User, Conversation, Message, AgentTask } from '../src/server/types';
+import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
 
 describe('Cortex AI Automated Test Suite', () => {
   let testUser1: User;
@@ -290,6 +291,34 @@ describe('Cortex AI Automated Test Suite', () => {
       assert.strictEqual(resolved.isFallback, false, 'Vision-enabled model should not trigger fallback');
       assert.strictEqual(resolved.model.id, 'gemini-3.8-flash');
       assert.strictEqual(resolved.model.capabilities.vision, true);
+    });
+  });
+
+  describe('6. Real-Time Web Search & Citation Grounding', () => {
+    it('formats search results into augmented prompt citations correctly', () => {
+      const sampleResults = [
+        {
+          title: 'Official TypeScript Documentation',
+          url: 'https://www.typescriptlang.org/docs/',
+          snippet: 'TypeScript extends JavaScript by adding types to the language.',
+        },
+        {
+          title: 'Node.js LTS Releases',
+          url: 'https://nodejs.org/en/about/releases',
+          snippet: 'Information on Node.js active, maintenance, and end-of-life releases.',
+        },
+      ];
+
+      const formatted = formatSearchAugmentation(sampleResults);
+      assert.ok(formatted.includes('LIVE WEB SEARCH RESULTS'));
+      assert.ok(formatted.includes('[1] "Official TypeScript Documentation"'));
+      assert.ok(formatted.includes('https://www.typescriptlang.org/docs/'));
+      assert.ok(formatted.includes('[2] "Node.js LTS Releases"'));
+      assert.ok(formatted.includes('[1](url)'));
+    });
+
+    it('returns empty string when no search results exist', () => {
+      assert.strictEqual(formatSearchAugmentation([]), '');
     });
   });
 });

@@ -8,6 +8,7 @@ import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
 import { authenticateRequest, generateTokens } from '../auth/auth';
 import { Message, User } from '../types';
+import { performWebSearch, formatSearchAugmentation } from '../services/search';
 
 export const apiRouter = express.Router();
 
@@ -285,6 +286,26 @@ apiRouter.post('/chat/stream', async (req: Request, res: Response) => {
   };
 
   let accumulatedText = '';
+
+  // Execute real-time web search grounding if requested
+  const isWebSearchRequested = content.includes('[Web Search]') || Boolean(req.body.enableWebSearch);
+  if (isWebSearchRequested) {
+    sendEvent({
+      type: 'delta',
+      payload: { text: '*Searching the live web for verified sources...*\n\n' },
+    });
+    try {
+      const searchResults = await performWebSearch(content);
+      if (searchResults.length > 0) {
+        const augmentation = formatSearchAugmentation(searchResults);
+        if (history.length > 0) {
+          history[history.length - 1].content += augmentation;
+        }
+      }
+    } catch (searchErr) {
+      console.warn('[Web Search Error]', searchErr);
+    }
+  }
 
   try {
     const result = await modelRouter.stream(
