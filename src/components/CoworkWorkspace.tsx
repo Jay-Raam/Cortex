@@ -15,6 +15,10 @@ import {
   Check,
   ChevronRight,
   Layers,
+  Terminal,
+  Trash2,
+  X,
+  Zap,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact } from '../server/types';
 import { fetchGraphQL, advanceTaskApi } from '../lib/api';
@@ -41,6 +45,53 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   const [desiredOutput, setDesiredOutput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedArtId, setCopiedArtId] = useState<string | null>(null);
+
+  // Sandboxed Code Execution Runner State
+  const [isRunningCode, setIsRunningCode] = useState(false);
+  const [executionResult, setExecutionResult] = useState<{
+    success: boolean;
+    output?: {
+      language: string;
+      executionTimeMs: number;
+      logs: Array<{ type: string; text: string; time: string }>;
+      result?: string;
+    };
+    error?: string;
+  } | null>(null);
+  const [isExecutionDrawerOpen, setIsExecutionDrawerOpen] = useState(false);
+
+  const isExecutableArtifact = (lang?: string) => {
+    const l = (lang || '').toLowerCase();
+    return ['javascript', 'js', 'typescript', 'ts', 'json', 'python', 'py', 'node'].includes(l);
+  };
+
+  const handleRunArtifactCode = async () => {
+    if (!selectedArtifact || isRunningCode) return;
+    setIsRunningCode(true);
+    setIsExecutionDrawerOpen(true);
+    try {
+      const res = await fetch('/api/cowork/run-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: selectedArtifact.content,
+          language: selectedArtifact.language || 'javascript',
+          workspaceId: workspace?.id || 'default',
+        }),
+      });
+      const data = await res.json();
+      setExecutionResult(data);
+    } catch (err: any) {
+      setExecutionResult({
+        success: false,
+        error: err.message || 'Execution failed due to network or server error.',
+      });
+    } finally {
+      setIsRunningCode(false);
+    }
+  };
 
   // Load tasks & artifacts
   const loadWorkspaceData = async () => {
@@ -450,6 +501,21 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
 
           {selectedArtifact && (
             <div className="flex items-center gap-2">
+              {isExecutableArtifact(selectedArtifact.language) && (
+                <button
+                  onClick={handleRunArtifactCode}
+                  disabled={isRunningCode}
+                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                  title="Execute code in sandboxed runner"
+                >
+                  {isRunningCode ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Play className="w-3 h-3 fill-current" />
+                  )}
+                  <span>{isRunningCode ? 'Running...' : 'Run Code'}</span>
+                </button>
+              )}
               <button
                 onClick={() => copyArtifactContent(selectedArtifact)}
                 className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
@@ -509,6 +575,124 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
               <pre className="text-xs font-mono text-slate-800 leading-relaxed whitespace-pre-wrap p-4 bg-slate-50 rounded-xl border border-slate-200">
                 <code>{selectedArtifact.content}</code>
               </pre>
+
+              {/* Execution Drawer Panel */}
+              {isExecutionDrawerOpen && (
+                <div className="mt-6 rounded-xl border border-slate-800 bg-[#16161E] text-slate-200 overflow-hidden shadow-lg">
+                  {/* Console Header Bar */}
+                  <div className="px-4 py-2.5 bg-[#1F1F2E] border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Terminal className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-bold font-mono tracking-wide text-slate-200">
+                        Execution Console
+                      </span>
+                      {executionResult && (
+                        <span
+                          className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full ${
+                            executionResult.success
+                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              : 'bg-rose-950 text-rose-400 border border-rose-800'
+                          }`}
+                        >
+                          {executionResult.success ? 'Success' : 'Failed'}
+                        </span>
+                      )}
+                      {executionResult?.output?.executionTimeMs !== undefined && (
+                        <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-amber-400" />
+                          {executionResult.output.executionTimeMs}ms
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleRunArtifactCode}
+                        disabled={isRunningCode}
+                        className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition-colors cursor-pointer"
+                        title="Re-run code"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isRunningCode ? 'animate-spin' : ''}`} />
+                        <span>Rerun</span>
+                      </button>
+                      <button
+                        onClick={() => setExecutionResult(null)}
+                        className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-slate-400 hover:text-slate-200 bg-slate-800/60 hover:bg-slate-700 rounded transition-colors cursor-pointer"
+                        title="Clear console logs"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Clear</span>
+                      </button>
+                      <button
+                        onClick={() => setIsExecutionDrawerOpen(false)}
+                        className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                        title="Close console"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Console Output Body */}
+                  <div className="p-4 font-mono text-xs max-h-72 overflow-y-auto space-y-1.5 no-scrollbar">
+                    {isRunningCode && (
+                      <div className="flex items-center gap-2 text-slate-400 py-2">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                        <span>Executing sandboxed code...</span>
+                      </div>
+                    )}
+
+                    {executionResult?.output?.logs && executionResult.output.logs.length > 0 ? (
+                      executionResult.output.logs.map((log, lIdx) => (
+                        <div
+                          key={lIdx}
+                          className={`flex items-start gap-2 ${
+                            log.type === 'error'
+                              ? 'text-rose-400'
+                              : log.type === 'warn'
+                              ? 'text-amber-300'
+                              : log.type === 'info'
+                              ? 'text-sky-300'
+                              : 'text-emerald-300'
+                          }`}
+                        >
+                          <span className="text-[10px] text-slate-500 shrink-0 select-none">
+                            {new Date(log.time).toLocaleTimeString()}
+                          </span>
+                          <span className="text-slate-400 select-none">❯</span>
+                          <span className="whitespace-pre-wrap break-all">{log.text}</span>
+                        </div>
+                      ))
+                    ) : (
+                      !isRunningCode && !executionResult?.error && (
+                        <div className="text-slate-500 italic py-1">
+                          No stdout output logged.
+                        </div>
+                      )
+                    )}
+
+                    {/* Return Value display */}
+                    {executionResult?.output?.result && (
+                      <div className="mt-3 pt-2 border-t border-slate-800 text-cyan-300">
+                        <span className="text-slate-500 select-none text-[10px] uppercase font-bold block mb-1">
+                          Return Value
+                        </span>
+                        <pre className="whitespace-pre-wrap break-all bg-slate-900/80 p-2.5 rounded border border-slate-800 text-xs">
+                          {executionResult.output.result}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Fatal Error display */}
+                    {executionResult?.error && (
+                      <div className="mt-2 p-2.5 rounded bg-rose-950/60 border border-rose-900 text-rose-300 text-xs">
+                        <span className="font-bold block mb-0.5">Execution Error:</span>
+                        <span className="font-mono">{executionResult.error}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="py-24 text-center text-xs text-slate-400">

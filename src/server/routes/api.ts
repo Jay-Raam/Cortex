@@ -425,6 +425,35 @@ apiRouter.post('/cowork/tasks/:id/advance', async (req: Request, res: Response) 
 });
 
 /**
+ * Sandboxed Code Execution Runner for Workspace Artifacts
+ */
+apiRouter.post('/cowork/run-code', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { code, language = 'javascript', workspaceId = 'default', timeoutMs = 3000 } = req.body;
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid code string to execute.' });
+  }
+
+  try {
+    const result = await coworkEngine.executeTool(
+      'code_execution_runner',
+      { code, language, timeoutMs },
+      workspaceId,
+      user.id
+    );
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * Notification test triggers (verifies adapter contracts without sending spam)
  */
 apiRouter.post('/notifications/test', (req: Request, res: Response) => {

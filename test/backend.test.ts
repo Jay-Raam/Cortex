@@ -395,5 +395,84 @@ describe('Cortex AI Automated Test Suite', () => {
       assert.strictEqual(assistantResponses[1].modelUsed, alternateModelId);
     });
   });
+
+  describe('8. Sandboxed Code Execution Runner in Co-Work Workspace', () => {
+    it('executes safe JavaScript code and captures stdout logs, return value, and execution metrics', async () => {
+      const code = `
+        const numbers = [1, 2, 3, 4, 5];
+        const sum = numbers.reduce((a, b) => a + b, 0);
+        console.log("Calculated sum:", sum);
+        sum * 2;
+      `;
+
+      const result = await coworkEngine.executeTool(
+        'code_execution_runner',
+        { code, language: 'javascript', timeoutMs: 2000 },
+        'ws_test',
+        testUser1.id
+      );
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.output);
+      assert.strictEqual(result.output.language, 'javascript');
+      assert.strictEqual(result.output.result, '30');
+      assert.ok(Array.isArray(result.output.logs));
+      assert.ok(result.output.logs.some((l: any) => l.text.includes('Calculated sum: 15')));
+      assert.ok(typeof result.output.executionTimeMs === 'number');
+    });
+
+    it('traps runtime errors safely without crashing the host process', async () => {
+      const code = `
+        const x = undefinedVariable + 10;
+      `;
+
+      const result = await coworkEngine.executeTool(
+        'code_execution_runner',
+        { code, language: 'javascript', timeoutMs: 1000 },
+        'ws_test',
+        testUser1.id
+      );
+
+      assert.strictEqual(result.success, false);
+      assert.ok(result.error?.includes('undefinedVariable is not defined'));
+      assert.ok(result.output?.logs.some((l: any) => l.type === 'error'));
+    });
+
+    it('validates and pretty-prints JSON artifacts', async () => {
+      const jsonStr = '{"service": "cortex", "active": true, "version": 1.5}';
+      const result = await coworkEngine.executeTool(
+        'code_execution_runner',
+        { code: jsonStr, language: 'json' },
+        'ws_test',
+        testUser1.id
+      );
+
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(result.output?.valid, true);
+      assert.ok(result.output?.result.includes('"service": "cortex"'));
+    });
+
+    it('simulates sandboxed execution for Python code artifacts', async () => {
+      const pyCode = `
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+print(fibonacci(10))
+      `;
+
+      const result = await coworkEngine.executeTool(
+        'code_execution_runner',
+        { code: pyCode, language: 'python' },
+        'ws_test',
+        testUser1.id
+      );
+
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(result.output?.language, 'python');
+      assert.ok(result.output?.logs.some((l: any) => l.text.includes('PYTHON')));
+    });
+  });
 });
 
