@@ -1,24 +1,29 @@
 import React, { useState } from 'react';
-import { Copy, Check, RefreshCw, FileText, User, Maximize2, X, Download } from 'lucide-react';
+import { Copy, Check, RefreshCw, FileText, User, Maximize2, X, Download, Cpu, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import { Message } from '../server/types';
+import { Message, ModelInfo } from '../server/types';
 import { CognivoLogo } from './CognivoLogo';
 
 interface ChatMessageProps {
   message: Message;
   isStreaming?: boolean;
+  availableModels?: ModelInfo[];
   onRegenerate?: () => void;
+  onRegenerateWithModel?: (modelId: string) => void;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   isStreaming,
+  availableModels = [],
   onRegenerate,
+  onRegenerateWithModel,
 }) => {
   const [copied, setCopied] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const isAssistant = message.role === 'assistant';
 
   const handleCopy = () => {
@@ -142,12 +147,60 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
               {onRegenerate && (
                 <button
+                  type="button"
                   onClick={onRegenerate}
                   className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded border border-transparent hover:border-slate-200 transition-colors cursor-pointer"
+                  title="Regenerate response"
                 >
                   <RefreshCw className="w-3 h-3" />
                   <span>Regenerate</span>
                 </button>
+              )}
+
+              {onRegenerateWithModel && availableModels.length > 0 && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded border border-transparent hover:border-slate-200 transition-colors cursor-pointer"
+                    title="Compare response with another model"
+                  >
+                    <Cpu className="w-3 h-3" />
+                    <span>Compare with...</span>
+                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                  </button>
+
+                  {isModelDropdownOpen && (
+                    <div className="absolute left-0 bottom-full mb-1 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1 overflow-hidden animate-in fade-in">
+                      <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                        Regenerate with Model
+                      </div>
+                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-50">
+                        {availableModels.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setIsModelDropdownOpen(false);
+                              onRegenerateWithModel(m.id);
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer"
+                          >
+                            <div className="pr-2 truncate">
+                              <div className="text-xs font-semibold text-slate-800 truncate">{m.displayName}</div>
+                              <div className="text-[10px] text-slate-400 uppercase tracking-wider">{m.providerId}</div>
+                            </div>
+                            {m.isFree && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 shrink-0">
+                                FREE
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

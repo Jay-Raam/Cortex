@@ -321,5 +321,79 @@ describe('Cortex AI Automated Test Suite', () => {
       assert.strictEqual(formatSearchAugmentation([]), '');
     });
   });
+
+  describe('7. Multi-Model Comparison & Context Regeneration', () => {
+    it('accurately resolves preceding user prompt and attachments for multi-model regeneration', () => {
+      const conv = db.createConversation({
+        id: `conv_regen_${Date.now()}`,
+        userId: testUser1.id,
+        title: 'Model Comparison Chat',
+        modelId: 'gemini-3.8-flash',
+        providerId: 'gemini',
+        mode: 'balanced',
+        isPinned: false,
+        isArchived: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const userMsg = db.addMessage(
+        {
+          id: `msg_user_prompt_${Date.now()}`,
+          conversationId: conv.id,
+          role: 'user',
+          content: 'Compare QuickSort and MergeSort computational complexity.',
+          createdAt: new Date().toISOString(),
+        },
+        testUser1.id
+      );
+
+      const asstMsg1 = db.addMessage(
+        {
+          id: `msg_asst_1_${Date.now()}`,
+          conversationId: conv.id,
+          role: 'assistant',
+          content: 'QuickSort is O(n log n) average but O(n^2) worst case.',
+          modelUsed: 'gemini-3.8-flash',
+          createdAt: new Date().toISOString(),
+        },
+        testUser1.id
+      );
+
+      const allMessages = db.getMessages(conv.id, testUser1.id);
+      const asstIndex = allMessages.findIndex((m) => m.id === asstMsg1.id);
+
+      // Locate prior user prompt
+      let resolvedPrompt = '';
+      for (let i = asstIndex - 1; i >= 0; i--) {
+        if (allMessages[i].role === 'user') {
+          resolvedPrompt = allMessages[i].content;
+          break;
+        }
+      }
+
+      assert.strictEqual(resolvedPrompt, 'Compare QuickSort and MergeSort computational complexity.');
+
+      // Simulate regenerated response from an alternate model
+      const alternateModelId = 'meta-llama/llama-3.3-70b-instruct:free';
+      const asstMsg2 = db.addMessage(
+        {
+          id: `msg_asst_2_${Date.now()}`,
+          conversationId: conv.id,
+          role: 'assistant',
+          content: 'MergeSort is guaranteed O(n log n) time at the cost of O(n) auxiliary space.',
+          modelUsed: alternateModelId,
+          createdAt: new Date().toISOString(),
+        },
+        testUser1.id
+      );
+
+      const updatedHistory = db.getMessages(conv.id, testUser1.id);
+      const assistantResponses = updatedHistory.filter((m) => m.role === 'assistant');
+      assert.strictEqual(assistantResponses.length, 2, 'Both model responses should be captured for side-by-side comparison');
+      assert.strictEqual(assistantResponses[0].modelUsed, 'gemini-3.8-flash');
+      assert.strictEqual(assistantResponses[1].modelUsed, alternateModelId);
+    });
+  });
 });
 

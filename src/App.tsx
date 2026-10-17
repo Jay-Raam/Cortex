@@ -375,9 +375,10 @@ export default function App() {
     }
   };
 
-  const handleSendMessage = async (content: string, attachments: any[]) => {
+  const handleSendMessage = async (content: string, attachments: any[], overrideModelId?: string) => {
     if (!content.trim() && attachments.length === 0) return;
 
+    const modelToUse = overrideModelId || selectedModelId;
     let convId = activeConversationId;
     if (!convId) {
       try {
@@ -395,7 +396,7 @@ export default function App() {
           }
         `, {
           title: titleSnippet,
-          modelId: selectedModelId,
+          modelId: modelToUse,
           mode: selectedMode,
           skillId: activeSkillId,
         });
@@ -430,7 +431,7 @@ export default function App() {
       {
         conversationId: convId!,
         content,
-        modelId: selectedModelId,
+        modelId: modelToUse,
         skillId: activeSkillId || undefined,
         attachments: attachments,
       },
@@ -541,6 +542,23 @@ export default function App() {
       setMessages((prev) => [...prev, partialMsg]);
       setStreamingContent('');
     }
+  };
+
+  const handleRegenerate = (messageId: string, overrideModelId?: string) => {
+    if (isStreaming) return;
+    const msgIndex = messages.findIndex((m) => m.id === messageId);
+    let userPrompt = 'Regenerate previous answer with deeper analysis.';
+    let attachments: any[] = [];
+    if (msgIndex !== -1) {
+      for (let i = msgIndex - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') {
+          userPrompt = messages[i].content;
+          attachments = messages[i].attachments || [];
+          break;
+        }
+      }
+    }
+    handleSendMessage(userPrompt, attachments, overrideModelId);
   };
 
   const activeModel = models.find((m) => m.id === selectedModelId) || models[0];
@@ -769,9 +787,15 @@ export default function App() {
                       <ChatMessage
                         key={msg.id}
                         message={msg}
+                        availableModels={models}
                         onRegenerate={
                           msg.role === 'assistant'
-                            ? () => handleSendMessage('Regenerate previous answer with deeper analysis.', [])
+                            ? () => handleRegenerate(msg.id)
+                            : undefined
+                        }
+                        onRegenerateWithModel={
+                          msg.role === 'assistant'
+                            ? (modelId) => handleRegenerate(msg.id, modelId)
                             : undefined
                         }
                       />
