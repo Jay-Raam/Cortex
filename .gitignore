@@ -7,4 +7,5 @@ coverage/
 .env*
 !.env.example
 uploads/
+workspaces/
 .dart_tool/

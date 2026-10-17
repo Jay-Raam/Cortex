@@ -12,6 +12,8 @@ import {
   AgentTask,
   NotificationItem,
   NotificationPreferences,
+  ApprovalRequest,
+  WorkspaceCheckpoint,
 } from '../types';
 
 interface DatabaseSchema {
@@ -23,6 +25,8 @@ interface DatabaseSchema {
   workspaces: Workspace[];
   artifacts: WorkspaceArtifact[];
   tasks: AgentTask[];
+  approvals: ApprovalRequest[];
+  checkpoints: WorkspaceCheckpoint[];
   notifications: NotificationItem[];
   preferences: NotificationPreferences[];
 }
@@ -161,7 +165,21 @@ class Database {
       }
       if (fs.existsSync(DATA_FILE)) {
         const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        return {
+          users: parsed.users || [],
+          sessions: parsed.sessions || [],
+          conversations: parsed.conversations || [],
+          messages: parsed.messages || [],
+          skills: parsed.skills || [...INITIAL_SKILLS],
+          workspaces: parsed.workspaces || [],
+          artifacts: parsed.artifacts || [],
+          tasks: parsed.tasks || [],
+          approvals: parsed.approvals || [],
+          checkpoints: parsed.checkpoints || [],
+          notifications: parsed.notifications || [],
+          preferences: parsed.preferences || [],
+        };
       }
     } catch (err) {
       console.error('Error loading database file, initializing clean database:', err);
@@ -175,6 +193,8 @@ class Database {
       workspaces: [],
       artifacts: [],
       tasks: [],
+      approvals: [],
+      checkpoints: [],
       notifications: [],
       preferences: [],
     };
@@ -546,6 +566,47 @@ class Database {
     Object.assign(pref, updates);
     this.persist();
     return pref;
+  }
+
+  // --- Approval Requests ---
+  getApprovalRequests(taskId: string): ApprovalRequest[] {
+    return this.data.approvals.filter((a) => a.taskId === taskId);
+  }
+
+  getApprovalById(id: string): ApprovalRequest | undefined {
+    return this.data.approvals.find((a) => a.id === id);
+  }
+
+  createApprovalRequest(approval: ApprovalRequest): ApprovalRequest {
+    this.data.approvals.unshift(approval);
+    this.persist();
+    return approval;
+  }
+
+  updateApprovalRequest(id: string, status: 'approved' | 'rejected'): ApprovalRequest | undefined {
+    const approval = this.getApprovalById(id);
+    if (!approval) return undefined;
+    approval.status = status;
+    approval.resolvedAt = new Date().toISOString();
+    this.persist();
+    return approval;
+  }
+
+  // --- Checkpoints ---
+  getCheckpoints(workspaceId: string): WorkspaceCheckpoint[] {
+    return this.data.checkpoints
+      .filter((c) => c.workspaceId === workspaceId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  getCheckpointById(id: string): WorkspaceCheckpoint | undefined {
+    return this.data.checkpoints.find((c) => c.id === id);
+  }
+
+  createCheckpoint(ckpt: WorkspaceCheckpoint): WorkspaceCheckpoint {
+    this.data.checkpoints.unshift(ckpt);
+    this.persist();
+    return ckpt;
   }
 }
 

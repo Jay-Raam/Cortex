@@ -115,6 +115,9 @@ export interface Workspace {
   userId: string;
   name: string;
   description: string;
+  projectRoot?: string;
+  isLocalBinding?: boolean;
+  gitBranch?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -124,9 +127,59 @@ export type TaskStatus =
   | 'planning'
   | 'running'
   | 'awaiting_approval'
+  | 'verifying'
   | 'completed'
   | 'failed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'timed_out';
+
+export interface ApprovalRequest {
+  id: string;
+  taskId: string;
+  stepId: string;
+  workspaceId: string;
+  tool: string;
+  toolInput: Record<string, any>;
+  reason: string;
+  impactLevel: 'low' | 'medium' | 'high';
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface WorkspaceFileNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+  updatedAt?: string;
+  children?: WorkspaceFileNode[];
+}
+
+export interface ExecutionCommandResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  timedOut: boolean;
+}
+
+export interface WorkspaceCheckpoint {
+  id: string;
+  workspaceId: string;
+  title: string;
+  description: string;
+  files: Array<{ path: string; content: string }>;
+  createdAt: string;
+}
+
+export interface TaskExecutionEvent {
+  taskId: string;
+  eventId: string;
+  type: string;
+  payload: any;
+  timestamp: string;
+}
 
 export interface AgentTaskStep {
   id: string;

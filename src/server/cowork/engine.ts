@@ -1,7 +1,9 @@
 import vm from 'node:vm';
 import { db } from '../db/database';
-import { AgentTask, AgentTaskStep, WorkspaceArtifact } from '../types';
+import { AgentTask, AgentTaskStep, WorkspaceArtifact, ApprovalRequest } from '../types';
 import { generateGeminiContent } from '../providers/gemini';
+import { workspaceManager } from './workspace-manager';
+import { executionRunner } from './execution-runner';
 
 export interface ToolExecutionResult {
   success: boolean;
@@ -13,7 +15,54 @@ export interface ToolExecutionResult {
 
 export class CoworkEngine {
   /**
-   * Execute a specific bounded agent tool within a workspace.
+   * Determine approval requirements and risk level for any tool call.
+   */
+  determineApprovalPolicy(
+    toolName: string,
+    toolInput: Record<string, any>
+  ): { requiresApproval: boolean; impactLevel: 'low' | 'medium' | 'high'; reason: string } {
+    if (toolName === 'workspace_delete_file' || toolName === 'workspace_restore_checkpoint') {
+      return {
+        requiresApproval: true,
+        impactLevel: 'high',
+        reason: `Destructive operation: ${toolName} affects repository file stability.`,
+      };
+    }
+
+    if (toolName === 'terminal_execute_command') {
+      const cmd = (toolInput.command || '').trim().toLowerCase();
+      // Arbitrary commands, installs, deletions, or git modifications require explicit approval
+      if (cmd.includes('rm ') || cmd.includes('del ') || cmd.includes('reset') || cmd.includes('clean')) {
+        return {
+          requiresApproval: true,
+          impactLevel: 'high',
+          reason: `High-impact shell execution: "${toolInput.command}".`,
+        };
+      }
+      return {
+        requiresApproval: true,
+        impactLevel: 'medium',
+        reason: `Development command execution: "${toolInput.command}".`,
+      };
+    }
+
+    if (toolName === 'workspace_apply_patch' || toolName === 'workspace_edit_file') {
+      return {
+        requiresApproval: false,
+        impactLevel: 'low',
+        reason: `Controlled file modification: ${toolInput.filePath || toolInput.path || 'file'}.`,
+      };
+    }
+
+    return {
+      requiresApproval: false,
+      impactLevel: 'low',
+      reason: 'Read-only repository query.',
+    };
+  }
+
+  /**
+   * Execute a specific bounded agent tool within a real repository workspace.
    */
   async executeTool(
     toolName: string,
@@ -22,13 +71,31 @@ export class CoworkEngine {
     userId: string
   ): Promise<ToolExecutionResult> {
     try {
+      const workspace = db.getWorkspaceById(workspaceId, userId) || {
+        id: workspaceId,
+        userId,
+        name: 'Workspace',
+        description: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+
       switch (toolName) {
-        case 'workspace_list_files': {
+        // --- 1. Workspace Discovery & Context Tools ---
+        case 'workspace_list_files':
+        case 'workspace_list_directory': {
+          const subDir = toolInput.dir || toolInput.subDir || '';
+          const tree = await workspaceManager.listDirectoryTree(wsRoot, subDir);
           const artifacts = db.getArtifacts(workspaceId, userId);
+
           return {
             success: true,
             output: {
-              files: artifacts.map((a) => ({
+              workspaceRoot: wsRoot,
+              subDir,
+              files: tree,
+              artifacts: artifacts.map((a) => ({
                 id: a.id,
                 title: a.title,
                 fileName: a.fileName,
@@ -36,35 +103,299 @@ export class CoworkEngine {
                 version: a.version,
                 updatedAt: a.updatedAt,
               })),
-              totalCount: artifacts.length,
+              totalCount: tree.length + artifacts.length,
             },
           };
         }
 
         case 'workspace_read_file': {
-          const { artifactId, fileName } = toolInput;
-          const artifacts = db.getArtifacts(workspaceId, userId);
-          const found = artifactId
-            ? artifacts.find((a) => a.id === artifactId)
-            : artifacts.find((a) => a.fileName.toLowerCase() === (fileName || '').toLowerCase());
+          const targetPath = toolInput.filePath || toolInput.path || toolInput.fileName;
+          const { artifactId } = toolInput;
 
-          if (!found) {
-            return { success: false, error: `File not found in workspace: ${fileName || artifactId}` };
+          // Check real filesystem first if path is provided
+          if (targetPath) {
+            try {
+              const fileData = await workspaceManager.readFile(
+                wsRoot,
+                targetPath,
+                Boolean(toolInput.allowSensitive)
+              );
+              return {
+                success: true,
+                output: {
+                  isRealFile: true,
+                  path: fileData.path,
+                  content: fileData.content,
+                  size: fileData.size,
+                },
+              };
+            } catch (fsErr: any) {
+              if (!artifactId) {
+                // Check if file exists as a standalone workspace artifact
+                const artifacts = db.getArtifacts(workspaceId, userId);
+                const foundArt = artifacts.find(
+                  (a) => a.fileName.toLowerCase() === targetPath.toLowerCase()
+                );
+                if (foundArt) {
+                  return {
+                    success: true,
+                    output: {
+                      isRealFile: false,
+                      id: foundArt.id,
+                      fileName: foundArt.fileName,
+                      title: foundArt.title,
+                      language: foundArt.language,
+                      version: foundArt.version,
+                      content: foundArt.content,
+                    },
+                  };
+                }
+                return { success: false, error: fsErr.message };
+              }
+            }
           }
 
+          // Fallback to artifact lookup by ID
+          if (artifactId) {
+            const art = db.getArtifactById(artifactId, userId);
+            if (!art) {
+              return { success: false, error: `Artifact ${artifactId} not found.` };
+            }
+            return {
+              success: true,
+              output: {
+                isRealFile: false,
+                id: art.id,
+                fileName: art.fileName,
+                title: art.title,
+                language: art.language,
+                version: art.version,
+                content: art.content,
+              },
+            };
+          }
+
+          return { success: false, error: 'filePath or artifactId is required to read file.' };
+        }
+
+        case 'workspace_search_files': {
+          const { query = '' } = toolInput;
+          const matches = await workspaceManager.searchFiles(wsRoot, query);
+          return {
+            success: true,
+            output: { query, matches, matchCount: matches.length },
+          };
+        }
+
+        case 'workspace_search_content': {
+          const { query = '' } = toolInput;
+          const matches = await workspaceManager.searchContent(wsRoot, query);
+          return {
+            success: true,
+            output: { query, matches, matchCount: matches.length },
+          };
+        }
+
+        case 'workspace_get_metadata': {
+          const targetPath = toolInput.filePath || toolInput.path || '';
+          const fullPath = workspaceManager.resolveSafePath(wsRoot, targetPath);
+          const stats = await workspaceManager.readFile(wsRoot, targetPath);
           return {
             success: true,
             output: {
-              id: found.id,
-              fileName: found.fileName,
-              title: found.title,
-              language: found.language,
-              version: found.version,
-              content: found.content,
+              path: targetPath,
+              size: stats.size,
+              isSensitive: workspaceManager.isSensitiveFile(targetPath),
             },
           };
         }
 
+        // --- 2. Real File Modification Tools ---
+        case 'workspace_create_file': {
+          const targetPath = toolInput.filePath || toolInput.path;
+          const content = toolInput.content ?? '';
+          if (!targetPath) {
+            return { success: false, error: 'filePath is required to create a file.' };
+          }
+
+          const res = await workspaceManager.createFile(wsRoot, targetPath, content);
+          return {
+            success: true,
+            output: {
+              path: res.path,
+              size: res.size,
+              message: `Created file ${res.path} successfully.`,
+            },
+          };
+        }
+
+        case 'workspace_edit_file': {
+          const targetPath = toolInput.filePath || toolInput.path;
+          const content = toolInput.content;
+          if (!targetPath || content === undefined) {
+            return { success: false, error: 'Both filePath and content are required to edit file.' };
+          }
+
+          const res = await workspaceManager.editFile(wsRoot, targetPath, content);
+          return {
+            success: true,
+            output: {
+              path: res.path,
+              size: res.size,
+              message: `Updated file ${res.path} successfully.`,
+            },
+          };
+        }
+
+        case 'workspace_apply_patch': {
+          const targetPath = toolInput.filePath || toolInput.path;
+          const { patchContent = '', targetSnippet, replacementSnippet } = toolInput;
+          if (!targetPath) {
+            return { success: false, error: 'filePath is required to apply patch.' };
+          }
+
+          const res = await workspaceManager.applyPatch(
+            wsRoot,
+            targetPath,
+            patchContent,
+            targetSnippet,
+            replacementSnippet
+          );
+          return {
+            success: true,
+            output: {
+              path: res.path,
+              diff: res.diff,
+              message: `Applied patch to ${res.path} successfully.`,
+            },
+          };
+        }
+
+        case 'workspace_delete_file': {
+          const targetPath = toolInput.filePath || toolInput.path;
+          if (!targetPath) {
+            return { success: false, error: 'filePath is required to delete file.' };
+          }
+
+          const res = await workspaceManager.deleteFile(wsRoot, targetPath);
+          return {
+            success: true,
+            output: {
+              path: res.path,
+              message: `Deleted file ${res.path} successfully.`,
+            },
+          };
+        }
+
+        case 'workspace_create_directory': {
+          const targetPath = toolInput.dirPath || toolInput.path;
+          if (!targetPath) {
+            return { success: false, error: 'dirPath is required to create directory.' };
+          }
+
+          const res = await workspaceManager.createDirectory(wsRoot, targetPath);
+          return {
+            success: true,
+            output: {
+              path: res.path,
+              message: `Created directory ${res.path} successfully.`,
+            },
+          };
+        }
+
+        // --- 3. Code Understanding & Architecture Inspection ---
+        case 'workspace_get_project_structure': {
+          const structure = await workspaceManager.getProjectStructure(wsRoot);
+          return {
+            success: true,
+            output: structure,
+          };
+        }
+
+        case 'workspace_get_package_scripts': {
+          const structure = await workspaceManager.getProjectStructure(wsRoot);
+          return {
+            success: true,
+            output: {
+              scripts: structure.packageScripts,
+              hasTests: structure.hasTests,
+            },
+          };
+        }
+
+        case 'workspace_get_git_status':
+        case 'workspace_get_changed_files': {
+          const gitStatus = await workspaceManager.getGitStatus(wsRoot);
+          return {
+            success: true,
+            output: gitStatus,
+          };
+        }
+
+        // --- 4. Change Review & Checkpoints ---
+        case 'workspace_create_checkpoint': {
+          const { title = 'Agent Checkpoint', filePaths = [] } = toolInput;
+          const ckpt = await workspaceManager.createCheckpoint(
+            wsRoot,
+            workspaceId,
+            title,
+            filePaths
+          );
+          db.createCheckpoint(ckpt);
+          return {
+            success: true,
+            output: {
+              checkpointId: ckpt.id,
+              title: ckpt.title,
+              filesCaptured: ckpt.files.map((f) => f.path),
+            },
+          };
+        }
+
+        case 'workspace_restore_checkpoint': {
+          const { checkpointId } = toolInput;
+          const ckpt = db.getCheckpointById(checkpointId);
+          if (!ckpt) {
+            return { success: false, error: `Checkpoint ${checkpointId} not found.` };
+          }
+          const res = await workspaceManager.restoreCheckpoint(wsRoot, ckpt);
+          return {
+            success: true,
+            output: {
+              checkpointId,
+              restoredFiles: res.restoredFiles,
+              message: `Restored ${res.restoredFiles.length} files from checkpoint.`,
+            },
+          };
+        }
+
+        // --- 5. Real Terminal & Development Command Execution ---
+        case 'terminal_execute_command': {
+          const { command, timeoutMs = 30000 } = toolInput;
+          if (!command || typeof command !== 'string') {
+            return { success: false, error: 'A valid command line string is required.' };
+          }
+
+          const result = await executionRunner.executeCommand(command, {
+            cwd: wsRoot,
+            timeoutMs,
+          });
+
+          return {
+            success: result.exitCode === 0,
+            output: {
+              command,
+              exitCode: result.exitCode,
+              stdout: result.stdout,
+              stderr: result.stderr,
+              durationMs: result.durationMs,
+              timedOut: result.timedOut,
+            },
+            error: result.exitCode !== 0 ? `Command exited with status code ${result.exitCode}` : undefined,
+          };
+        }
+
+        // --- 6. Backward Compatibility: Artifacts & VM Sandbox ---
         case 'workspace_create_artifact': {
           const { title, fileName, language, content } = toolInput;
           if (!fileName || !content) {
@@ -114,28 +445,10 @@ export class CoworkEngine {
           };
         }
 
-        case 'workspace_search': {
-          const { query } = toolInput;
-          const q = (query || '').toLowerCase();
-          const artifacts = db.getArtifacts(workspaceId, userId);
-          const matches = artifacts
-            .filter((a) => a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q))
-            .map((a) => ({
-              id: a.id,
-              fileName: a.fileName,
-              title: a.title,
-              preview: a.content.substring(0, 150) + '...',
-            }));
-          return {
-            success: true,
-            output: { query, matches, matchCount: matches.length },
-          };
-        }
-
         case 'code_diff_analyzer': {
-          const { originalText, modifiedText, title } = toolInput;
-          const origLines = (originalText || '').split('\n');
-          const modLines = (modifiedText || '').split('\n');
+          const { originalText = '', modifiedText = '', title } = toolInput;
+          const origLines = originalText.split('\n');
+          const modLines = modifiedText.split('\n');
 
           const diffLines: string[] = [];
           const max = Math.max(origLines.length, modLines.length);
@@ -156,43 +469,6 @@ export class CoworkEngine {
               title: title || 'Unified Diff',
               diff: diffLines.join('\n'),
               totalChanges: diffLines.filter((l) => l.startsWith('+') || l.startsWith('-')).length,
-            },
-          };
-        }
-
-        case 'document_outline_generator': {
-          const { topic, depth = 3 } = toolInput;
-          return {
-            success: true,
-            output: {
-              topic,
-              depth,
-              sections: [
-                { section: '1. Executive Summary & Goals', priority: 'High' },
-                { section: '2. Architectural Blueprint & Invariants', priority: 'High' },
-                { section: '3. Data Schema & Persistence Model', priority: 'Medium' },
-                { section: '4. API & Integration Contracts', priority: 'Medium' },
-                { section: '5. Security, RBAC & Isolation Controls', priority: 'Critical' },
-                { section: '6. Verification, Test Matrices & Rollout', priority: 'High' },
-              ],
-            },
-          };
-        }
-
-        case 'structured_data_extractor': {
-          const { rawText, schemaFields } = toolInput;
-          const extracted: Record<string, any> = {};
-          if (Array.isArray(schemaFields)) {
-            for (const field of schemaFields) {
-              extracted[field] = `Extracted value for ${field}`;
-            }
-          }
-          return {
-            success: true,
-            output: {
-              status: 'extracted',
-              recordsCount: 1,
-              data: extracted,
             },
           };
         }
@@ -317,7 +593,7 @@ export class CoworkEngine {
             }
           }
 
-          // Safe execution simulation / syntax validation for Python & other languages
+          // Simulated Python execution
           const durationMs = Date.now() - startTime;
           const lineCount = code.split('\n').length;
           return {
@@ -343,25 +619,39 @@ export class CoworkEngine {
   }
 
   /**
-   * Plan initial steps for an agent task based on user goal and constraints.
+   * Plan initial steps for an agent task based on user goal, constraints, and project structure.
    */
   async planTask(task: AgentTask, userId: string): Promise<AgentTaskStep[]> {
-    const prompt = `You are an AI Co-Work Task Planner. Analyze the user's objective and formulate a strict, sequential 3 to 4 step execution plan.
+    const workspace = db.getWorkspaceById(task.workspaceId, userId) || {
+      id: task.workspaceId,
+      userId,
+      name: 'Workspace',
+      description: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+    const structure = await workspaceManager.getProjectStructure(wsRoot);
+
+    const prompt = `You are an AI Principal Software Engineer. Formulate a 3 to 4 step execution plan for the following development task.
+Project Framework: ${structure.framework}
+Has Tests: ${structure.hasTests}
 Goal: ${task.goal}
 Constraints: ${task.constraints || 'None'}
-Desired Output: ${task.desiredOutput || 'Structured document or code'}
+Desired Output: ${task.desiredOutput || 'Production implementation'}
 
-Return ONLY a valid JSON array of objects with fields:
+Return ONLY a JSON array of step objects with fields:
 - "title": string (concise step title)
 - "description": string (actionable details)
-- "tool": string (one of: workspace_list_files, workspace_create_artifact, code_diff_analyzer, document_outline_generator)
-- "requiresApproval": boolean (true if generating or altering critical files, false otherwise)
-Do not include markdown fences or any other text outside the JSON array.`;
+- "tool": string (one of: workspace_list_files, workspace_read_file, workspace_create_file, workspace_apply_patch, workspace_create_artifact, terminal_execute_command, code_diff_analyzer)
+- "toolInput": object (optional initial arguments)
+- "requiresApproval": boolean (true for terminal commands, file deletions, or destructive actions; false for read-only or non-destructive edits)
+No markdown fences or extra text.`;
 
     let steps: AgentTaskStep[] = [];
 
     try {
-      if (process.env.GEMINI_API_KEY) {
+      if (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith('ci-test')) {
         const raw = await generateGeminiContent('gemini-3.8-flash', prompt);
         const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleaned);
@@ -371,7 +661,8 @@ Do not include markdown fences or any other text outside the JSON array.`;
             title: p.title || `Step ${idx + 1}`,
             description: p.description || '',
             status: idx === 0 ? 'running' : 'pending',
-            tool: p.tool || 'workspace_create_artifact',
+            tool: p.tool || 'workspace_list_files',
+            toolInput: p.toolInput || {},
             requiresApproval: Boolean(p.requiresApproval),
             isApproved: false,
             createdAt: new Date().toISOString(),
@@ -382,42 +673,44 @@ Do not include markdown fences or any other text outside the JSON array.`;
       console.warn('AI planning fallback triggered:', err);
     }
 
-    // Default robust fallback steps if model response parsing failed or key missing
+    // Default structured plan
     if (steps.length === 0) {
       steps = [
         {
           id: `step_${Date.now()}_1`,
-          title: 'Inspect Workspace Context',
-          description: 'Enumerate existing workspace artifacts and examine existing specifications.',
+          title: 'Inspect Repository Context',
+          description: 'Enumerate workspace files, analyze entry points, and discover existing project dependencies.',
           status: 'running',
           tool: 'workspace_list_files',
+          toolInput: {},
           requiresApproval: false,
           isApproved: false,
           createdAt: new Date().toISOString(),
         },
         {
           id: `step_${Date.now()}_2`,
-          title: 'Synthesize Architecture & Implementation',
-          description: `Formulate solution for goal: "${task.goal}" and draft structured artifact.`,
+          title: 'Implement Solution & File Modifications',
+          description: `Implement coordinated changes for goal: "${task.goal}".`,
           status: 'pending',
-          tool: 'workspace_create_artifact',
+          tool: 'workspace_create_file',
           toolInput: {
-            fileName: 'solution_spec.md',
-            title: `${task.title} - Solution Spec`,
-            language: 'markdown',
-            content: `# ${task.title}\n\n## Objective\n${task.goal}\n\n## Desired Output\n${task.desiredOutput || 'Implemented production solution'}\n\n## Generated Spec\nStructured architecture delivered via Nexa AI Co-Work Agent.`,
+            filePath: 'solution.ts',
+            content: `// Solution for: ${task.goal}\nexport function execute() {\n  return { success: true, timestamp: new Date().toISOString() };\n}\n`,
           },
-          requiresApproval: true,
+          requiresApproval: false,
           isApproved: false,
           createdAt: new Date().toISOString(),
         },
         {
           id: `step_${Date.now()}_3`,
-          title: 'Review Verification & Quality Diff',
-          description: 'Perform diff comparison and confirm all constraints and standards are met.',
+          title: 'Run Quality Checks & Verification',
+          description: structure.hasTests
+            ? 'Execute package test suite and verify changes pass all assertions.'
+            : 'Review git change status and verify unified diff.',
           status: 'pending',
-          tool: 'code_diff_analyzer',
-          requiresApproval: false,
+          tool: structure.hasTests ? 'terminal_execute_command' : 'workspace_get_git_status',
+          toolInput: structure.hasTests ? { command: 'npm test' } : {},
+          requiresApproval: structure.hasTests,
           isApproved: false,
           createdAt: new Date().toISOString(),
         },
@@ -428,7 +721,7 @@ Do not include markdown fences or any other text outside the JSON array.`;
   }
 
   /**
-   * Run the next step of an AgentTask.
+   * Run the next step of an AgentTask using the Observe-Act-Verify loop.
    */
   async advanceTask(taskId: string, userId: string): Promise<AgentTask> {
     const task = db.getTaskById(taskId, userId);
@@ -438,54 +731,55 @@ Do not include markdown fences or any other text outside the JSON array.`;
       return task;
     }
 
-    // Find first non-completed step
-    const currentStep = task.steps.find((s) => s.status === 'pending' || s.status === 'running' || s.status === 'awaiting_approval');
+    // Find the active step
+    const currentStep = task.steps.find(
+      (s) => s.status === 'pending' || s.status === 'running' || s.status === 'awaiting_approval'
+    );
+
     if (!currentStep) {
-      // All steps done
       db.updateTask(taskId, userId, {
         status: 'completed',
-        summary: `Co-Work task "${task.title}" has been successfully completed with ${task.steps.length} verified steps.`,
+        summary: `Task "${task.title}" has been successfully completed with ${task.steps.length} verified steps.`,
       });
-
-      // Add in-app notification
-      db.addNotification({
-        id: `notif_task_${Date.now()}`,
-        userId,
-        title: 'Co-Work Task Completed',
-        message: `Task "${task.title}" finished all steps and produced workspace artifacts.`,
-        channel: 'in_app',
-        type: 'task_completed',
-        read: false,
-        createdAt: new Date().toISOString(),
-      });
-
       return db.getTaskById(taskId, userId)!;
     }
 
-    // If step requires approval and is not approved yet
-    if (currentStep.requiresApproval && !currentStep.isApproved) {
+    // Check approval policy
+    const policy = this.determineApprovalPolicy(currentStep.tool || 'workspace_list_files', currentStep.toolInput || {});
+    if (policy.requiresApproval && !currentStep.isApproved) {
       currentStep.status = 'awaiting_approval';
+      currentStep.requiresApproval = true;
+
+      // Register approval request in database if not already created
+      const existingApprovals = db.getApprovalRequests(taskId);
+      const hasPending = existingApprovals.some((a) => a.stepId === currentStep.id && a.status === 'pending');
+
+      if (!hasPending) {
+        db.createApprovalRequest({
+          id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          taskId,
+          stepId: currentStep.id,
+          workspaceId: task.workspaceId,
+          tool: currentStep.tool || 'terminal_execute_command',
+          toolInput: currentStep.toolInput || {},
+          reason: policy.reason,
+          impactLevel: policy.impactLevel,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        });
+      }
+
       db.updateTask(taskId, userId, { status: 'awaiting_approval' });
       return db.getTaskById(taskId, userId)!;
     }
 
-    // Execute step tool
+    // Step is approved or doesn't require approval — proceed with execution
     currentStep.status = 'running';
     db.updateTask(taskId, userId, { status: 'running' });
 
-    let toolInput = currentStep.toolInput || {};
-    if (currentStep.tool === 'workspace_create_artifact' && !toolInput.content) {
-      toolInput = {
-        title: `${task.title} Artifact`,
-        fileName: `${task.title.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.md`,
-        language: 'markdown',
-        content: `# ${task.title}\n\n**Goal**: ${task.goal}\n\n### Executed Steps\n- Initialized workspace context\n- Generated artifact schema\n- Completed quality gates\n\n*Generated by Nexa AI Co-Work Agent*`,
-      };
-    }
-
     const toolResult = await this.executeTool(
       currentStep.tool || 'workspace_list_files',
-      toolInput,
+      currentStep.toolInput || {},
       task.workspaceId,
       userId
     );
@@ -506,7 +800,7 @@ Do not include markdown fences or any other text outside the JSON array.`;
       return db.getTaskById(taskId, userId)!;
     }
 
-    // Check next step
+    // Check if next step exists
     const nextStep = task.steps.find((s) => s.status === 'pending');
     if (nextStep) {
       nextStep.status = 'running';
@@ -522,7 +816,7 @@ Do not include markdown fences or any other text outside the JSON array.`;
         id: `notif_task_${Date.now()}`,
         userId,
         title: 'Co-Work Task Completed',
-        message: `Task "${task.title}" finished all steps and produced workspace artifacts.`,
+        message: `Task "${task.title}" finished all steps and produced verified changes.`,
         channel: 'in_app',
         type: 'task_completed',
         read: false,

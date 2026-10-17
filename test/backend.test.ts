@@ -12,6 +12,8 @@ import { db } from '../src/server/db/database';
 import { modelCatalog } from '../src/server/providers/catalog';
 import { modelRouter } from '../src/server/providers/router';
 import { coworkEngine } from '../src/server/cowork/engine';
+import { workspaceManager } from '../src/server/cowork/workspace-manager';
+import { executionRunner } from '../src/server/cowork/execution-runner';
 import { User, Conversation, Message, AgentTask } from '../src/server/types';
 import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
 
@@ -476,6 +478,220 @@ print(fibonacci(10))
       assert.strictEqual(result.success, true);
       assert.strictEqual(result.output?.language, 'python');
       assert.ok(result.output?.logs.some((l: any) => l.text.includes('PYTHON')));
+    });
+  });
+
+  describe('9. Production-Grade Repository-Aware AI Agent (Scenarios A through H)', () => {
+    const testWsId = `ws_repo_test_${Date.now()}`;
+    let testWs: any;
+
+    before(() => {
+      testWs = db.createWorkspace({
+        id: testWsId,
+        userId: testUser1.id,
+        name: 'Repo Agent Verification Workspace',
+        description: 'Target workspace for end-to-end repository agent tests.',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('Scenario A: Repository understanding without inventing files', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(testWs);
+
+      // Create known project files
+      await workspaceManager.createFile(wsRoot, 'src/auth/jwt.ts', 'export function verifyToken() { return true; }');
+      await workspaceManager.createFile(wsRoot, 'package.json', JSON.stringify({ name: 'sample-project', scripts: { test: 'node --test' } }));
+
+      const structure = await workspaceManager.getProjectStructure(wsRoot);
+      assert.strictEqual(structure.hasTests, true);
+      assert.strictEqual(structure.packageScripts.test, 'node --test');
+
+      const search = await workspaceManager.searchContent(wsRoot, 'verifyToken');
+      assert.ok(search.length >= 1);
+      assert.strictEqual(search[0].file, 'src/auth/jwt.ts');
+    });
+
+    it('Scenario B: Multi-file coordinated implementation and atomic patches', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(testWs);
+
+      // File 1: Middleware
+      const f1 = await workspaceManager.createFile(
+        wsRoot,
+        'src/middleware/auth.ts',
+        'export const requireAuth = (req: any, res: any, next: any) => next();'
+      );
+      assert.strictEqual(f1.success, true);
+
+      // File 2: Route Protection
+      const f2 = await workspaceManager.createFile(
+        wsRoot,
+        'src/routes/api.ts',
+        'import { requireAuth } from "../middleware/auth";\nexport const router = {};'
+      );
+      assert.strictEqual(f2.success, true);
+
+      // Apply targeted patch to Middleware
+      const patch = await workspaceManager.applyPatch(
+        wsRoot,
+        'src/middleware/auth.ts',
+        '',
+        'next()',
+        'req.user ? next() : res.status(401).send("Unauthorized")'
+      );
+      assert.strictEqual(patch.success, true);
+      assert.ok(patch.diff.includes('+'));
+
+      const verified = await workspaceManager.readFile(wsRoot, 'src/middleware/auth.ts');
+      assert.ok(verified.content.includes('res.status(401)'));
+    });
+
+    it('Scenario C: Bug fixing and verification loop', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(testWs);
+
+      // Create buggy code
+      await workspaceManager.createFile(
+        wsRoot,
+        'src/math.ts',
+        'export function calculateTax(amount: number) { return amount - 0.2; } // BUG: should be amount * 0.2'
+      );
+
+      // Apply fix
+      const fix = await workspaceManager.applyPatch(
+        wsRoot,
+        'src/math.ts',
+        '',
+        'amount - 0.2',
+        'amount * 0.2'
+      );
+      assert.strictEqual(fix.success, true);
+
+      // Verify fix
+      const verified = await workspaceManager.readFile(wsRoot, 'src/math.ts');
+      assert.ok(verified.content.includes('amount * 0.2'));
+    });
+
+    it('Scenario D: Approval policy enforcement on server', () => {
+      // Read-only tool -> low impact, no approval needed
+      const readPolicy = coworkEngine.determineApprovalPolicy('workspace_read_file', { filePath: 'src/math.ts' });
+      assert.strictEqual(readPolicy.requiresApproval, false);
+      assert.strictEqual(readPolicy.impactLevel, 'low');
+
+      // Destructive deletion -> high impact, requires approval
+      const deletePolicy = coworkEngine.determineApprovalPolicy('workspace_delete_file', { filePath: 'important.ts' });
+      assert.strictEqual(deletePolicy.requiresApproval, true);
+      assert.strictEqual(deletePolicy.impactLevel, 'high');
+
+      // Destructive shell execution -> high impact, requires approval
+      const shellPolicy = coworkEngine.determineApprovalPolicy('terminal_execute_command', { command: 'rm -rf dist' });
+      assert.strictEqual(shellPolicy.requiresApproval, true);
+      assert.strictEqual(shellPolicy.impactLevel, 'high');
+    });
+
+    it('Scenario E: Tenant isolation and path traversal defense', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(testWs);
+
+      // Attempt path traversal outside workspace root
+      assert.throws(() => {
+        workspaceManager.resolveSafePath(wsRoot, '../../etc/passwd');
+      }, /Security Violation: Path traversal detected/);
+
+      assert.throws(() => {
+        workspaceManager.resolveSafePath(wsRoot, '..\\..\\windows\\system32');
+      }, /Security Violation: Path traversal detected/);
+
+      // Sensitive file filter (.env protection)
+      assert.strictEqual(workspaceManager.isSensitiveFile('.env'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.env.local'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('server.key'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('src/index.ts'), false);
+
+      // User 2 cannot access User 1 workspace
+      const user2Workspace = db.getWorkspaceById(testWs.id, testUser2.id);
+      assert.strictEqual(user2Workspace, undefined, 'User 2 must not see User 1 workspace');
+    });
+
+    it('Scenario F: Sanitized command execution and timeout limits', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(testWs);
+
+      // Verify command runs and stdout is captured
+      const res = await executionRunner.executeCommand('node -e "console.log(process.env.GEMINI_API_KEY || \'SECRET_STRIPPED\')"', {
+        cwd: wsRoot,
+        timeoutMs: 5000,
+      });
+
+      assert.strictEqual(res.exitCode, 0);
+      assert.ok(res.stdout.includes('SECRET_STRIPPED'), 'Server secrets must be stripped from child process');
+
+      // Verify timeout enforcement kills process cleanly
+      const timeoutRes = await executionRunner.executeCommand('node -e "setTimeout(() => {}, 5000)"', {
+        cwd: wsRoot,
+        timeoutMs: 400, // Trigger 400ms timeout
+      });
+
+      assert.strictEqual(timeoutRes.timedOut, true, 'Long running process must be timed out');
+    });
+
+    it('Scenario G: Interrupted execution state persistence and recovery', () => {
+      const task = db.createTask({
+        id: `task_recover_${Date.now()}`,
+        workspaceId: testWs.id,
+        userId: testUser1.id,
+        title: 'Recovery Resilience Test',
+        goal: 'Test crash recovery',
+        status: 'running',
+        modelId: 'gemini-3.8-flash',
+        steps: [
+          {
+            id: 's1',
+            title: 'Step 1',
+            description: 'Inspect',
+            status: 'completed',
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: 's2',
+            title: 'Step 2',
+            description: 'Modify',
+            status: 'running',
+            createdAt: new Date().toISOString(),
+          },
+        ],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Simulate worker restart / refresh
+      const retrieved = db.getTaskById(task.id, testUser1.id);
+      assert.ok(retrieved);
+      assert.strictEqual(retrieved?.status, 'running');
+      assert.strictEqual(retrieved?.steps[0].status, 'completed');
+      assert.strictEqual(retrieved?.steps[1].status, 'running');
+    });
+
+    it('Scenario H: Backward compatibility with artifacts and existing features', async () => {
+      // Existing artifact creation still works seamlessly
+      const artResult = await coworkEngine.executeTool(
+        'workspace_create_artifact',
+        { title: 'Test Spec', fileName: 'spec.md', language: 'markdown', content: '# Backward Compatible' },
+        testWs.id,
+        testUser1.id
+      );
+
+      assert.strictEqual(artResult.success, true);
+      assert.ok(artResult.artifactCreated?.id);
+
+      // Existing code diff analyzer still works
+      const diffResult = await coworkEngine.executeTool(
+        'code_diff_analyzer',
+        { originalText: 'line 1\nline 2', modifiedText: 'line 1\nline 2 edited' },
+        testWs.id,
+        testUser1.id
+      );
+
+      assert.strictEqual(diffResult.success, true);
+      assert.ok(diffResult.output?.diff.includes('+ line 2 edited'));
     });
   });
 });

@@ -6,6 +6,8 @@ import bcrypt from 'bcryptjs';
 import { db } from '../db/database';
 import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
+import { workspaceManager } from '../cowork/workspace-manager';
+import { executionRunner } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens } from '../auth/auth';
 import { Message, User } from '../types';
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
@@ -421,6 +423,167 @@ apiRouter.post('/cowork/tasks/:id/advance', async (req: Request, res: Response) 
     res.json({ success: true, task });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * Approve a pending step
+ */
+apiRouter.post('/cowork/tasks/:id/approve', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const { stepId, approvalId } = req.body;
+  const task = db.getTaskById(id, user.id);
+  if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
+
+  if (approvalId) {
+    db.updateApprovalRequest(approvalId, 'approved');
+  }
+
+  const step = task.steps.find((s) => s.id === stepId || s.status === 'awaiting_approval');
+  if (step) {
+    step.isApproved = true;
+    step.status = 'running';
+    db.updateTask(id, user.id, { steps: task.steps });
+  }
+
+  try {
+    const advanced = await coworkEngine.advanceTask(id, user.id);
+    res.json({ success: true, task: advanced });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Reject a pending step
+ */
+apiRouter.post('/cowork/tasks/:id/reject', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const { stepId, approvalId, reason = 'Rejected by user' } = req.body;
+  const task = db.getTaskById(id, user.id);
+  if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
+
+  if (approvalId) {
+    db.updateApprovalRequest(approvalId, 'rejected');
+  }
+
+  const step = task.steps.find((s) => s.id === stepId || s.status === 'awaiting_approval');
+  if (step) {
+    step.status = 'failed';
+    db.updateTask(id, user.id, { status: 'failed', error: `Step was rejected: ${reason}` });
+  }
+
+  res.json({ success: true, task: db.getTaskById(id, user.id) });
+});
+
+/**
+ * Cancel a running task
+ */
+apiRouter.post('/cowork/tasks/:id/cancel', (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const task = db.getTaskById(id, user.id);
+  if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
+  db.updateTask(id, user.id, { status: 'cancelled' });
+  res.json({ success: true, task: db.getTaskById(id, user.id) });
+});
+
+/**
+ * Get workspace real directory tree
+ */
+apiRouter.get('/cowork/workspaces/:id/tree', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found or access denied' });
+
+  try {
+    const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+    const subDir = typeof req.query.dir === 'string' ? req.query.dir : '';
+    const tree = await workspaceManager.listDirectoryTree(wsRoot, subDir);
+    const gitStatus = await workspaceManager.getGitStatus(wsRoot);
+    res.json({ success: true, workspaceRoot: wsRoot, tree, git: gitStatus });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Read a real workspace file
+ */
+apiRouter.get('/cowork/workspaces/:id/file', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const filePath = req.query.path as string;
+  if (!filePath) return res.status(400).json({ error: 'path query parameter is required' });
+
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found or access denied' });
+
+  try {
+    const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+    const fileData = await workspaceManager.readFile(wsRoot, filePath);
+    res.json({ success: true, ...fileData });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+/**
+ * Save / edit a real workspace file
+ */
+apiRouter.post('/cowork/workspaces/:id/file', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const { path: filePath, content } = req.body;
+  if (!filePath || content === undefined) {
+    return res.status(400).json({ error: 'path and content are required' });
+  }
+
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found or access denied' });
+
+  try {
+    const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+    const result = await workspaceManager.createFile(wsRoot, filePath, content);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Execute terminal command in workspace
+ */
+apiRouter.post('/cowork/workspaces/:id/terminal/execute', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const { command, timeoutMs = 30000 } = req.body;
+  if (!command || typeof command !== 'string') {
+    return res.status(400).json({ error: 'command string is required' });
+  }
+
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found or access denied' });
+
+  try {
+    const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+    const result = await executionRunner.executeCommand(command, {
+      cwd: wsRoot,
+      timeoutMs,
+    });
+    res.json({ success: result.exitCode === 0, result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
