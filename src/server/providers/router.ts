@@ -36,7 +36,9 @@ export class ModelRouter {
         if (hasImageAttachments && !explicit.capabilities.vision) {
           const visionFallback =
             catalog.find((m) => m.id === 'gemini-3.8-flash' && m.availability === 'available') ||
-            catalog.find((m) => m.capabilities.vision && m.availability === 'available');
+            catalog.find((m) => m.capabilities.vision && m.availability === 'available') ||
+            catalog.find((m) => m.id === 'gemini-3.8-flash') ||
+            catalog.find((m) => m.capabilities.vision);
           if (visionFallback) {
             return {
               model: visionFallback,
@@ -54,6 +56,10 @@ export class ModelRouter {
         }
         // Check availability
         if (explicit.availability === 'unconfigured') {
+          // If image attachments are present and explicit model already has vision, keep vision model
+          if (hasImageAttachments && explicit.capabilities.vision) {
+            return { model: explicit, isFallback: false };
+          }
           // If requested model is unconfigured (e.g. missing API key), fallback to an available configured model
           const fallback = this.findFallbackModel(mode, forceFree);
           if (fallback) {

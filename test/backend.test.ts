@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Ensure test environment mock credentials exist for deterministic CI pipeline runs
+process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'ci-test-mock-gemini-key';
+process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'ci-test-mock-openrouter-key';
+
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import bcrypt from 'bcryptjs';
