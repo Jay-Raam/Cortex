@@ -457,27 +457,77 @@ apiRouter.post('/cowork/tasks/:id/approve', async (req: Request, res: Response) 
 });
 
 /**
- * Reject a pending step
+ * Approve the complete task execution plan (Mode B)
  */
-apiRouter.post('/cowork/tasks/:id/reject', async (req: Request, res: Response) => {
+apiRouter.post('/cowork/tasks/:id/plan/approve', async (req: Request, res: Response) => {
   let user: User;
   try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
   const { id } = req.params;
-  const { stepId, approvalId, reason = 'Rejected by user' } = req.body;
+  const { plannedFiles = [] } = req.body;
   const task = db.getTaskById(id, user.id);
   if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
 
-  if (approvalId) {
-    db.updateApprovalRequest(approvalId, 'rejected');
+  // Extract all file targets from planned steps if not provided explicitly
+  const extractedFiles = [...plannedFiles];
+  for (const step of task.steps) {
+    const f = step.toolInput?.filePath || step.toolInput?.path;
+    if (f && !extractedFiles.includes(f)) {
+      extractedFiles.push(f);
+    }
   }
 
-  const step = task.steps.find((s) => s.id === stepId || s.status === 'awaiting_approval');
-  if (step) {
-    step.status = 'failed';
-    db.updateTask(id, user.id, { status: 'failed', error: `Step was rejected: ${reason}` });
+  db.updateTask(id, user.id, {
+    isPlanApproved: true,
+    plannedFiles: extractedFiles,
+    status: 'running',
+  });
+
+  try {
+    const advanced = await coworkEngine.advanceTask(id, user.id);
+    res.json({ success: true, task: advanced, plannedFiles: extractedFiles });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * Reject the complete task execution plan
+ */
+apiRouter.post('/cowork/tasks/:id/plan/reject', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const { reason = 'Plan rejected by developer' } = req.body;
+  const task = db.getTaskById(id, user.id);
+  if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
+
+  db.updateTask(id, user.id, {
+    status: 'failed',
+    isPlanApproved: false,
+    error: `Execution plan was rejected: ${reason}`,
+  });
 
   res.json({ success: true, task: db.getTaskById(id, user.id) });
+});
+
+/**
+ * Update workspace permission mode (ask_every_change, approve_plan, session_edit)
+ */
+apiRouter.post('/cowork/workspaces/:id/permission-mode', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const { permissionMode } = req.body;
+
+  const validModes = ['ask_every_change', 'approve_plan', 'session_edit'];
+  if (!permissionMode || !validModes.includes(permissionMode)) {
+    return res.status(400).json({ error: `Invalid mode. Must be one of: ${validModes.join(', ')}` });
+  }
+
+  const updated = db.updateWorkspace(id, user.id, { permissionMode: permissionMode as any });
+  if (!updated) return res.status(404).json({ error: 'Workspace not found or access denied' });
+
+  res.json({ success: true, workspace: updated });
 });
 
 /**

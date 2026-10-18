@@ -367,6 +367,53 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
     }
   };
 
+  // Approve Complete Plan (Mode B)
+  const handleApprovePlan = async (taskId: string) => {
+    try {
+      await fetch(`/api/cowork/tasks/${taskId}/plan/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      await loadWorkspaceData();
+      await loadProjectTree();
+    } catch (err) {
+      console.error('Failed to approve plan:', err);
+    }
+  };
+
+  // Reject Complete Plan
+  const handleRejectPlan = async (taskId: string) => {
+    try {
+      await fetch(`/api/cowork/tasks/${taskId}/plan/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Rejected by developer' }),
+      });
+      await loadWorkspaceData();
+    } catch (err) {
+      console.error('Failed to reject plan:', err);
+    }
+  };
+
+  // Update Workspace Permission Mode
+  const handleUpdatePermissionMode = async (mode: string) => {
+    if (!workspace) return;
+    try {
+      const res = await fetch(`/api/cowork/workspaces/${workspace.id}/permission-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissionMode: mode }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onRefreshWorkspace();
+      }
+    } catch (err) {
+      console.error('Failed to update permission mode:', err);
+    }
+  };
+
   // Server-Enforced Rejection
   const handleRejectStep = async (taskId: string, stepId: string) => {
     try {
@@ -459,6 +506,21 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Permission Mode Selector */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-xs">
+            <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-[10px] uppercase font-bold text-slate-500">Mode:</span>
+            <select
+              value={workspace?.permissionMode || 'approve_plan'}
+              onChange={(e) => handleUpdatePermissionMode(e.target.value)}
+              className="bg-transparent font-semibold text-slate-800 text-xs focus:outline-none cursor-pointer"
+            >
+              <option value="approve_plan">Mode B: Approve Plan (Default)</option>
+              <option value="ask_every_change">Mode A: Ask Every Change</option>
+              <option value="session_edit">Mode C: Session Edit</option>
+            </select>
+          </div>
+
           <button
             onClick={() => {
               loadWorkspaces();
@@ -702,6 +764,35 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                     </button>
                   </div>
                 </div>
+
+                {/* Mode B: Plan-Level Approval Gate Banner */}
+                {(workspace?.permissionMode || 'approve_plan') === 'approve_plan' && !selectedTask.isPlanApproved && selectedTask.status !== 'completed' && selectedTask.status !== 'cancelled' && (
+                  <div className="p-2.5 mb-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+                      <ShieldAlert className="w-4 h-4 text-amber-600" />
+                      <span>Mode B: Complete Plan Review</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-tight mb-2">
+                      Review all planned steps before modifying files. Once approved, routine planned edits proceed automatically.
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleApprovePlan(selectedTask.id)}
+                        className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded shadow-2xs cursor-pointer text-[11px]"
+                      >
+                        Approve Change Plan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRejectPlan(selectedTask.id)}
+                        className="px-2 py-1 text-amber-800 hover:bg-amber-100 rounded cursor-pointer text-[11px]"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Steps List */}
                 <div className="space-y-2">

@@ -458,6 +458,14 @@ class Database {
     return workspace;
   }
 
+  updateWorkspace(id: string, userId: string, updates: Partial<Workspace>): Workspace | undefined {
+    const ws = this.getWorkspaceById(id, userId);
+    if (!ws) return undefined;
+    Object.assign(ws, updates, { updatedAt: new Date().toISOString() });
+    this.persist();
+    return ws;
+  }
+
   // --- Artifacts ---
   getArtifacts(workspaceId: string, userId: string): WorkspaceArtifact[] {
     const ws = this.getWorkspaceById(workspaceId, userId);

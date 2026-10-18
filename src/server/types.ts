@@ -220,6 +220,9 @@ export interface AgentTask {
   status: TaskStatus;
   modelId: string;
   skillId?: string;
+  permissionMode?: PermissionMode;
+  isPlanApproved?: boolean;
+  plannedFiles?: string[];
   steps: AgentTaskStep[];
   artifactIds: string[];
   summary?: string;

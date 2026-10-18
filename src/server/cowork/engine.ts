@@ -1,6 +1,6 @@
 import vm from 'node:vm';
 import { db } from '../db/database';
-import { AgentTask, AgentTaskStep, WorkspaceArtifact, ApprovalRequest } from '../types';
+import { AgentTask, AgentTaskStep, WorkspaceArtifact, ApprovalRequest, PermissionMode } from '../types';
 import { generateGeminiContent } from '../providers/gemini';
 import { workspaceManager } from './workspace-manager';
 import { executionRunner } from './execution-runner';
@@ -14,13 +14,19 @@ export interface ToolExecutionResult {
 }
 
 export class CoworkEngine {
-  /**
-   * Determine approval requirements and risk level for any tool call.
-   */
   determineApprovalPolicy(
     toolName: string,
-    toolInput: Record<string, any>
+    toolInput: Record<string, any>,
+    options?: {
+      permissionMode?: PermissionMode;
+      plannedFiles?: string[];
+      isPlanApproved?: boolean;
+    }
   ): { requiresApproval: boolean; impactLevel: 'low' | 'medium' | 'high'; reason: string } {
+    const mode: PermissionMode = options?.permissionMode || 'approve_plan';
+    const filePath = toolInput.filePath || toolInput.path;
+
+    // Destructive deletions or rollback always require explicit approval
     if (toolName === 'workspace_delete_file' || toolName === 'workspace_restore_checkpoint') {
       return {
         requiresApproval: true,
@@ -29,9 +35,9 @@ export class CoworkEngine {
       };
     }
 
+    // Terminal command execution
     if (toolName === 'terminal_execute_command') {
       const cmd = (toolInput.command || '').trim().toLowerCase();
-      // Arbitrary commands, installs, deletions, or git modifications require explicit approval
       if (cmd.includes('rm ') || cmd.includes('del ') || cmd.includes('reset') || cmd.includes('clean')) {
         return {
           requiresApproval: true,
@@ -39,6 +45,7 @@ export class CoworkEngine {
           reason: `High-impact shell execution: "${toolInput.command}".`,
         };
       }
+      // Mode C: routine commands still request approval unless low impact read
       return {
         requiresApproval: true,
         impactLevel: 'medium',
@@ -46,14 +53,65 @@ export class CoworkEngine {
       };
     }
 
-    if (toolName === 'workspace_apply_patch' || toolName === 'workspace_edit_file') {
-      return {
-        requiresApproval: false,
-        impactLevel: 'low',
-        reason: `Controlled file modification: ${toolInput.filePath || toolInput.path || 'file'}.`,
-      };
+    // File Modification Tools
+    const isFileModTool =
+      toolName === 'workspace_apply_patch' ||
+      toolName === 'workspace_edit_file' ||
+      toolName === 'workspace_create_file';
+
+    if (isFileModTool) {
+      // --- Mode A: Ask for Every Change ---
+      if (mode === 'ask_every_change') {
+        return {
+          requiresApproval: true,
+          impactLevel: 'medium',
+          reason: `Mode A (Ask for Every Change): Requires explicit approval for modifying "${filePath || 'file'}".`,
+        };
+      }
+
+      // --- Mode B: Approve Complete Change Plan (Default) ---
+      if (mode === 'approve_plan') {
+        // If plan is approved, verify if target file is within planned scope
+        if (options?.isPlanApproved) {
+          if (filePath && options.plannedFiles && options.plannedFiles.length > 0) {
+            const isPlanned = options.plannedFiles.some(
+              (p) => p.toLowerCase() === filePath.toLowerCase() || filePath.toLowerCase().endsWith(p.toLowerCase())
+            );
+            if (!isPlanned) {
+              return {
+                requiresApproval: true,
+                impactLevel: 'medium',
+                reason: `Scope Expansion: "${filePath}" was not in the approved implementation plan. Approval required.`,
+              };
+            }
+          }
+          // File is within approved plan scope
+          return {
+            requiresApproval: false,
+            impactLevel: 'low',
+            reason: `Covered by approved task plan: "${filePath || 'file'}".`,
+          };
+        } else {
+          // Plan not yet approved -> requires approval
+          return {
+            requiresApproval: true,
+            impactLevel: 'medium',
+            reason: `Task implementation plan requires developer approval before executing file modifications.`,
+          };
+        }
+      }
+
+      // --- Mode C: Session-Level Project Edit Permission ---
+      if (mode === 'session_edit') {
+        return {
+          requiresApproval: false,
+          impactLevel: 'low',
+          reason: `Mode C (Session-Level Edit): Routine file modification allowed within workspace.`,
+        };
+      }
     }
 
+    // Default read-only repository query
     return {
       requiresApproval: false,
       impactLevel: 'low',
@@ -744,8 +802,18 @@ No markdown fences or extra text.`;
       return db.getTaskById(taskId, userId)!;
     }
 
-    // Check approval policy
-    const policy = this.determineApprovalPolicy(currentStep.tool || 'workspace_list_files', currentStep.toolInput || {});
+    // Check approval policy based on workspace / task permission mode
+    const workspace = db.getWorkspaceById(task.workspaceId, userId);
+    const mode = task.permissionMode || workspace?.permissionMode || 'approve_plan';
+    const policy = this.determineApprovalPolicy(
+      currentStep.tool || 'workspace_list_files',
+      currentStep.toolInput || {},
+      {
+        permissionMode: mode,
+        plannedFiles: task.plannedFiles || [],
+        isPlanApproved: task.isPlanApproved ?? false,
+      }
+    );
     if (policy.requiresApproval && !currentStep.isApproved) {
       currentStep.status = 'awaiting_approval';
       currentStep.requiresApproval = true;
