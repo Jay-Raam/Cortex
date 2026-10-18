@@ -32,6 +32,9 @@ import {
   Send,
   PanelLeft,
   PanelLeftClose,
+  PanelRight,
+  PanelRightClose,
+  ListTodo,
   ChevronUp,
   Sparkles,
   BarChart3,
@@ -47,12 +50,14 @@ interface CoworkWorkspaceProps {
   workspace: Workspace | null;
   onRefreshWorkspace: () => void;
   onSelectWorkspace?: (ws: Workspace) => void;
+  onDeleteWorkspace?: (id: string) => void;
 }
 
 export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   workspace,
   onRefreshWorkspace,
   onSelectWorkspace,
+  onDeleteWorkspace,
 }) => {
   // Tasks state
   const [tasks, setTasks] = useState<AgentTask[]>([]);
@@ -83,6 +88,10 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
 
   // Right panel view mode: 'editor' | 'diff' | 'artifacts'
   const [rightViewMode, setRightViewMode] = useState<'editor' | 'diff' | 'artifacts'>('editor');
+
+  // Responsive drawer overlay state for smaller viewports
+  const [isTasksOpen, setIsTasksOpen] = useState(false);
+  const [isSidecarOpen, setIsSidecarOpen] = useState(false);
 
   // Canvas drawer & inline prompt state (Claude Cowork / ChatGPT Canvas layout)
   const [isExplorerOpen, setIsExplorerOpen] = useState(true);
@@ -593,48 +602,79 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   return (
     <div className="flex flex-col h-full w-full bg-[#FAF8F5] select-none overflow-hidden font-sans text-slate-800">
       {/* Top Workspace Header - Claude Cowork Style */}
-      <div className="h-13 border-b border-[#EBE7DF] px-4 flex items-center justify-between bg-[#FCFAF7] shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-[#FFF7ED] border border-[#FEE5D2] flex items-center justify-center text-[#EA580C] shadow-2xs">
+      <div className="min-h-13 py-2 px-3 sm:px-4 border-b border-[#EBE7DF] flex items-center justify-between gap-2 bg-[#FCFAF7] shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setIsTasksOpen(!isTasksOpen)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer shrink-0 ${
+              isTasksOpen
+                ? 'bg-[#FFF7ED] border-[#FED7AA] text-[#EA580C]'
+                : 'bg-white border-[#E5E0D8] text-slate-600 hover:bg-slate-50'
+            }`}
+            title={isTasksOpen ? 'Hide tasks panel' : 'Show tasks panel'}
+          >
+            {isTasksOpen ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeft className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">Tasks</span>
+            {tasks.length > 0 && <span className="text-[10px] opacity-75 font-mono">({tasks.length})</span>}
+          </button>
+
+          <div className="w-8 h-8 rounded-xl bg-[#FFF7ED] border border-[#FEE5D2] flex items-center justify-center text-[#EA580C] shadow-2xs shrink-0">
             <Briefcase className="w-4 h-4" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-xs font-bold text-slate-900 tracking-tight">
+              <h2 className="text-xs font-bold text-slate-900 tracking-tight truncate max-w-[120px] sm:max-w-[200px]">
                 {workspace?.name || 'Primary Workspace'}
               </h2>
               {availableWorkspaces.length > 1 && (
-                <select
-                  value={workspace?.id}
-                  onChange={(e) => {
-                    const found = availableWorkspaces.find((w) => w.id === e.target.value);
-                    if (found && onSelectWorkspace) {
-                      onSelectWorkspace(found);
-                    }
-                  }}
-                  className="text-[10px] bg-white hover:bg-slate-50 border border-[#E5E0D8] rounded-md px-1.5 py-0.5 text-slate-700 font-semibold cursor-pointer focus:outline-none shadow-2xs"
-                  title="Switch workspace"
-                >
-                  {availableWorkspaces.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1 shrink-0">
+                  <select
+                    value={workspace?.id}
+                    onChange={(e) => {
+                      const found = availableWorkspaces.find((w) => w.id === e.target.value);
+                      if (found && onSelectWorkspace) {
+                        onSelectWorkspace(found);
+                      }
+                    }}
+                    className="text-[10px] bg-white hover:bg-slate-50 border border-[#E5E0D8] rounded-md px-1.5 py-0.5 text-slate-700 font-semibold cursor-pointer focus:outline-none shadow-2xs"
+                    title="Switch workspace"
+                  >
+                    {availableWorkspaces.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                  {workspace && onDeleteWorkspace && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`Are you sure you want to delete workspace "${workspace.name}"?`)) {
+                          onDeleteWorkspace(workspace.id);
+                        }
+                      }}
+                      className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                      title="Delete this workspace"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono mt-0.5">
-              <span className="truncate max-w-[200px]" title={workspace?.projectRoot}>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-mono mt-0.5 overflow-hidden">
+              <span className="truncate max-w-[120px] sm:max-w-[200px]" title={workspace?.projectRoot}>
                 {workspace?.projectRoot || 'workspaces/' + (workspace?.id || '')}
               </span>
               {gitStatus?.isGit && (
-                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded font-sans font-semibold">
+                <span className="hidden sm:inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded font-sans font-semibold shrink-0">
                   <GitBranch className="w-2.5 h-2.5" />
                   {gitStatus.branch || 'main'}
                 </span>
               )}
               {projectStack && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-[#FFF7ED] text-[#9A3412] font-sans text-[10px] font-semibold border border-[#FED7AA]">
+                <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-[#FFF7ED] text-[#9A3412] font-sans text-[10px] font-semibold border border-[#FED7AA] shrink-0">
                   {projectStack.framework}
                   {projectStack.hasTests && ' · Tests'}
                 </span>
@@ -643,77 +683,49 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Configurable Context Window Selector */}
-          <div
-            className="flex items-center gap-1.5 bg-white border border-[#E5E0D8] px-2.5 py-1 rounded-lg text-xs shadow-2xs"
-            title={contextBudget ? `Effective limit: ${(contextBudget.effectiveLimit / 1024).toFixed(0)}K · Remaining: ${(contextBudget.remainingTokens / 1024).toFixed(1)}K` : undefined}
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-[10px] uppercase font-bold text-slate-500">Context:</span>
-            <select
-              value={contextPreference}
-              onChange={(e) => handleChangeContextPreference(e.target.value)}
-              className="bg-transparent font-semibold text-slate-800 text-xs focus:outline-none cursor-pointer"
-            >
-              <option value="auto">Auto (1M)</option>
-              <option value="32k">32K Tokens</option>
-              <option value="64k">64K Tokens</option>
-              <option value="128k">128K Tokens</option>
-              <option value="200k">200K Tokens</option>
-              <option value="500k">500K Tokens</option>
-              <option value="1m">1M Tokens</option>
-            </select>
-            {contextBudget && (
-              <span className="text-[10px] font-mono text-slate-500 border-l border-[#E5E0D8] pl-1.5">
-                {contextBudget.utilizationPercent}%
-              </span>
-            )}
-          </div>
-
-          {/* Permission Mode Selector */}
-          <div className="flex items-center gap-1.5 bg-white border border-[#E5E0D8] px-2.5 py-1 rounded-lg text-xs shadow-2xs">
-            <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-[10px] uppercase font-bold text-slate-500">Mode:</span>
-            <select
-              value={workspace?.permissionMode || 'approve_plan'}
-              onChange={(e) => handleUpdatePermissionMode(e.target.value)}
-              className="bg-transparent font-semibold text-slate-800 text-xs focus:outline-none cursor-pointer"
-            >
-              <option value="approve_plan">Mode B: Approve Plan (Default)</option>
-              <option value="ask_every_change">Mode A: Ask Every Change</option>
-              <option value="session_edit">Mode C: Session Edit</option>
-            </select>
-          </div>
-
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => {
               loadWorkspaces();
               setIsBindingLocal(true);
             }}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-[#E5E0D8] rounded-lg transition-colors cursor-pointer shadow-2xs"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-[#E5E0D8] rounded-xl transition-colors cursor-pointer shadow-2xs"
             title="Bind local project folder"
           >
             <FolderOpen className="w-3.5 h-3.5 text-amber-500" />
-            <span>Open Folder</span>
+            <span className="hidden sm:inline">Open Folder</span>
           </button>
           <button
             onClick={() => {
               loadWorkspaceData();
               loadProjectTree();
             }}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-[#E5E0D8] rounded-lg transition-colors cursor-pointer shadow-2xs"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-[#E5E0D8] rounded-xl transition-colors cursor-pointer shadow-2xs"
             title="Refresh repository and tasks"
           >
-            <RefreshCw className="w-3 h-3 text-slate-500" />
-            <span>Sync</span>
+            <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden sm:inline">Sync</span>
           </button>
           <button
             onClick={() => setIsCreatingTask(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-xl shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>New Goal</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSidecarOpen(!isSidecarOpen)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer shrink-0 ${
+              isSidecarOpen
+                ? 'bg-[#FFF7ED] border-[#FED7AA] text-[#EA580C]'
+                : 'bg-white border-[#E5E0D8] text-slate-600 hover:bg-slate-50'
+            }`}
+            title={isSidecarOpen ? 'Hide sidecar panel' : 'Show sidecar panel'}
+          >
+            {isSidecarOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">Sidecar</span>
           </button>
         </div>
       </div>
@@ -810,99 +822,123 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
       )}
 
       {/* Main 3-Panel Claude Cowork Body matching Image 3 */}
-      <div className="flex-1 flex overflow-hidden bg-[#FAF8F5]">
+      <div className="flex-1 flex overflow-hidden bg-[#FAF8F5] relative">
         {/* Panel 1 (Left): Task List & New Task Button (Image 3 Left Panel) */}
-        <div className="w-72 md:w-80 border-r border-[#EBE7DF] bg-[#FAF8F5] flex flex-col shrink-0 overflow-hidden">
-          {/* + New task Button */}
-          <div className="p-3 border-b border-[#EBE7DF] bg-[#FCFAF7] shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedTaskId(null);
-                setIsCreatingTask(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 bg-white hover:bg-[#FFF7ED] text-slate-800 hover:text-[#EA580C] border border-[#E5E0D8] hover:border-[#FED7AA] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer group"
-            >
-              <div className="w-5 h-5 rounded-lg bg-slate-100 group-hover:bg-[#FFF7ED] flex items-center justify-center text-slate-600 group-hover:text-[#EA580C] transition-colors">
-                <Plus className="w-3.5 h-3.5" />
-              </div>
-              <span>New task</span>
-            </button>
-          </div>
-
-          {/* Task List Items */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
-            {tasks.map((task) => {
-              const isSelected = selectedTaskId === task.id;
-              const completedCount = task.steps?.filter((s) => s.status === 'completed').length || 0;
-              const totalCount = task.steps?.length || 0;
-
-              return (
+        {isTasksOpen && (
+          <div
+            className="fixed inset-0 bg-black/25 backdrop-blur-2xs z-30 xl:hidden"
+            onClick={() => setIsTasksOpen(false)}
+          />
+        )}
+        <div
+          className={`${
+            isTasksOpen
+              ? 'fixed inset-y-0 left-0 z-40 xl:static flex'
+              : 'hidden xl:flex'
+          } w-72 md:w-80 border-r border-[#EBE7DF] bg-[#FAF8F5] flex-col shrink-0 overflow-hidden shadow-xl xl:shadow-none animate-in slide-in-from-left duration-200`}
+        >
+              {/* + New task Button */}
+              <div className="p-3 border-b border-[#EBE7DF] bg-[#FCFAF7] shrink-0 flex items-center justify-between gap-2">
                 <button
-                  key={task.id}
                   type="button"
-                  onClick={() => setSelectedTaskId(task.id)}
-                  className={`w-full p-2.5 rounded-xl text-left transition-all cursor-pointer flex items-start justify-between gap-2 border ${
-                    isSelected
-                      ? 'bg-white border-[#E5E0D8] shadow-xs'
-                      : 'hover:bg-white/70 border-transparent hover:border-[#E5E0D8]/60 text-slate-700'
-                  }`}
+                  onClick={() => {
+                    setSelectedTaskId(null);
+                    setIsCreatingTask(false);
+                    if (typeof window !== 'undefined' && window.innerWidth < 1280) setIsTasksOpen(false);
+                  }}
+                  className="flex-1 flex items-center gap-2 px-3 py-2 bg-white hover:bg-[#FFF7ED] text-slate-800 hover:text-[#EA580C] border border-[#E5E0D8] hover:border-[#FED7AA] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer group"
                 >
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">
-                      {task.title}
-                    </h4>
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5 font-mono">
-                      {task.status === 'completed' ? (
-                        <span className="text-emerald-700 font-sans font-medium">Finished · Verified</span>
-                      ) : task.status === 'awaiting_approval' ? (
-                        <span className="text-amber-700 font-sans font-semibold">Needs human approval</span>
-                      ) : totalCount > 0 ? (
-                        <span>Step {completedCount + 1} of {totalCount}</span>
-                      ) : (
-                        <span>Autonomous Task</span>
-                      )}
-                    </p>
+                  <div className="w-5 h-5 rounded-lg bg-slate-100 group-hover:bg-[#FFF7ED] flex items-center justify-center text-slate-600 group-hover:text-[#EA580C] transition-colors">
+                    <Plus className="w-3.5 h-3.5" />
                   </div>
-
-                  {/* Status Indicator Dot matching Image 3 */}
-                  <div className="shrink-0 mt-1">
-                    {task.status === 'completed' ? (
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Completed" />
-                    ) : task.status === 'awaiting_approval' ? (
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" title="Needs Approval" />
-                    ) : task.status === 'running' ? (
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#EA580C] animate-ping" title="Running" />
-                    ) : (
-                      <div className="w-2.5 h-2.5 rounded-full border border-slate-300 bg-white" title="Ready" />
-                    )}
-                  </div>
+                  <span>New task</span>
                 </button>
-              );
-            })}
-
-            {tasks.length === 0 && (
-              <div className="py-12 text-center text-xs text-slate-400 italic">
-                No tasks yet. Click "+ New task" above.
+                <button
+                  type="button"
+                  onClick={() => setIsTasksOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer xl:hidden"
+                  title="Close tasks"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-            )}
-          </div>
 
-          {/* User profile footer matching Image 3 bottom */}
-          <div className="p-3 border-t border-[#EBE7DF] bg-[#FCFAF7] flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 rounded-full bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-xs font-bold text-[#EA580C]">
-              C
+              {/* Task List Items */}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
+                {tasks.map((task) => {
+                  const isSelected = selectedTaskId === task.id;
+                  const completedCount = task.steps?.filter((s) => s.status === 'completed').length || 0;
+                  const totalCount = task.steps?.length || 0;
+
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTaskId(task.id);
+                        if (typeof window !== 'undefined' && window.innerWidth < 1280) setIsTasksOpen(false);
+                      }}
+                      className={`w-full p-2.5 rounded-xl text-left transition-all cursor-pointer flex items-start justify-between gap-2 border ${
+                        isSelected
+                          ? 'bg-white border-[#E5E0D8] shadow-xs'
+                          : 'hover:bg-white/70 border-transparent hover:border-[#E5E0D8]/60 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">
+                          {task.title}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5 font-mono">
+                          {task.status === 'completed' ? (
+                            <span className="text-emerald-700 font-sans font-medium">Finished · Verified</span>
+                          ) : task.status === 'awaiting_approval' ? (
+                            <span className="text-amber-700 font-sans font-semibold">Needs human approval</span>
+                          ) : totalCount > 0 ? (
+                            <span>Step {completedCount + 1} of {totalCount}</span>
+                          ) : (
+                            <span>Autonomous Task</span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Status Indicator Dot matching Image 3 */}
+                      <div className="shrink-0 mt-1">
+                        {task.status === 'completed' ? (
+                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Completed" />
+                        ) : task.status === 'awaiting_approval' ? (
+                          <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" title="Needs Approval" />
+                        ) : task.status === 'running' ? (
+                          <div className="w-2.5 h-2.5 rounded-full bg-[#EA580C] animate-ping" title="Running" />
+                        ) : (
+                          <div className="w-2.5 h-2.5 rounded-full border border-slate-300 bg-white" title="Ready" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {tasks.length === 0 && (
+                  <div className="py-12 text-center text-xs text-slate-400 italic">
+                    No tasks yet. Click "+ New task" above.
+                  </div>
+                )}
+              </div>
+
+              {/* User profile footer matching Image 3 bottom */}
+              <div className="p-3 border-t border-[#EBE7DF] bg-[#FCFAF7] flex items-center gap-2.5 shrink-0">
+                <div className="w-8 h-8 rounded-full bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-xs font-bold text-[#EA580C]">
+                  C
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-slate-800 truncate">Developer Workspace</div>
+                  <div className="text-[10px] text-slate-400 font-mono truncate">{workspace?.name || 'Cortex AI'}</div>
+                </div>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-slate-800 truncate">Developer Workspace</div>
-              <div className="text-[10px] text-slate-400 font-mono truncate">{workspace?.name || 'Cortex AI'}</div>
-            </div>
-          </div>
-        </div>
 
         {/* Panel 2 (Center): Workspace / Canvas (Image 3 Center Notebook) */}
         <div
-          className="flex-1 flex flex-col overflow-hidden relative bg-[#FAF8F5]"
+          className="flex-1 min-w-0 flex flex-col overflow-y-auto relative bg-[#FAF8F5]"
           style={{
             backgroundImage: 'radial-gradient(#E8E3DA 1px, transparent 1px)',
             backgroundSize: '24px 24px',
@@ -910,19 +946,19 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         >
           {/* When No Task is Selected: Hero "Let's knock something off your list" matching Image 3 */}
           {!selectedTask ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-10 max-w-2xl mx-auto w-full animate-in fade-in duration-200">
+            <div className="flex-1 min-w-0 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 max-w-2xl mx-auto w-full my-auto animate-in fade-in duration-200">
               {/* Anthropic Terracotta Icon & Headline */}
-              <div className="flex flex-col items-center text-center mb-8">
+              <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
                 <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C] mb-4 shadow-xs">
                   <Sparkles className="w-6 h-6 fill-current" />
                 </div>
-                <h2 className="font-serif text-2xl md:text-3xl font-semibold text-slate-800 tracking-tight">
+                <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-slate-800 tracking-tight text-center leading-snug">
                   Let's knock something off your list
                 </h2>
               </div>
 
               {/* 6 Action Cards Grid (2 rows x 3 columns) matching Image 3 */}
-              <div className="w-full grid grid-cols-2 md:grid-cols-3 gap-2.5 mb-8">
+              <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-6 sm:mb-8">
                 <button
                   type="button"
                   onClick={() => setInlinePrompt('Create a new file in workspace: ')}
@@ -1000,19 +1036,62 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                     placeholder="Type a task here or use / for more tools"
                     className="w-full bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none resize-none px-1 leading-relaxed"
                   />
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => setIsExplorerOpen(!isExplorerOpen)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                      title="Attach file / browse workspace"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+                    <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
+                      <button
+                        type="button"
+                        onClick={() => setIsExplorerOpen(!isExplorerOpen)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer shrink-0"
+                        title="Attach file / browse workspace"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+
+                      {/* Mode Selector Pill in Prompt Composer */}
+                      <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-[#E5E0D8] px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs shrink-0">
+                        <ShieldAlert className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <select
+                          value={workspace?.permissionMode || 'approve_plan'}
+                          onChange={(e) => handleUpdatePermissionMode(e.target.value)}
+                          className="bg-transparent font-semibold text-slate-700 text-xs focus:outline-none cursor-pointer"
+                        >
+                          <option value="approve_plan">Mode B: Approve Plan</option>
+                          <option value="ask_every_change">Mode A: Ask Each Change</option>
+                          <option value="session_edit">Mode C: Session Edit</option>
+                        </select>
+                      </div>
+
+                      {/* Context Window Selector Pill in Prompt Composer */}
+                      <div
+                        className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-[#E5E0D8] px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs shrink-0"
+                        title={contextBudget ? `Effective limit: ${(contextBudget.effectiveLimit / 1024).toFixed(0)}K · Remaining: ${(contextBudget.remainingTokens / 1024).toFixed(1)}K` : undefined}
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <select
+                          value={contextPreference}
+                          onChange={(e) => handleChangeContextPreference(e.target.value)}
+                          className="bg-transparent font-semibold text-slate-700 text-xs focus:outline-none cursor-pointer"
+                        >
+                          <option value="auto">Auto (1M)</option>
+                          <option value="32k">32K Tokens</option>
+                          <option value="64k">64K Tokens</option>
+                          <option value="128k">128K Tokens</option>
+                          <option value="200k">200K Tokens</option>
+                          <option value="500k">500K Tokens</option>
+                          <option value="1m">1M Tokens</option>
+                        </select>
+                        {contextBudget && (
+                          <span className="text-[10px] font-mono text-slate-500 border-l border-[#E5E0D8] pl-1.5 shrink-0">
+                            {contextBudget.utilizationPercent}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
                     <button
                       type="submit"
                       disabled={isInlineSubmitting || !inlinePrompt.trim()}
-                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-40 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-40 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
                     >
                       {isInlineSubmitting ? (
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -1325,9 +1404,33 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         </div>
 
         {/* Panel 3 (Right): Sidecar Widgets (Progress, Artifacts, Context) matching Image 3 */}
-        <div className="w-72 xl:w-80 border-l border-[#EBE7DF] bg-[#FAF8F5] flex flex-col shrink-0 overflow-y-auto p-3 space-y-3 no-scrollbar">
-          {/* Card 1: Progress (matching Image 3 top card) */}
-          <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
+        {isSidecarOpen && (
+          <div
+            className="fixed inset-0 bg-black/25 backdrop-blur-2xs z-30 2xl:hidden"
+            onClick={() => setIsSidecarOpen(false)}
+          />
+        )}
+        <div
+          className={`${
+            isSidecarOpen
+              ? 'fixed inset-y-0 right-0 z-40 2xl:static flex'
+              : 'hidden 2xl:flex'
+          } w-72 xl:w-80 border-l border-[#EBE7DF] bg-[#FAF8F5] flex-col shrink-0 overflow-y-auto p-3 space-y-3 no-scrollbar shadow-xl 2xl:shadow-none animate-in slide-in-from-right duration-200`}
+        >
+              <div className="flex items-center justify-between pb-1 2xl:hidden border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-700">Sidecar & Progress</span>
+                <button
+                  type="button"
+                  onClick={() => setIsSidecarOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-md transition-colors cursor-pointer"
+                  title="Close sidecar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Card 1: Progress (matching Image 3 top card) */}
+              <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
             <button
               type="button"
               onClick={() => setIsProgressOpen(!isProgressOpen)}

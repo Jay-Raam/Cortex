@@ -466,6 +466,17 @@ class Database {
     return ws;
   }
 
+  deleteWorkspace(id: string, userId: string): boolean {
+    const ws = this.getWorkspaceById(id, userId);
+    if (!ws) return false;
+    this.data.workspaces = this.data.workspaces.filter((w) => !(w.id === id && w.userId === userId));
+    this.data.artifacts = this.data.artifacts.filter((a) => a.workspaceId !== id);
+    this.data.tasks = this.data.tasks.filter((t) => t.workspaceId !== id);
+    this.data.checkpoints = this.data.checkpoints.filter((c) => c.workspaceId !== id);
+    this.persist();
+    return true;
+  }
+
   // --- Artifacts ---
   getArtifacts(workspaceId: string, userId: string): WorkspaceArtifact[] {
     const ws = this.getWorkspaceById(workspaceId, userId);

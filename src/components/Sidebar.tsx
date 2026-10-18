@@ -32,6 +32,7 @@ interface SidebarProps {
   activeWorkspaceId?: string | null;
   onSelectWorkspace?: (workspace: Workspace) => void;
   onNewWorkspace?: () => void;
+  onDeleteWorkspace?: (id: string) => void;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
   onDeleteConversation: (id: string) => void;
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeWorkspaceId,
   onSelectWorkspace,
   onNewWorkspace,
+  onDeleteWorkspace,
   onSelectConversation,
   onNewConversation,
   onDeleteConversation,
@@ -245,20 +247,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {workspaces.map((ws) => {
                 const isActive = activeWorkspaceId === ws.id;
                 return (
-                  <button
+                  <div
                     key={ws.id}
-                    type="button"
                     onClick={() => onSelectWorkspace && onSelectWorkspace(ws)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer truncate ${
+                    className={`group relative w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer select-none ${
                       isActive
                         ? 'bg-[#FFF7ED] text-[#EA580C] font-bold border border-[#FED7AA] shadow-2xs'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                     }`}
                     title={`Open ${ws.name} in Co-Work`}
                   >
-                    <Folder className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#EA580C]' : 'text-amber-500'}`} />
-                    <span className="truncate">{ws.name}</span>
-                  </button>
+                    <div className="flex items-center gap-2 truncate min-w-0 pr-1">
+                      <Folder className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#EA580C]' : 'text-amber-500'}`} />
+                      <span className="truncate">{ws.name}</span>
+                    </div>
+                    {onDeleteWorkspace && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Are you sure you want to delete project "${ws.name}"?`)) {
+                            onDeleteWorkspace(ws.id);
+                          }
+                        }}
+                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded opacity-0 group-hover:opacity-100 cursor-pointer shrink-0"
+                        title="Delete project"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
               {workspaces.length === 0 && (

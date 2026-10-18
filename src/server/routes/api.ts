@@ -630,6 +630,18 @@ apiRouter.get('/cowork/workspaces', async (req: Request, res: Response) => {
 });
 
 /**
+ * Delete a workspace
+ */
+apiRouter.delete('/cowork/workspaces/:id', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const deleted = db.deleteWorkspace(id, user.id);
+  if (!deleted) return res.status(404).json({ error: 'Workspace not found or access denied' });
+  res.json({ success: true, message: 'Workspace deleted' });
+});
+
+/**
  * Bind a local project folder as a persistent Co-Work workspace
  */
 apiRouter.post('/cowork/workspaces/bind-local', async (req: Request, res: Response) => {

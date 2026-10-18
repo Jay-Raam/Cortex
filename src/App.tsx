@@ -340,6 +340,23 @@ export default function App() {
     }
   };
 
+  const handleDeleteWorkspace = async (workspaceId: string) => {
+    try {
+      const res = await fetch(`/api/cowork/workspaces/${workspaceId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId));
+        if (activeWorkspace?.id === workspaceId) {
+          const remaining = workspaces.filter((w) => w.id !== workspaceId);
+          setActiveWorkspace(remaining.length > 0 ? remaining[0] : null);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete workspace', err);
+    }
+  };
+
   const handleTogglePin = async (id: string, currentPin: boolean) => {
     try {
       const data = await fetchGraphQL(`
@@ -605,6 +622,7 @@ export default function App() {
             setCurrentView('cowork');
           }}
           onNewWorkspace={() => setCurrentView('cowork')}
+          onDeleteWorkspace={handleDeleteWorkspace}
           onSelectConversation={(id) => setActiveConversationId(id)}
           onNewConversation={handleNewConversation}
           onDeleteConversation={handleDeleteConversation}
@@ -853,6 +871,7 @@ export default function App() {
               workspace={activeWorkspace}
               onRefreshWorkspace={loadInitialData}
               onSelectWorkspace={(ws) => setActiveWorkspace(ws)}
+              onDeleteWorkspace={handleDeleteWorkspace}
             />
           )}
 
