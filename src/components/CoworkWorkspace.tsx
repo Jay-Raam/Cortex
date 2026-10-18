@@ -294,6 +294,9 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
             desiredOutput
             status
             modelId
+            permissionMode
+            isPlanApproved
+            plannedFiles
             summary
             error
             steps {
@@ -302,6 +305,8 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
               description
               status
               tool
+              operation
+              targetPath
               requiresApproval
               isApproved
             }
@@ -837,7 +842,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
 
                 {/* Mode B: Plan-Level Approval Gate Banner */}
                 {(workspace?.permissionMode || 'approve_plan') === 'approve_plan' && !selectedTask.isPlanApproved && selectedTask.status !== 'completed' && selectedTask.status !== 'cancelled' && (
-                  <div className="p-2.5 mb-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs">
+                  <div className="p-3 mb-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs">
                     <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
                       <ShieldAlert className="w-4 h-4 text-amber-600" />
                       <span>Mode B: Complete Plan Review</span>
@@ -845,6 +850,21 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                     <p className="text-[11px] text-amber-800 leading-tight mb-2">
                       Review all planned steps before modifying files. Once approved, routine planned edits proceed automatically.
                     </p>
+
+                    {/* Planned Files Preview */}
+                    {selectedTask.plannedFiles && selectedTask.plannedFiles.length > 0 && (
+                      <div className="mb-2 p-2 bg-amber-100/60 rounded border border-amber-200/80">
+                        <span className="text-[10px] font-bold text-amber-900 block mb-1">Target Files ({selectedTask.plannedFiles.length}):</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedTask.plannedFiles.map((f) => (
+                            <span key={f} className="px-1.5 py-0.5 rounded bg-white text-amber-900 font-mono text-[10px] border border-amber-300 font-semibold shadow-2xs">
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
@@ -890,18 +910,49 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                           <Clock className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-slate-900 truncate">
-                            {idx + 1}. {step.title}
+                          <div className="flex items-center justify-between gap-1 mb-0.5">
+                            <div className="font-bold text-slate-900 truncate">
+                              {idx + 1}. {step.title}
+                            </div>
+                            {step.operation && (
+                              <span
+                                className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider shrink-0 ${
+                                  step.operation === 'create'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : step.operation === 'edit'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                    : step.operation === 'delete'
+                                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                    : step.operation === 'command'
+                                    ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-300'
+                                }`}
+                              >
+                                {step.operation}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-500 leading-tight mt-0.5">
                             {step.description}
                           </div>
 
-                          {step.tool && (
-                            <div className="mt-1 text-[10px] font-mono text-slate-400">
-                              Tool: <span className="text-[#EA580C] font-semibold">{step.tool}</span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            {step.targetPath && (
+                              <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-1 rounded truncate max-w-[140px]">
+                                {step.targetPath}
+                              </span>
+                            )}
+                            {step.tool && (
+                              <span className="text-[10px] font-mono text-slate-400 truncate">
+                                tool: <span className="text-[#EA580C] font-semibold">{step.tool}</span>
+                              </span>
+                            )}
+                            {step.status === 'completed' && (
+                              <span className="ml-auto inline-flex items-center gap-0.5 text-emerald-700 font-semibold bg-emerald-100/80 px-1.5 py-0.2 rounded text-[9px] border border-emerald-200 shrink-0">
+                                <Check className="w-2.5 h-2.5" /> Verified
+                              </span>
+                            )}
+                          </div>
 
                           {/* Server-Enforced Approval Dialog */}
                           {step.requiresApproval && !step.isApproved && step.status === 'awaiting_approval' && (
@@ -1126,6 +1177,13 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                   className="px-2 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 rounded text-slate-300 cursor-pointer"
                 >
                   npm test
+                </button>
+                <button
+                  onClick={() => handleExecuteTerminal('npm run lint')}
+                  disabled={isExecutingCommand}
+                  className="px-2 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 rounded text-slate-300 cursor-pointer"
+                >
+                  npm run lint
                 </button>
                 <button
                   onClick={() => handleExecuteTerminal('git status')}

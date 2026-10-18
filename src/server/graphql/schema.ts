@@ -119,6 +119,8 @@ export const schema = createSchema({
       description: String!
       status: String!
       tool: String
+      operation: String
+      targetPath: String
       requiresApproval: Boolean
       isApproved: Boolean
       createdAt: String!
@@ -135,6 +137,9 @@ export const schema = createSchema({
       status: String!
       modelId: String!
       skillId: String
+      permissionMode: String
+      isPlanApproved: Boolean
+      plannedFiles: [String!]
       steps: [AgentTaskStep!]!
       artifactIds: [String!]!
       summary: String
