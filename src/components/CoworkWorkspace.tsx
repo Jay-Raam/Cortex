@@ -87,6 +87,51 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   const [isSelectingWorkspace, setIsSelectingWorkspace] = useState(false);
   const [isBindingSubmitting, setIsBindingSubmitting] = useState(false);
 
+  // Configurable Context Window state
+  const [contextPreference, setContextPreference] = useState<string>(workspace?.contextWindowPreference || 'auto');
+  const [contextBudget, setContextBudget] = useState<any>(null);
+  const [contextOptions, setContextOptions] = useState<Array<{ id: string; label: string; disabled: boolean }>>([]);
+
+  // Load Context Budget
+  const loadContextBudget = async (pref = contextPreference) => {
+    if (!workspace) return;
+    try {
+      const res = await fetch('/api/cowork/context-budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: 'gemini-3.8-flash',
+          preference: pref,
+          workspaceId: workspace.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setContextBudget(data.budget);
+        if (data.options) {
+          setContextOptions(data.options);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load context budget:', err);
+    }
+  };
+
+  // Change Context Window Preference
+  const handleChangeContextPreference = async (newPref: string) => {
+    setContextPreference(newPref);
+    await loadContextBudget(newPref);
+    if (workspace) {
+      try {
+        await fetch(`/api/cowork/workspaces/${workspace.id}/context-preference`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contextWindowPreference: newPref }),
+        });
+      } catch {}
+    }
+  };
+
   // Load Workspaces list
   const loadWorkspaces = async () => {
     try {
@@ -295,6 +340,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   useEffect(() => {
     loadWorkspaceData();
     loadProjectTree();
+    loadContextBudget();
   }, [workspace]);
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
@@ -506,6 +552,30 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Configurable Context Window Selector */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-xs" title={contextBudget ? `Effective limit: ${(contextBudget.effectiveLimit / 1024).toFixed(0)}K · Remaining: ${(contextBudget.remainingTokens / 1024).toFixed(1)}K` : undefined}>
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-[10px] uppercase font-bold text-slate-500">Context:</span>
+            <select
+              value={contextPreference}
+              onChange={(e) => handleChangeContextPreference(e.target.value)}
+              className="bg-transparent font-semibold text-slate-800 text-xs focus:outline-none cursor-pointer"
+            >
+              <option value="auto">Auto (1M)</option>
+              <option value="32k">32K Tokens</option>
+              <option value="64k">64K Tokens</option>
+              <option value="128k">128K Tokens</option>
+              <option value="200k">200K Tokens</option>
+              <option value="500k">500K Tokens</option>
+              <option value="1m">1M Tokens</option>
+            </select>
+            {contextBudget && (
+              <span className="text-[10px] font-mono text-slate-500 border-l border-slate-200 pl-1.5">
+                {contextBudget.utilizationPercent}%
+              </span>
+            )}
+          </div>
+
           {/* Permission Mode Selector */}
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-xs">
             <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />

@@ -11,6 +11,7 @@ import { executionRunner } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens } from '../auth/auth';
 import { Message, User, Workspace } from '../types';
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
+import { contextManager } from '../cowork/context-manager';
 
 export const apiRouter = express.Router();
 
@@ -528,6 +529,59 @@ apiRouter.post('/cowork/workspaces/:id/permission-mode', async (req: Request, re
   if (!updated) return res.status(404).json({ error: 'Workspace not found or access denied' });
 
   res.json({ success: true, workspace: updated });
+});
+
+/**
+ * Update workspace context window preference (auto, 32k, 64k, 128k, 200k, 500k, 1m)
+ */
+apiRouter.post('/cowork/workspaces/:id/context-preference', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const { contextWindowPreference } = req.body;
+
+  const validPreferences = ['auto', '32k', '64k', '128k', '200k', '500k', '1m'];
+  if (!contextWindowPreference || !validPreferences.includes(contextWindowPreference)) {
+    return res.status(400).json({ error: `Invalid context preference. Must be one of: ${validPreferences.join(', ')}` });
+  }
+
+  const updated = db.updateWorkspace(id, user.id, { contextWindowPreference });
+  if (!updated) return res.status(404).json({ error: 'Workspace not found or access denied' });
+
+  res.json({ success: true, workspace: updated });
+});
+
+/**
+ * Calculate dynamic context budget for model and workspace content
+ */
+apiRouter.post('/cowork/context-budget', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { modelId = 'gemini-3.8-flash', preference = 'auto', workspaceId, systemPrompt = '', toolCount = 15 } = req.body;
+
+  let usedTextContent = '';
+  if (workspaceId) {
+    const ws = db.getWorkspaceById(workspaceId, user.id);
+    if (ws) {
+      try {
+        const wsRoot = workspaceManager.getWorkspaceRoot(ws);
+        const tree = await workspaceManager.listDirectoryTree(wsRoot, '', 3);
+        usedTextContent = JSON.stringify(tree);
+      } catch {}
+    }
+  }
+
+  const budget = contextManager.calculateBudget({
+    modelId,
+    preference,
+    systemPrompt,
+    toolCount,
+    usedTextContent,
+  });
+
+  const validOptions = contextManager.getValidOptionsForModel(modelId);
+
+  res.json({ success: true, budget, options: validOptions });
 });
 
 /**
