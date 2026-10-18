@@ -110,6 +110,17 @@ export interface WorkspaceArtifact {
   updatedAt: string;
 }
 
+export type PermissionMode = 'ask_every_change' | 'approve_plan' | 'session_edit';
+
+export interface ProjectStackInfo {
+  framework: string;
+  hasTests: boolean;
+  packageScripts: Record<string, string>;
+  dependencies: Record<string, string>;
+  configFiles: string[];
+  entryPoints: string[];
+}
+
 export interface Workspace {
   id: string;
   userId: string;
@@ -118,6 +129,9 @@ export interface Workspace {
   projectRoot?: string;
   isLocalBinding?: boolean;
   gitBranch?: string;
+  permissionMode?: PermissionMode;
+  contextWindowPreference?: string; // 'auto' | '32k' | '64k' | '128k' | '200k' | '500k' | '1m'
+  detectedStack?: ProjectStackInfo;
   createdAt: string;
   updatedAt: string;
 }

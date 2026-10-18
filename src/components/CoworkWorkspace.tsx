@@ -78,7 +78,29 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   const [terminalOutput, setTerminalOutput] = useState<ExecutionCommandResult | null>(null);
   const [terminalHistory, setTerminalHistory] = useState<Array<{ command: string; result: ExecutionCommandResult }>>([]);
 
-  // Load Real Project Tree
+  // Project stack & local folder binding state
+  const [projectStack, setProjectStack] = useState<any>(null);
+  const [isBindingLocal, setIsBindingLocal] = useState(false);
+  const [localFolderPath, setLocalFolderPath] = useState('');
+  const [localWorkspaceName, setLocalWorkspaceName] = useState('');
+  const [availableWorkspaces, setAvailableWorkspaces] = useState<Workspace[]>([]);
+  const [isSelectingWorkspace, setIsSelectingWorkspace] = useState(false);
+  const [isBindingSubmitting, setIsBindingSubmitting] = useState(false);
+
+  // Load Workspaces list
+  const loadWorkspaces = async () => {
+    try {
+      const res = await fetch('/api/cowork/workspaces');
+      const data = await res.json();
+      if (data.success && data.workspaces) {
+        setAvailableWorkspaces(data.workspaces);
+      }
+    } catch (err) {
+      console.warn('Failed to load workspaces:', err);
+    }
+  };
+
+  // Load Real Project Tree & Stack
   const loadProjectTree = async () => {
     if (!workspace) return;
     try {
@@ -89,9 +111,43 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         if (data.git) {
           setGitStatus(data.git);
         }
+        if (data.stack) {
+          setProjectStack(data.stack);
+        }
       }
     } catch (err) {
       console.warn('Failed to load project tree:', err);
+    }
+  };
+
+  // Bind local project folder
+  const handleBindLocalFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!localFolderPath.trim() || isBindingSubmitting) return;
+    setIsBindingSubmitting(true);
+    try {
+      const res = await fetch('/api/cowork/workspaces/bind-local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folderPath: localFolderPath.trim(),
+          name: localWorkspaceName.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsBindingLocal(false);
+        setLocalFolderPath('');
+        setLocalWorkspaceName('');
+        onRefreshWorkspace();
+        await loadWorkspaces();
+      } else {
+        alert(data.error || 'Failed to bind local folder.');
+      }
+    } catch (err: any) {
+      alert(`Error binding folder: ${err.message}`);
+    } finally {
+      setIsBindingSubmitting(false);
     }
   };
 
@@ -392,11 +448,28 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                   {gitStatus.branch || 'main'}
                 </span>
               )}
+              {projectStack && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-sans text-[10px] font-medium border border-blue-200">
+                  {projectStack.framework}
+                  {projectStack.hasTests && ' · Tests'}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              loadWorkspaces();
+              setIsBindingLocal(true);
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+            title="Bind local project folder"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-amber-500" />
+            <span>Open Project Folder</span>
+          </button>
           <button
             onClick={() => {
               loadWorkspaceData();
@@ -417,6 +490,97 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Bind Local Folder Modal */}
+      {isBindingLocal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-amber-500" />
+                <h3 className="text-sm font-bold text-slate-900">Select Local Project Folder</h3>
+              </div>
+              <button
+                onClick={() => setIsBindingLocal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBindLocalFolder} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Local Folder Path <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. D:\Chat Application or /home/user/project"
+                  value={localFolderPath}
+                  onChange={(e) => setLocalFolderPath(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:border-[#FF6B00] bg-slate-50/50"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Enter absolute path to authorized local project folder. Stack and scripts will be automatically detected.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Workspace Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. My Core Service"
+                  value={localWorkspaceName}
+                  onChange={(e) => setLocalWorkspaceName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              {availableWorkspaces.length > 0 && (
+                <div className="border-t border-slate-100 pt-3">
+                  <div className="text-[11px] font-semibold text-slate-600 mb-2">Recent Authorized Projects:</div>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {availableWorkspaces.map((ws) => (
+                      <div
+                        key={ws.id}
+                        onClick={() => {
+                          if (ws.projectRoot) setLocalFolderPath(ws.projectRoot);
+                          setLocalWorkspaceName(ws.name);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-amber-50 border border-slate-200/80 text-xs flex items-center justify-between cursor-pointer transition-colors"
+                      >
+                        <span className="font-semibold text-slate-800">{ws.name}</span>
+                        <span className="font-mono text-[10px] text-slate-500 truncate max-w-[200px]">{ws.projectRoot || ws.id}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsBindingLocal(false)}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isBindingSubmitting || !localFolderPath.trim()}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#FF6B00] hover:bg-[#E56000] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isBindingSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Authorize & Open Workspace</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Main 3-Column IDE Body */}
       <div className="flex-1 flex overflow-hidden">

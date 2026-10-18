@@ -9,7 +9,7 @@ import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
 import { executionRunner } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens } from '../auth/auth';
-import { Message, User } from '../types';
+import { Message, User, Workspace } from '../types';
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
 
 export const apiRouter = express.Router();
@@ -508,10 +508,62 @@ apiRouter.get('/cowork/workspaces/:id/tree', async (req: Request, res: Response)
     const subDir = typeof req.query.dir === 'string' ? req.query.dir : '';
     const tree = await workspaceManager.listDirectoryTree(wsRoot, subDir);
     const gitStatus = await workspaceManager.getGitStatus(wsRoot);
-    res.json({ success: true, workspaceRoot: wsRoot, tree, git: gitStatus });
+    const stack = await workspaceManager.getProjectStructure(wsRoot);
+    res.json({ success: true, workspaceRoot: wsRoot, tree, git: gitStatus, stack });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * List all workspaces for authenticated user
+ */
+apiRouter.get('/cowork/workspaces', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const workspaces = db.getWorkspaces(user.id);
+  res.json({ success: true, workspaces });
+});
+
+/**
+ * Bind a local project folder as a persistent Co-Work workspace
+ */
+apiRouter.post('/cowork/workspaces/bind-local', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { folderPath, name, description, permissionMode = 'approve_plan' } = req.body;
+
+  if (!folderPath || typeof folderPath !== 'string') {
+    return res.status(400).json({ error: 'folderPath string is required.' });
+  }
+
+  // Canonicalize path and ensure directory exists
+  const resolvedPath = path.resolve(folderPath.trim());
+  if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isDirectory()) {
+    return res.status(400).json({ error: `Folder does not exist or is not a directory: "${resolvedPath}"` });
+  }
+
+  // Detect project stack
+  const stack = await workspaceManager.getProjectStructure(resolvedPath);
+  const git = await workspaceManager.getGitStatus(resolvedPath);
+
+  const folderName = path.basename(resolvedPath) || 'Local Project';
+  const newWorkspace: Workspace = {
+    id: `ws_local_${Date.now()}`,
+    userId: user.id,
+    name: name?.trim() || folderName,
+    description: description?.trim() || `Bound local folder: ${resolvedPath}`,
+    projectRoot: resolvedPath,
+    isLocalBinding: true,
+    gitBranch: git.branch,
+    permissionMode: permissionMode as any,
+    detectedStack: stack,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.createWorkspace(newWorkspace);
+  res.json({ success: true, workspace: newWorkspace, stack });
 });
 
 /**

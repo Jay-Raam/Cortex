@@ -386,6 +386,7 @@ export class WorkspaceManager {
     packageScripts: Record<string, string>;
     dependencies: Record<string, string>;
     hasTests: boolean;
+    configFiles: string[];
     entryPoints: string[];
   }> {
     const pkgPath = path.join(workspaceRoot, 'package.json');
@@ -404,11 +405,38 @@ export class WorkspaceManager {
         if (dependencies.react) framework = 'React';
         if (dependencies.next) framework = 'Next.js';
         if (dependencies.vue) framework = 'Vue';
+        if (dependencies.svelte) framework = 'Svelte';
         if (dependencies.express) framework += ' + Express';
+        if (dependencies.vite) framework += ' (Vite)';
       } catch {}
     }
 
-    const entryCandidates = ['src/index.ts', 'src/main.ts', 'src/App.tsx', 'index.js', 'server.ts'];
+    const configCandidates = [
+      'tsconfig.json',
+      'vite.config.ts',
+      'vite.config.js',
+      'next.config.js',
+      'next.config.mjs',
+      'next.config.ts',
+      'tailwind.config.js',
+      'tailwind.config.ts',
+      'eslint.config.js',
+      '.eslintrc.json',
+      '.gitignore',
+      'package.json',
+    ];
+    const configFiles = configCandidates.filter((cfg) => fs.existsSync(path.join(workspaceRoot, cfg)));
+
+    const entryCandidates = [
+      'src/index.ts',
+      'src/main.ts',
+      'src/main.tsx',
+      'src/App.tsx',
+      'index.js',
+      'server.ts',
+      'app/layout.tsx',
+      'app/page.tsx',
+    ];
     const entryPoints = entryCandidates.filter((cand) => fs.existsSync(path.join(workspaceRoot, cand)));
 
     return {
@@ -416,6 +444,7 @@ export class WorkspaceManager {
       packageScripts,
       dependencies,
       hasTests,
+      configFiles,
       entryPoints,
     };
   }
