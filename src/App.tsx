@@ -845,6 +845,7 @@ export default function App() {
             <CoworkWorkspace
               workspace={activeWorkspace}
               onRefreshWorkspace={loadInitialData}
+              onSelectWorkspace={(ws) => setActiveWorkspace(ws)}
             />
           )}
 

@@ -36,11 +36,13 @@ import { fetchGraphQL, advanceTaskApi } from '../lib/api';
 interface CoworkWorkspaceProps {
   workspace: Workspace | null;
   onRefreshWorkspace: () => void;
+  onSelectWorkspace?: (ws: Workspace) => void;
 }
 
 export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   workspace,
   onRefreshWorkspace,
+  onSelectWorkspace,
 }) => {
   // Tasks state
   const [tasks, setTasks] = useState<AgentTask[]>([]);
@@ -184,6 +186,9 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         setIsBindingLocal(false);
         setLocalFolderPath('');
         setLocalWorkspaceName('');
+        if (data.workspace && onSelectWorkspace) {
+          onSelectWorkspace(data.workspace);
+        }
         onRefreshWorkspace();
         await loadWorkspaces();
       } else {
@@ -346,6 +351,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
     loadWorkspaceData();
     loadProjectTree();
     loadContextBudget();
+    loadWorkspaces();
   }, [workspace]);
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
@@ -535,9 +541,30 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
             <Briefcase className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-xs font-bold text-slate-900">
-              {workspace?.name || 'Primary Workspace'}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xs font-bold text-slate-900">
+                {workspace?.name || 'Primary Workspace'}
+              </h2>
+              {availableWorkspaces.length > 1 && (
+                <select
+                  value={workspace?.id}
+                  onChange={(e) => {
+                    const found = availableWorkspaces.find((w) => w.id === e.target.value);
+                    if (found && onSelectWorkspace) {
+                      onSelectWorkspace(found);
+                    }
+                  }}
+                  className="text-[10px] bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-1.5 py-0.5 text-slate-700 font-semibold cursor-pointer focus:outline-none"
+                  title="Switch workspace"
+                >
+                  {availableWorkspaces.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
               <span>Path: {workspace?.projectRoot || 'workspaces/' + (workspace?.id || '')}</span>
               {gitStatus?.isGit && (
