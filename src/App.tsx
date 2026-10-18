@@ -598,6 +598,13 @@ export default function App() {
           conversations={conversations}
           activeConversationId={activeConversationId}
           currentUser={currentUser}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspace?.id}
+          onSelectWorkspace={(ws) => {
+            setActiveWorkspace(ws);
+            setCurrentView('cowork');
+          }}
+          onNewWorkspace={() => setCurrentView('cowork')}
           onSelectConversation={(id) => setActiveConversationId(id)}
           onNewConversation={handleNewConversation}
           onDeleteConversation={handleDeleteConversation}

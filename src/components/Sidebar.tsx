@@ -15,14 +15,23 @@ import {
   Search,
   Edit2,
   Check,
+  Briefcase,
+  Folder,
+  FolderPlus,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
-import { Conversation, User } from '../server/types';
+import { Conversation, User, Workspace } from '../server/types';
 import { CognivoLogo } from './CognivoLogo';
 
 interface SidebarProps {
   conversations: Conversation[];
   activeConversationId: string | null;
   currentUser?: User | null;
+  workspaces?: Workspace[];
+  activeWorkspaceId?: string | null;
+  onSelectWorkspace?: (workspace: Workspace) => void;
+  onNewWorkspace?: () => void;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
   onDeleteConversation: (id: string) => void;
@@ -43,6 +52,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   conversations,
   activeConversationId,
   currentUser,
+  workspaces = [],
+  activeWorkspaceId,
+  onSelectWorkspace,
+  onNewWorkspace,
   onSelectConversation,
   onNewConversation,
   onDeleteConversation,
@@ -62,6 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
   const modKey = isMac ? '⌘' : 'Ctrl';
 
@@ -123,6 +137,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Plus className="w-4 h-4" />
           </button>
+          {workspaces.length > 0 && (
+            <button
+              onClick={() => {
+                if (onSelectWorkspace && workspaces[0]) onSelectWorkspace(workspaces[0]);
+              }}
+              className="w-9 h-9 rounded-xl hover:bg-slate-200/60 text-[#EA580C] flex items-center justify-center transition-colors cursor-pointer"
+              title={`Projects (${workspaces.length})`}
+            >
+              <Briefcase className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col items-center gap-3">
@@ -185,8 +210,68 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </button>
 
+        {/* Dedicated Projects Section - Claude Style */}
+        <div className="pt-0.5">
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/70 hover:bg-white border border-slate-200/60 shadow-2xs transition-colors">
+            <button
+              type="button"
+              onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
+              className="flex items-center gap-2 flex-1 text-left cursor-pointer"
+            >
+              <Briefcase className="w-4 h-4 text-[#EA580C]" />
+              <span className="text-xs font-bold text-slate-800">Projects</span>
+              <span className="text-[10px] text-slate-400 font-mono">({workspaces.length})</span>
+              {isProjectsExpanded ? (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-auto" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400 ml-auto" />
+              )}
+            </button>
+            {onNewWorkspace && (
+              <button
+                type="button"
+                onClick={onNewWorkspace}
+                className="p-1 text-slate-400 hover:text-[#EA580C] hover:bg-orange-50 rounded transition-colors ml-1 cursor-pointer"
+                title="New Project / Bind Folder"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Expanded Projects List */}
+          {isProjectsExpanded && (
+            <div className="pl-2 pr-1 space-y-1 mt-1.5">
+              {workspaces.map((ws) => {
+                const isActive = activeWorkspaceId === ws.id;
+                return (
+                  <button
+                    key={ws.id}
+                    type="button"
+                    onClick={() => onSelectWorkspace && onSelectWorkspace(ws)}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer truncate ${
+                      isActive
+                        ? 'bg-[#FFF7ED] text-[#EA580C] font-bold border border-[#FED7AA] shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                    title={`Open ${ws.name} in Co-Work`}
+                  >
+                    <Folder className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#EA580C]' : 'text-amber-500'}`} />
+                    <span className="truncate">{ws.name}</span>
+                  </button>
+                );
+              })}
+              {workspaces.length === 0 && (
+                <div className="text-[11px] text-slate-400 px-3 py-1 italic">
+                  No projects added yet.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Secondary Navigation Links */}
-        <div className="space-y-0.5 pt-1">
+        <div className="space-y-0.5 pt-0.5">
           <button
             type="button"
             onClick={onOpenExplore}

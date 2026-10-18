@@ -75,29 +75,37 @@ export const TopNav: React.FC<TopNavProps> = ({
           <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 shrink-0" />
         </button>
 
-        {/* Quiet view tabs for Co-Work and Platform features */}
-        <div className="hidden lg:flex items-center gap-1 ml-4 pl-4 border-l border-slate-200">
+        {/* Claude Style [ Chat | Cowork ] Pill Toggle */}
+        <div className="flex items-center bg-[#F4F1EA] p-0.5 rounded-xl border border-[#E5E0D8] shadow-2xs ml-2 sm:ml-4">
           <button
             onClick={() => onNavigate('chat')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-              currentView === 'chat' ? 'text-[#FF6B00] bg-orange-50 font-semibold' : 'text-slate-500 hover:text-slate-800'
+            className={`px-3.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              currentView === 'chat'
+                ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             Chat
           </button>
           <button
             onClick={() => onNavigate('cowork')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-              currentView === 'cowork' ? 'text-[#FF6B00] bg-orange-50 font-semibold' : 'text-slate-500 hover:text-slate-800'
+            className={`flex items-center gap-1.5 px-3.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              currentView === 'cowork'
+                ? 'bg-white text-[#EA580C] shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Co-Work</span>
+            <Layers className="w-3.5 h-3.5 text-[#EA580C]" />
+            <span>Cowork</span>
           </button>
+        </div>
+
+        {/* Secondary feature tabs */}
+        <div className="hidden xl:flex items-center gap-1 ml-2">
           <button
             onClick={() => onNavigate('skills')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-              currentView === 'skills' ? 'text-[#FF6B00] bg-orange-50 font-semibold' : 'text-slate-500 hover:text-slate-800'
+              currentView === 'skills' ? 'text-[#EA580C] bg-orange-50 font-semibold' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             <Wrench className="w-3.5 h-3.5" />
@@ -106,7 +114,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           <button
             onClick={() => onNavigate('docs')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-              currentView === 'docs' ? 'text-[#FF6B00] bg-orange-50 font-semibold' : 'text-slate-500 hover:text-slate-800'
+              currentView === 'docs' ? 'text-[#EA580C] bg-orange-50 font-semibold' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
