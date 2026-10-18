@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Briefcase,
   Play,
@@ -22,6 +22,8 @@ import {
   Zap,
   Folder,
   FolderOpen,
+  FolderUp,
+  UploadCloud,
   File,
   GitBranch,
   Save,
@@ -118,6 +120,12 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   const [availableWorkspaces, setAvailableWorkspaces] = useState<Workspace[]>([]);
   const [isSelectingWorkspace, setIsSelectingWorkspace] = useState(false);
   const [isBindingSubmitting, setIsBindingSubmitting] = useState(false);
+  const [pickedFiles, setPickedFiles] = useState<Array<{ path: string; content: string }>>([]);
+  const [pickedFolderName, setPickedFolderName] = useState('');
+  const [isReadingFolder, setIsReadingFolder] = useState(false);
+  const [isSyncingFiles, setIsSyncingFiles] = useState(false);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const syncFolderInputRef = useRef<HTMLInputElement>(null);
 
   // Configurable Context Window state
   const [contextPreference, setContextPreference] = useState<string>(workspace?.contextWindowPreference || 'auto');
@@ -197,25 +205,186 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
     }
   };
 
-  // Bind local project folder
+  // Browse and read folder directly from user's disk
+  const handlePickFolderFromDisk = async () => {
+    if ('showDirectoryPicker' in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker();
+        setIsReadingFolder(true);
+        const files: Array<{ path: string; content: string }> = [];
+
+        async function readDir(handle: any, currentPath = '') {
+          for await (const entry of handle.values()) {
+            if (entry.kind === 'file') {
+              if (
+                /\.(png|jpe?g|gif|ico|webp|svg|mp4|zip|tar|gz|pdf|exe|dll|dylib|so|lock)$/i.test(entry.name) ||
+                entry.name === 'package-lock.json' ||
+                entry.name === 'yarn.lock' ||
+                entry.name === 'pnpm-lock.yaml'
+              ) {
+                continue;
+              }
+              try {
+                const file = await entry.getFile();
+                if (file.size > 2 * 1024 * 1024) continue;
+                const content = await file.text();
+                const relPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+                files.push({ path: relPath, content });
+              } catch (e) {
+                console.warn('Failed to read file:', entry.name, e);
+              }
+            } else if (entry.kind === 'directory') {
+              if (['node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.cache'].includes(entry.name)) {
+                continue;
+              }
+              const nextPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+              await readDir(entry, nextPath);
+            }
+          }
+        }
+
+        await readDir(dirHandle);
+        setPickedFolderName(dirHandle.name);
+        setPickedFiles(files);
+        setLocalWorkspaceName(dirHandle.name);
+        setLocalFolderPath(dirHandle.name);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.warn('Directory picker failed, falling back to input:', err);
+          folderInputRef.current?.click();
+        }
+      } finally {
+        setIsReadingFolder(false);
+      }
+    } else {
+      folderInputRef.current?.click();
+    }
+  };
+
+  // Fallback directory input handler
+  const handleFolderInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    setIsReadingFolder(true);
+    try {
+      const files: Array<{ path: string; content: string }> = [];
+      let detectedName = '';
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        const relPath = file.webkitRelativePath || file.name;
+        const segments = relPath.split('/');
+        if (segments.length > 1 && !detectedName) {
+          detectedName = segments[0];
+        }
+        if (segments.some((s) => ['node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.cache'].includes(s))) {
+          continue;
+        }
+        if (file.size > 2 * 1024 * 1024) continue;
+        if (/\.(png|jpe?g|gif|ico|webp|svg|mp4|zip|tar|gz|pdf|exe|dll|dylib|so|lock)$/i.test(file.name)) {
+          continue;
+        }
+        try {
+          const content = await file.text();
+          const cleanRelPath = segments.length > 1 ? segments.slice(1).join('/') : relPath;
+          files.push({ path: cleanRelPath, content });
+        } catch (err) {
+          console.warn('Error reading file:', file.name, err);
+        }
+      }
+      const folderName = detectedName || 'Local Project';
+      setPickedFolderName(folderName);
+      setPickedFiles(files);
+      setLocalWorkspaceName(folderName);
+      setLocalFolderPath(folderName);
+    } finally {
+      setIsReadingFolder(false);
+    }
+  };
+
+  // Sync / Upload files into current workspace
+  const handleSyncFolderInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!workspace) return;
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    setIsSyncingFiles(true);
+    try {
+      const files: Array<{ path: string; content: string }> = [];
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        const relPath = file.webkitRelativePath || file.name;
+        const segments = relPath.split('/');
+        if (segments.some((s) => ['node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.cache'].includes(s))) {
+          continue;
+        }
+        if (file.size > 2 * 1024 * 1024) continue;
+        if (/\.(png|jpe?g|gif|ico|webp|svg|mp4|zip|tar|gz|pdf|exe|dll|dylib|so|lock)$/i.test(file.name)) {
+          continue;
+        }
+        try {
+          const content = await file.text();
+          const cleanRelPath = segments.length > 1 ? segments.slice(1).join('/') : relPath;
+          files.push({ path: cleanRelPath, content });
+        } catch (err) {
+          console.warn('Error reading file for sync:', file.name, err);
+        }
+      }
+
+      if (files.length > 0) {
+        const res = await fetch(`/api/cowork/workspaces/${workspace.id}/sync-files`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Successfully synced ${data.syncedCount} file(s) into workspace!`);
+          await loadProjectTree();
+        } else {
+          alert(data.error || 'Failed to sync files.');
+        }
+      }
+    } catch (err: any) {
+      alert(`Error syncing files: ${err.message}`);
+    } finally {
+      setIsSyncingFiles(false);
+    }
+  };
+
+  // Bind local project folder or import picked files
   const handleBindLocalFolder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!localFolderPath.trim() || isBindingSubmitting) return;
+    if ((!localFolderPath.trim() && pickedFiles.length === 0) || isBindingSubmitting) return;
     setIsBindingSubmitting(true);
     try {
-      const res = await fetch('/api/cowork/workspaces/bind-local', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          folderPath: localFolderPath.trim(),
-          name: localWorkspaceName.trim() || undefined,
-        }),
-      });
+      let res: Response;
+      if (pickedFiles.length > 0) {
+        res = await fetch('/api/cowork/workspaces/import-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: localWorkspaceName.trim() || pickedFolderName || 'Local Project',
+            folderName: pickedFolderName,
+            originalPath: localFolderPath.trim() || pickedFolderName,
+            files: pickedFiles,
+          }),
+        });
+      } else {
+        res = await fetch('/api/cowork/workspaces/bind-local', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            folderPath: localFolderPath.trim(),
+            name: localWorkspaceName.trim() || undefined,
+          }),
+        });
+      }
       const data = await res.json();
       if (data.success) {
         setIsBindingLocal(false);
         setLocalFolderPath('');
         setLocalWorkspaceName('');
+        setPickedFiles([]);
+        setPickedFolderName('');
         if (data.workspace && onSelectWorkspace) {
           onSelectWorkspace(data.workspace);
         }
@@ -736,32 +905,96 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-amber-500" />
+                <FolderOpen className="w-5 h-5 text-[#EA580C]" />
                 <h3 className="text-sm font-bold text-slate-900">Select Local Project Folder</h3>
               </div>
               <button
-                onClick={() => setIsBindingLocal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                onClick={() => {
+                  setIsBindingLocal(false);
+                  setPickedFiles([]);
+                  setPickedFolderName('');
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleBindLocalFolder} className="p-5 space-y-4">
+              {/* Option 1: Native Folder Picker / Upload */}
+              <div className="p-4 rounded-xl border border-dashed border-[#FED7AA] bg-[#FFFBF7] flex flex-col items-center justify-center text-center space-y-2.5">
+                <div className="w-10 h-10 rounded-full bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C]">
+                  {isReadingFolder ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <FolderUp className="w-5 h-5" />
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900">
+                    Choose Folder from your Computer
+                  </div>
+                  <div className="text-[11px] text-slate-500 max-w-xs mt-0.5">
+                    Select a local project folder directly (e.g. your portfolio or React app) to authorize and sync into the workspace.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePickFolderFromDisk}
+                  disabled={isReadingFolder}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 shadow-2xs transition-all cursor-pointer hover:border-[#EA580C]"
+                >
+                  <FolderOpen className="w-4 h-4 text-[#EA580C]" />
+                  <span>{isReadingFolder ? 'Reading Folder...' : 'Browse Local Folder'}</span>
+                </button>
+
+                <input
+                  type="file"
+                  ref={folderInputRef}
+                  onChange={handleFolderInputChange}
+                  className="hidden"
+                  // @ts-ignore
+                  webkitdirectory=""
+                  directory=""
+                  multiple
+                />
+
+                {pickedFiles.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Selected <strong>{pickedFolderName}</strong> ({pickedFiles.length} file{pickedFiles.length > 1 ? 's' : ''} ready)
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-slate-200 w-full" />
+                <span className="bg-white px-2 text-[10px] uppercase font-bold text-slate-400 tracking-wider absolute">
+                  Or Enter Folder Path
+                </span>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Local Folder Path <span className="text-red-500">*</span>
+                  Local Folder Path {pickedFiles.length === 0 && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. D:\Chat Application or /home/user/project"
+                  required={pickedFiles.length === 0}
+                  placeholder="e.g. D:\Portfoloi or /home/user/project"
                   value={localFolderPath}
-                  onChange={(e) => setLocalFolderPath(e.target.value)}
+                  onChange={(e) => {
+                    setLocalFolderPath(e.target.value);
+                    if (pickedFiles.length > 0) setPickedFiles([]);
+                  }}
                   className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:border-[#EA580C] bg-slate-50/50"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Enter absolute path to authorized local project folder. Stack and scripts will be automatically detected.
+                  Enter local path. On cloud environments, this initializes a managed workspace for your project.
                 </p>
               </div>
 
@@ -771,7 +1004,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. My Core Service"
+                  placeholder="e.g. Portfoloi"
                   value={localWorkspaceName}
                   onChange={(e) => setLocalWorkspaceName(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#EA580C]"
@@ -802,18 +1035,22 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsBindingLocal(false)}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+                  onClick={() => {
+                    setIsBindingLocal(false);
+                    setPickedFiles([]);
+                    setPickedFolderName('');
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isBindingSubmitting || !localFolderPath.trim()}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                  disabled={isBindingSubmitting || (!localFolderPath.trim() && pickedFiles.length === 0)}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   {isBindingSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  <span>Authorize & Open Workspace</span>
+                  <span>{pickedFiles.length > 0 ? 'Upload & Open Workspace' : 'Authorize & Open Workspace'}</span>
                 </button>
               </div>
             </form>
@@ -1214,12 +1451,34 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Project Explorer
                       </span>
-                      <button
-                        onClick={loadProjectTree}
-                        className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 rounded"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => syncFolderInputRef.current?.click()}
+                          disabled={isSyncingFiles}
+                          className="text-slate-400 hover:text-[#EA580C] cursor-pointer p-0.5 rounded transition-colors"
+                          title="Upload or sync folder files from disk"
+                        >
+                          {isSyncingFiles ? <RefreshCw className="w-3 h-3 animate-spin text-[#EA580C]" /> : <FolderUp className="w-3 h-3" />}
+                        </button>
+                        <input
+                          type="file"
+                          ref={syncFolderInputRef}
+                          onChange={handleSyncFolderInputChange}
+                          className="hidden"
+                          // @ts-ignore
+                          webkitdirectory=""
+                          directory=""
+                          multiple
+                        />
+                        <button
+                          onClick={loadProjectTree}
+                          className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 rounded transition-colors"
+                          title="Refresh project files"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="p-2 border-b border-[#EBE7DF]">

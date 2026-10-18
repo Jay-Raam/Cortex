@@ -653,22 +653,61 @@ apiRouter.post('/cowork/workspaces/bind-local', async (req: Request, res: Respon
     return res.status(400).json({ error: 'folderPath string is required.' });
   }
 
-  // Canonicalize path and ensure directory exists
-  const resolvedPath = path.resolve(folderPath.trim());
-  if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isDirectory()) {
-    return res.status(400).json({ error: `Folder does not exist or is not a directory: "${resolvedPath}"` });
+  const cleanInputPath = folderPath.trim();
+  const folderName = path.basename(cleanInputPath.replace(/\\/g, '/')) || 'Local Project';
+
+  let resolvedPath = path.resolve(cleanInputPath);
+  let isDir = fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isDirectory();
+
+  if (!isDir) {
+    // If not found via path.resolve, test if raw input path exists directly (e.g. Windows drive letters)
+    if (fs.existsSync(cleanInputPath) && fs.statSync(cleanInputPath).isDirectory()) {
+      resolvedPath = cleanInputPath;
+      isDir = true;
+    }
+  }
+
+  // If path doesn't exist on host filesystem (common on cloud servers like Render when receiving client Windows paths like D:\...)
+  if (!isDir) {
+    const isWindowsPathOnLinux = /^[a-zA-Z]:[/\\]/.test(cleanInputPath) && process.platform !== 'win32';
+    const isCloudEnv = Boolean(process.env.RENDER || process.env.VERCEL || process.env.NODE_ENV === 'production' || isWindowsPathOnLinux);
+
+    if (isCloudEnv) {
+      // Create a managed cloud workspace for this project
+      const wsId = `ws_cloud_${Date.now()}`;
+      const cloudWsDir = path.resolve(process.cwd(), 'workspaces', wsId);
+      fs.mkdirSync(cloudWsDir, { recursive: true });
+
+      // Create an initial informative README and package.json
+      const readmeContent = `# ${name?.trim() || folderName}\n\nWorkspace initialized for project: \`${cleanInputPath}\`\n\n*Running on Cloud Deployment. You can sync your local files directly using the "Browse Local Folder" button or start prompting the agent immediately.*`;
+      fs.writeFileSync(path.join(cloudWsDir, 'README.md'), readmeContent, 'utf8');
+
+      const pkgJson = {
+        name: (name?.trim() || folderName).toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
+        version: '1.0.0',
+        description: `Workspace for ${cleanInputPath}`,
+        scripts: {
+          test: "echo 'No tests specified' && exit 0"
+        }
+      };
+      fs.writeFileSync(path.join(cloudWsDir, 'package.json'), JSON.stringify(pkgJson, null, 2), 'utf8');
+
+      resolvedPath = cloudWsDir;
+      isDir = true;
+    } else {
+      return res.status(400).json({ error: `Folder does not exist or is not a directory: "${resolvedPath}"` });
+    }
   }
 
   // Detect project stack
   const stack = await workspaceManager.getProjectStructure(resolvedPath);
   const git = await workspaceManager.getGitStatus(resolvedPath);
 
-  const folderName = path.basename(resolvedPath) || 'Local Project';
   const newWorkspace: Workspace = {
     id: `ws_local_${Date.now()}`,
     userId: user.id,
     name: name?.trim() || folderName,
-    description: description?.trim() || `Bound local folder: ${resolvedPath}`,
+    description: description?.trim() || `Bound local folder: ${cleanInputPath}`,
     projectRoot: resolvedPath,
     isLocalBinding: true,
     gitBranch: git.branch,
@@ -680,6 +719,96 @@ apiRouter.post('/cowork/workspaces/bind-local', async (req: Request, res: Respon
 
   db.createWorkspace(newWorkspace);
   res.json({ success: true, workspace: newWorkspace, stack });
+});
+
+/**
+ * Import a local project folder directly with files uploaded from browser
+ */
+apiRouter.post('/cowork/workspaces/import-folder', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { name, folderName, originalPath, files = [], permissionMode = 'approve_plan' } = req.body;
+
+  const wsId = `ws_import_${Date.now()}`;
+  const wsRoot = path.resolve(process.cwd(), 'workspaces', wsId);
+  fs.mkdirSync(wsRoot, { recursive: true });
+
+  let savedCount = 0;
+  for (const file of files) {
+    if (!file.path || typeof file.path !== 'string') continue;
+    if (file.path.includes('..') || file.path.includes('\0')) continue;
+    try {
+      const safePath = workspaceManager.resolveSafePath(wsRoot, file.path);
+      fs.mkdirSync(path.dirname(safePath), { recursive: true });
+      fs.writeFileSync(safePath, typeof file.content === 'string' ? file.content : '', 'utf8');
+      savedCount++;
+    } catch (err) {
+      console.warn('Failed to import file:', file.path, err);
+    }
+  }
+
+  // If no files were written, create an initial README
+  if (savedCount === 0) {
+    const displayName = name?.trim() || folderName || 'Local Project';
+    fs.writeFileSync(
+      path.join(wsRoot, 'README.md'),
+      `# ${displayName}\n\nWorkspace initialized. Start adding code files or ask the agent to create components.`,
+      'utf8'
+    );
+  }
+
+  // Detect project stack and git if any
+  const stack = await workspaceManager.getProjectStructure(wsRoot);
+  const git = await workspaceManager.getGitStatus(wsRoot);
+
+  const displayWorkspaceName = name?.trim() || folderName || 'Local Project';
+  const newWorkspace: Workspace = {
+    id: wsId,
+    userId: user.id,
+    name: displayWorkspaceName,
+    description: originalPath ? `Imported from: ${originalPath}` : `Imported folder: ${folderName || 'Local Project'}`,
+    projectRoot: wsRoot,
+    isLocalBinding: true,
+    gitBranch: git.branch,
+    permissionMode: (permissionMode as any) || 'approve_plan',
+    detectedStack: stack,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.createWorkspace(newWorkspace);
+  res.json({ success: true, workspace: newWorkspace, stack, fileCount: savedCount });
+});
+
+/**
+ * Sync or upload files into an existing workspace
+ */
+apiRouter.post('/cowork/workspaces/:id/sync-files', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { files = [] } = req.body;
+  const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+
+  let syncedCount = 0;
+  for (const file of files) {
+    if (!file.path || typeof file.path !== 'string') continue;
+    if (file.path.includes('..') || file.path.includes('\0')) continue;
+    try {
+      const safePath = workspaceManager.resolveSafePath(wsRoot, file.path);
+      fs.mkdirSync(path.dirname(safePath), { recursive: true });
+      fs.writeFileSync(safePath, typeof file.content === 'string' ? file.content : '', 'utf8');
+      syncedCount++;
+    } catch (err) {
+      console.warn('Failed to sync file:', file.path, err);
+    }
+  }
+
+  const stack = await workspaceManager.getProjectStructure(wsRoot);
+  res.json({ success: true, syncedCount, stack });
 });
 
 /**
