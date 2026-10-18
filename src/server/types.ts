@@ -205,6 +205,8 @@ export interface AgentTaskStep {
   toolOutput?: Record<string, any>;
   requiresApproval?: boolean;
   isApproved?: boolean;
+  operation?: 'create' | 'edit' | 'delete' | 'read' | 'command';
+  targetPath?: string;
   createdAt: string;
   completedAt?: string;
 }

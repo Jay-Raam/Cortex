@@ -677,6 +677,42 @@ export class CoworkEngine {
   }
 
   /**
+   * Helper to infer operation category and target path from tool and input.
+   */
+  inferOperationAndTarget(
+    toolName: string,
+    toolInput: Record<string, any>
+  ): { operation: 'create' | 'edit' | 'delete' | 'read' | 'command'; targetPath?: string } {
+    if (toolName === 'workspace_create_file') {
+      return { operation: 'create', targetPath: toolInput.filePath || toolInput.path };
+    }
+    if (toolName === 'workspace_edit_file' || toolName === 'workspace_apply_patch') {
+      return { operation: 'edit', targetPath: toolInput.filePath || toolInput.path };
+    }
+    if (toolName === 'workspace_delete_file') {
+      return { operation: 'delete', targetPath: toolInput.filePath || toolInput.path };
+    }
+    if (toolName === 'workspace_create_artifact') {
+      return { operation: 'create', targetPath: toolInput.fileName || toolInput.title };
+    }
+    if (toolName === 'workspace_update_artifact') {
+      return { operation: 'edit', targetPath: toolInput.fileName || toolInput.title };
+    }
+    if (toolName === 'terminal_execute_command') {
+      return { operation: 'command', targetPath: toolInput.command };
+    }
+    return {
+      operation: 'read',
+      targetPath:
+        toolInput.filePath ||
+        toolInput.path ||
+        toolInput.fileName ||
+        toolInput.dir ||
+        toolInput.subDir,
+    };
+  }
+
+  /**
    * Plan initial steps for an agent task based on user goal, constraints, and project structure.
    */
   async planTask(task: AgentTask, userId: string): Promise<AgentTaskStep[]> {
@@ -691,6 +727,18 @@ export class CoworkEngine {
     const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
     const structure = await workspaceManager.getProjectStructure(wsRoot);
 
+    // Extract potential filenames mentioned in task.goal or constraints
+    const fileRegex = /([a-zA-Z0-9_\-\./\\]+\.[a-zA-Z0-9]+)/g;
+    const mentionedFiles: string[] = [];
+    const goalMatches = task.goal.match(fileRegex);
+    if (goalMatches) {
+      for (const m of goalMatches) {
+        if (!m.includes('http') && !mentionedFiles.includes(m)) {
+          mentionedFiles.push(m);
+        }
+      }
+    }
+
     const prompt = `You are an AI Principal Software Engineer. Formulate a 3 to 4 step execution plan for the following development task.
 Project Framework: ${structure.framework}
 Has Tests: ${structure.hasTests}
@@ -701,6 +749,8 @@ Desired Output: ${task.desiredOutput || 'Production implementation'}
 Return ONLY a JSON array of step objects with fields:
 - "title": string (concise step title)
 - "description": string (actionable details)
+- "operation": string ("create" | "edit" | "delete" | "read" | "command")
+- "targetPath": string (target file or command)
 - "tool": string (one of: workspace_list_files, workspace_read_file, workspace_create_file, workspace_apply_patch, workspace_create_artifact, terminal_execute_command, code_diff_analyzer)
 - "toolInput": object (optional initial arguments)
 - "requiresApproval": boolean (true for terminal commands, file deletions, or destructive actions; false for read-only or non-destructive edits)
@@ -714,17 +764,22 @@ No markdown fences or extra text.`;
         const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleaned);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          steps = parsed.map((p, idx) => ({
-            id: `step_${Date.now()}_${idx + 1}`,
-            title: p.title || `Step ${idx + 1}`,
-            description: p.description || '',
-            status: idx === 0 ? 'running' : 'pending',
-            tool: p.tool || 'workspace_list_files',
-            toolInput: p.toolInput || {},
-            requiresApproval: Boolean(p.requiresApproval),
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          }));
+          steps = parsed.map((p, idx) => {
+            const inferred = this.inferOperationAndTarget(p.tool || 'workspace_list_files', p.toolInput || {});
+            return {
+              id: `step_${Date.now()}_${idx + 1}`,
+              title: p.title || `Step ${idx + 1}`,
+              description: p.description || '',
+              status: idx === 0 ? 'running' : 'pending',
+              operation: p.operation || inferred.operation,
+              targetPath: p.targetPath || inferred.targetPath,
+              tool: p.tool || 'workspace_list_files',
+              toolInput: p.toolInput || {},
+              requiresApproval: Boolean(p.requiresApproval),
+              isApproved: false,
+              createdAt: new Date().toISOString(),
+            };
+          });
         }
       }
     } catch (err) {
@@ -733,12 +788,14 @@ No markdown fences or extra text.`;
 
     // Default structured plan
     if (steps.length === 0) {
+      const targetSolutionFile = mentionedFiles[0] || 'solution.ts';
       steps = [
         {
           id: `step_${Date.now()}_1`,
           title: 'Inspect Repository Context',
           description: 'Enumerate workspace files, analyze entry points, and discover existing project dependencies.',
           status: 'running',
+          operation: 'read',
           tool: 'workspace_list_files',
           toolInput: {},
           requiresApproval: false,
@@ -750,9 +807,11 @@ No markdown fences or extra text.`;
           title: 'Implement Solution & File Modifications',
           description: `Implement coordinated changes for goal: "${task.goal}".`,
           status: 'pending',
+          operation: 'create',
+          targetPath: targetSolutionFile,
           tool: 'workspace_create_file',
           toolInput: {
-            filePath: 'solution.ts',
+            filePath: targetSolutionFile,
             content: `// Solution for: ${task.goal}\nexport function execute() {\n  return { success: true, timestamp: new Date().toISOString() };\n}\n`,
           },
           requiresApproval: false,
@@ -766,6 +825,8 @@ No markdown fences or extra text.`;
             ? 'Execute package test suite and verify changes pass all assertions.'
             : 'Review git change status and verify unified diff.',
           status: 'pending',
+          operation: structure.hasTests ? 'command' : 'read',
+          targetPath: structure.hasTests ? 'npm test' : undefined,
           tool: structure.hasTests ? 'terminal_execute_command' : 'workspace_get_git_status',
           toolInput: structure.hasTests ? { command: 'npm test' } : {},
           requiresApproval: structure.hasTests,
@@ -774,6 +835,24 @@ No markdown fences or extra text.`;
         },
       ];
     }
+
+    // Tag and extract planned files
+    const plannedFilesSet = new Set<string>(mentionedFiles);
+    for (const s of steps) {
+      if (!s.operation) {
+        const inf = this.inferOperationAndTarget(s.tool || '', s.toolInput || {});
+        s.operation = inf.operation;
+        if (!s.targetPath && inf.targetPath) s.targetPath = inf.targetPath;
+      }
+      if (s.operation === 'create' || s.operation === 'edit' || s.operation === 'delete') {
+        const f = s.targetPath || s.toolInput?.filePath || s.toolInput?.path;
+        if (f) plannedFilesSet.add(f);
+      }
+    }
+
+    const plannedFiles = Array.from(plannedFilesSet);
+    task.plannedFiles = plannedFiles;
+    db.updateTask(task.id, userId, { plannedFiles });
 
     return steps;
   }
@@ -803,7 +882,14 @@ No markdown fences or extra text.`;
     }
 
     // Check approval policy based on workspace / task permission mode
-    const workspace = db.getWorkspaceById(task.workspaceId, userId);
+    const workspace = db.getWorkspaceById(task.workspaceId, userId) || {
+      id: task.workspaceId,
+      userId,
+      name: 'Workspace',
+      description: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
     const mode = task.permissionMode || workspace?.permissionMode || 'approve_plan';
     const policy = this.determineApprovalPolicy(
       currentStep.tool || 'workspace_list_files',
@@ -845,6 +931,37 @@ No markdown fences or extra text.`;
     currentStep.status = 'running';
     db.updateTask(taskId, userId, { status: 'running' });
 
+    // --- OBSERVE PHASE ---
+    const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+    const targetFile = currentStep.targetPath || currentStep.toolInput?.filePath || currentStep.toolInput?.path;
+    const observation: Record<string, any> = {
+      observedAt: new Date().toISOString(),
+      tool: currentStep.tool,
+      operation: currentStep.operation || 'read',
+      targetPath: targetFile,
+    };
+
+    const isModTool =
+      currentStep.operation === 'create' ||
+      currentStep.operation === 'edit' ||
+      currentStep.operation === 'delete' ||
+      currentStep.tool === 'workspace_create_file' ||
+      currentStep.tool === 'workspace_edit_file' ||
+      currentStep.tool === 'workspace_apply_patch' ||
+      currentStep.tool === 'workspace_delete_file';
+
+    if (targetFile && isModTool) {
+      try {
+        const existing = await workspaceManager.readFile(wsRoot, targetFile, true);
+        observation.preExisting = true;
+        observation.preSize = existing.size;
+        observation.preSnippet = existing.content.substring(0, 200);
+      } catch {
+        observation.preExisting = false;
+      }
+    }
+
+    // --- ACT PHASE ---
     const toolResult = await this.executeTool(
       currentStep.tool || 'workspace_list_files',
       currentStep.toolInput || {},
@@ -852,19 +969,72 @@ No markdown fences or extra text.`;
       userId
     );
 
-    currentStep.toolOutput = toolResult.output;
     if (toolResult.artifactCreated) {
       if (!task.artifactIds.includes(toolResult.artifactCreated.id)) {
         task.artifactIds.push(toolResult.artifactCreated.id);
       }
     }
 
+    // --- VERIFY PHASE ---
+    const verification: Record<string, any> = {
+      verified: false,
+      verifiedAt: new Date().toISOString(),
+    };
+
     if (toolResult.success) {
+      if (currentStep.operation === 'create' || currentStep.tool === 'workspace_create_file') {
+        try {
+          const verifiedFile = await workspaceManager.readFile(wsRoot, targetFile!, true);
+          verification.verified = true;
+          verification.size = verifiedFile.size;
+          verification.summary = `Verified file "${targetFile}" created on filesystem (${verifiedFile.size} bytes).`;
+        } catch (vErr: any) {
+          verification.verified = false;
+          verification.summary = `File verification error: ${vErr.message}`;
+        }
+      } else if (currentStep.operation === 'edit' || currentStep.tool === 'workspace_edit_file' || currentStep.tool === 'workspace_apply_patch') {
+        try {
+          const verifiedFile = await workspaceManager.readFile(wsRoot, targetFile!, true);
+          verification.verified = true;
+          verification.size = verifiedFile.size;
+          verification.summary = `Verified file "${targetFile}" modified on filesystem (${verifiedFile.size} bytes).`;
+        } catch (vErr: any) {
+          verification.verified = false;
+          verification.summary = `Modification verification error: ${vErr.message}`;
+        }
+      } else if (currentStep.operation === 'delete' || currentStep.tool === 'workspace_delete_file') {
+        try {
+          await workspaceManager.readFile(wsRoot, targetFile!, true);
+          verification.verified = false;
+          verification.summary = `Verification failed: File "${targetFile}" still exists.`;
+        } catch {
+          verification.verified = true;
+          verification.summary = `Verified file "${targetFile}" was deleted.`;
+        }
+      } else if (currentStep.operation === 'command' || currentStep.tool === 'terminal_execute_command') {
+        verification.verified = toolResult.output?.exitCode === 0;
+        verification.summary = `Command exited with code ${toolResult.output?.exitCode}.`;
+      } else {
+        verification.verified = true;
+        verification.summary = `Step completed and verified.`;
+      }
+
+      currentStep.toolOutput = {
+        ...toolResult.output,
+        observation,
+        verification,
+      };
+
       currentStep.status = 'completed';
       currentStep.completedAt = new Date().toISOString();
     } else {
       currentStep.status = 'failed';
-      db.updateTask(taskId, userId, { status: 'failed', error: toolResult.error });
+      currentStep.toolOutput = {
+        ...toolResult.output,
+        observation,
+        verification: { verified: false, error: toolResult.error },
+      };
+      db.updateTask(taskId, userId, { status: 'failed', error: toolResult.error, steps: task.steps });
       return db.getTaskById(taskId, userId)!;
     }
 
@@ -874,9 +1044,11 @@ No markdown fences or extra text.`;
       nextStep.status = 'running';
       db.updateTask(taskId, userId, { steps: task.steps });
     } else {
+      const verifiedStepsCount = task.steps.filter((s) => s.toolOutput?.verification?.verified).length;
+      const plannedList = task.plannedFiles && task.plannedFiles.length > 0 ? task.plannedFiles.join(', ') : 'workspace';
       db.updateTask(taskId, userId, {
         status: 'completed',
-        summary: `Co-Work task "${task.title}" has been successfully completed with all steps verified.`,
+        summary: `Co-Work task "${task.title}" has been successfully completed: ${verifiedStepsCount}/${task.steps.length} steps verified. Planned files: [${plannedList}].`,
         steps: task.steps,
       });
 

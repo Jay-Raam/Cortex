@@ -14,6 +14,7 @@ import { modelRouter } from '../src/server/providers/router';
 import { coworkEngine } from '../src/server/cowork/engine';
 import { workspaceManager } from '../src/server/cowork/workspace-manager';
 import { executionRunner } from '../src/server/cowork/execution-runner';
+import { contextManager } from '../src/server/cowork/context-manager';
 import { User, Conversation, Message, AgentTask } from '../src/server/types';
 import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
 
@@ -692,6 +693,210 @@ print(fibonacci(10))
 
       assert.strictEqual(diffResult.success, true);
       assert.ok(diffResult.output?.diff.includes('+ line 2 edited'));
+    });
+  });
+
+  describe('11. Autonomous Agent Execution: Prompt Planning, Observe-Act-Verify, and Permission Gates', () => {
+    let testWs: any;
+
+    before(async () => {
+      testWs = db.createWorkspace({
+        id: `ws_agent_test_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Autonomous Agent Test Workspace',
+        description: 'Verifies prompt parsing, observe-act-verify loop, and permission gates',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('parses target files from user prompt goal and populates plannedFiles with operation tags', async () => {
+      const task = db.createTask({
+        id: `task_plan_test_${Date.now()}`,
+        workspaceId: testWs.id,
+        userId: testUser1.id,
+        title: 'Prompt Analysis Goal Test',
+        goal: 'Add JWT verification in src/auth.ts and create test in tests/auth.test.ts',
+        status: 'planning',
+        modelId: 'gemini-3.8-flash',
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+      assert.ok(steps.length >= 2, 'Should generate at least 2 structured steps');
+      assert.ok(steps[0].operation, 'First step must have operation tagged');
+      assert.ok(steps.some((s) => s.operation === 'create' || s.operation === 'edit'), 'Should plan file operations');
+
+      // Check plannedFiles populated on task
+      const updatedTask = db.getTaskById(task.id, testUser1.id);
+      assert.ok(updatedTask?.plannedFiles && updatedTask.plannedFiles.length > 0, 'Planned files must be recorded');
+      assert.ok(
+        updatedTask.plannedFiles.some((f) => f.includes('auth.ts') || f.includes('solution.ts')),
+        'Extracted target files must include parsed filenames'
+      );
+    });
+
+    it('executes Observe-Act-Verify loop capturing pre-execution state and validating post-execution file', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(testWs);
+      const testFileName = `oav_test_${Date.now()}.ts`;
+
+      const task = db.createTask({
+        id: `task_oav_${Date.now()}`,
+        workspaceId: testWs.id,
+        userId: testUser1.id,
+        title: 'Observe-Act-Verify Test Task',
+        goal: `Create and update ${testFileName}`,
+        status: 'running',
+        permissionMode: 'session_edit', // Auto-run in Mode C for test
+        modelId: 'gemini-3.8-flash',
+        plannedFiles: [testFileName],
+        steps: [
+          {
+            id: `s_create_${Date.now()}`,
+            title: 'Create Test File',
+            description: `Create initial ${testFileName}`,
+            status: 'running',
+            operation: 'create',
+            targetPath: testFileName,
+            tool: 'workspace_create_file',
+            toolInput: {
+              filePath: testFileName,
+              content: 'export const status = "initial";\n',
+            },
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: `s_edit_${Date.now()}`,
+            title: 'Edit Test File',
+            description: `Modify ${testFileName}`,
+            status: 'pending',
+            operation: 'edit',
+            targetPath: testFileName,
+            tool: 'workspace_edit_file',
+            toolInput: {
+              filePath: testFileName,
+              content: 'export const status = "verified_modification";\n',
+            },
+            createdAt: new Date().toISOString(),
+          },
+        ],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Advance Step 1 (Creation): Observe -> Act -> Verify
+      const step1Result = await coworkEngine.advanceTask(task.id, testUser1.id);
+      const executedStep1 = step1Result.steps[0];
+
+      assert.strictEqual(executedStep1.status, 'completed');
+      assert.ok(executedStep1.toolOutput?.observation, 'Step 1 must record observation');
+      assert.strictEqual(executedStep1.toolOutput.observation.preExisting, false, 'File must not exist before creation');
+      assert.ok(executedStep1.toolOutput?.verification, 'Step 1 must record verification');
+      assert.strictEqual(executedStep1.toolOutput.verification.verified, true, 'File creation must be verified on disk');
+      assert.ok(executedStep1.toolOutput.verification.size > 0);
+
+      // Advance Step 2 (Modification): Observe -> Act -> Verify
+      const step2Result = await coworkEngine.advanceTask(task.id, testUser1.id);
+      const executedStep2 = step2Result.steps[1];
+
+      assert.strictEqual(executedStep2.status, 'completed');
+      assert.ok(executedStep2.toolOutput?.observation, 'Step 2 must record observation');
+      assert.strictEqual(executedStep2.toolOutput.observation.preExisting, true, 'File must exist before modification');
+      assert.ok(executedStep2.toolOutput?.verification, 'Step 2 must record verification');
+      assert.strictEqual(executedStep2.toolOutput.verification.verified, true, 'Modification must be verified on disk');
+
+      // Final task state
+      assert.strictEqual(step2Result.status, 'completed');
+      assert.ok(step2Result.summary?.includes('verified'), 'Summary must report verified completion');
+
+      // Clean up test file
+      try {
+        await workspaceManager.deleteFile(wsRoot, testFileName);
+      } catch {}
+    });
+
+    it('enforces 3-tier permission modes A, B, and C accurately', () => {
+      // Mode A: Ask for Every Change
+      const policyModeA = coworkEngine.determineApprovalPolicy(
+        'workspace_create_file',
+        { filePath: 'src/config.ts' },
+        { permissionMode: 'ask_every_change' }
+      );
+      assert.strictEqual(policyModeA.requiresApproval, true);
+      assert.ok(policyModeA.reason.includes('Mode A'));
+
+      // Mode B: Approve Complete Change Plan (Unapproved)
+      const policyModeBUnapproved = coworkEngine.determineApprovalPolicy(
+        'workspace_create_file',
+        { filePath: 'src/config.ts' },
+        { permissionMode: 'approve_plan', isPlanApproved: false }
+      );
+      assert.strictEqual(policyModeBUnapproved.requiresApproval, true);
+      assert.ok(policyModeBUnapproved.reason.includes('requires developer approval'));
+
+      // Mode B: Approved Plan with in-scope file
+      const policyModeBApproved = coworkEngine.determineApprovalPolicy(
+        'workspace_create_file',
+        { filePath: 'src/config.ts' },
+        { permissionMode: 'approve_plan', isPlanApproved: true, plannedFiles: ['src/config.ts'] }
+      );
+      assert.strictEqual(policyModeBApproved.requiresApproval, false);
+
+      // Mode B: Approved Plan with out-of-scope expansion
+      const policyModeBExpansion = coworkEngine.determineApprovalPolicy(
+        'workspace_create_file',
+        { filePath: 'unplanned/danger.ts' },
+        { permissionMode: 'approve_plan', isPlanApproved: true, plannedFiles: ['src/config.ts'] }
+      );
+      assert.strictEqual(policyModeBExpansion.requiresApproval, true);
+      assert.ok(policyModeBExpansion.reason.includes('Scope Expansion'));
+
+      // Mode C: Session-Level Project Edit Permission
+      const policyModeC = coworkEngine.determineApprovalPolicy(
+        'workspace_edit_file',
+        { filePath: 'src/config.ts' },
+        { permissionMode: 'session_edit' }
+      );
+      assert.strictEqual(policyModeC.requiresApproval, false);
+
+      // Mode C: High-impact destructive deletion still requires approval
+      const policyModeCDelete = coworkEngine.determineApprovalPolicy(
+        'workspace_delete_file',
+        { filePath: 'src/config.ts' },
+        { permissionMode: 'session_edit' }
+      );
+      assert.strictEqual(policyModeCDelete.requiresApproval, true);
+    });
+
+    it('enforces context window capability filter and safe margin budgeting formula', () => {
+      const budget128 = contextManager.calculateBudget({
+        modelId: 'gemini-3.8-flash',
+        preference: '128k',
+        systemPrompt: 'You are an autonomous engineering assistant.',
+        toolCount: 15,
+        usedTextContent: 'sample code content',
+      });
+
+      assert.strictEqual(budget128.effectiveLimit, 131072);
+      const expectedAvailable =
+        budget128.effectiveLimit -
+        budget128.reservedOutputTokens -
+        budget128.systemPromptTokens -
+        budget128.toolDefinitionTokens -
+        budget128.safetyMarginTokens;
+      assert.strictEqual(budget128.availableInputTokens, expectedAvailable);
+      assert.ok(budget128.utilizationPercent > 0);
+
+      // Model capability filter: A 128k model cannot support 500k or 1m
+      const options = contextManager.getValidOptionsForModel('meta-llama/llama-3.3-70b-instruct:free');
+      const option1M = options.find((o) => o.id === '1m');
+      if (option1M) {
+        assert.strictEqual(option1M.disabled, true, '1M tokens must be disabled on 128k model');
+      }
     });
   });
 });

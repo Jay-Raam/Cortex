@@ -63,8 +63,11 @@ export class WorkspaceManager {
       return rootNormalized;
     }
 
+    // Convert backslashes to forward slashes for universal cross-platform normalization
+    const normalizedRelative = relativePath.replace(/\\/g, '/');
+
     // Strip leading slashes to prevent root escapes
-    const cleanRelative = relativePath.replace(/^[\/\\]+/, '');
+    const cleanRelative = normalizedRelative.replace(/^\/+/, '');
     const resolved = path.resolve(rootNormalized, cleanRelative);
 
     if (resolved !== rootNormalized && !resolved.startsWith(rootNormalized + path.sep)) {
