@@ -317,6 +317,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <LayoutGrid className="w-4 h-4 text-slate-500" />
             <span>Templates</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setIsDesktopModalOpen(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-colors text-left cursor-pointer"
+          >
+            <Monitor className="w-4 h-4 text-[#EA580C]" />
+            <span>Download for Windows</span>
+          </button>
         </div>
 
         {/* Search Conversations Input */}
