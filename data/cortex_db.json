@@ -468,6 +468,23 @@
       "passwordHash": "$2b$08$xF1WY6S3rsASvmiNG11RZOoMZ0c9HyoqWJ9XnW.vAHo1fFN7X5dLG",
       "role": "user",
       "createdAt": "2026-10-22T17:02:20.963Z"
+    },
+    {
+      "id": "test_u1_1792689052135",
+      "email": "u1_1792689052135@nexa.ai",
+      "name": "Updated Name",
+      "passwordHash": "$2b$08$./Enl77FrxxrApLiHNwSkOVSNlkQZpzVzhGfEFJyWzm2h.QGyasRS",
+      "role": "user",
+      "createdAt": "2026-10-22T17:10:52.166Z",
+      "avatar": "data:image/webp;base64,sampleAvatarData"
+    },
+    {
+      "id": "test_u2_1792689052166",
+      "email": "u2_1792689052166@nexa.ai",
+      "name": "Test Engineer 2",
+      "passwordHash": "$2b$08$aw6ymC72MLH6iyFAyRUaEOPBmiqk/H.EWNyUadJy8sEnaA4hv0Eq2",
+      "role": "user",
+      "createdAt": "2026-10-22T17:10:52.189Z"
     }
   ],
   "sessions": [
@@ -522,6 +539,54 @@
     }
   ],
   "conversations": [
+    {
+      "id": "conv_regen_1792689052202",
+      "userId": "test_u1_1792689052135",
+      "title": "Model Comparison Chat",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-22T17:10:52.202Z",
+      "updatedAt": "2026-10-22T17:10:52.202Z"
+    },
+    {
+      "id": "conv_resilience_1792689052200",
+      "userId": "test_u1_1792689052135",
+      "title": "Resilience Test Chat",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-22T17:10:52.200Z",
+      "updatedAt": "2026-10-22T17:10:52.200Z"
+    },
+    {
+      "id": "conv_msgs_1792689052192",
+      "userId": "test_u1_1792689052135",
+      "title": "User 1 Private Thread",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-22T17:10:52.192Z",
+      "updatedAt": "2026-10-22T17:10:52.192Z"
+    },
+    {
+      "id": "conv_1792689052191",
+      "userId": "test_u1_1792689052135",
+      "title": "Secret Project Alpha",
+      "modelId": "gemini-3.8-flash",
+      "providerId": "gemini",
+      "mode": "balanced",
+      "isPinned": false,
+      "isArchived": false,
+      "createdAt": "2026-10-22T17:10:52.191Z",
+      "updatedAt": "2026-10-22T17:10:52.191Z"
+    },
     {
       "id": "conv_regen_1792688540974",
       "userId": "test_u1_1792688540898",
@@ -1690,6 +1755,37 @@
       "content": "MergeSort is guaranteed O(n log n) time at the cost of O(n) auxiliary space.",
       "modelUsed": "meta-llama/llama-3.3-70b-instruct:free",
       "createdAt": "2026-10-22T17:02:20.974Z"
+    },
+    {
+      "id": "msg_partial_1792689052200",
+      "conversationId": "conv_resilience_1792689052200",
+      "role": "assistant",
+      "content": "Here is the beginning of the generated solution...",
+      "modelUsed": "gemini-3.8-flash",
+      "createdAt": "2026-10-22T17:10:52.200Z"
+    },
+    {
+      "id": "msg_user_prompt_1792689052202",
+      "conversationId": "conv_regen_1792689052202",
+      "role": "user",
+      "content": "Compare QuickSort and MergeSort computational complexity.",
+      "createdAt": "2026-10-22T17:10:52.202Z"
+    },
+    {
+      "id": "msg_asst_1_1792689052202",
+      "conversationId": "conv_regen_1792689052202",
+      "role": "assistant",
+      "content": "QuickSort is O(n log n) average but O(n^2) worst case.",
+      "modelUsed": "gemini-3.8-flash",
+      "createdAt": "2026-10-22T17:10:52.202Z"
+    },
+    {
+      "id": "msg_asst_2_1792689052202",
+      "conversationId": "conv_regen_1792689052202",
+      "role": "assistant",
+      "content": "MergeSort is guaranteed O(n log n) time at the cost of O(n) auxiliary space.",
+      "modelUsed": "meta-llama/llama-3.3-70b-instruct:free",
+      "createdAt": "2026-10-22T17:10:52.202Z"
     }
   ],
   "skills": [
@@ -2797,6 +2893,104 @@
       "description": "Test env command resilience",
       "createdAt": "2026-10-22T17:02:22.408Z",
       "updatedAt": "2026-10-22T17:02:22.408Z"
+    },
+    {
+      "id": "ws_test_1792689052195",
+      "userId": "test_u1_1792689052135",
+      "name": "Test Sandbox",
+      "description": "Co-Work testing space",
+      "createdAt": "2026-10-22T17:10:52.195Z",
+      "updatedAt": "2026-10-22T17:10:52.195Z"
+    },
+    {
+      "id": "ws_repo_test_1792689052129",
+      "userId": "test_u1_1792689052135",
+      "name": "Repo Agent Verification Workspace",
+      "description": "Target workspace for end-to-end repository agent tests.",
+      "createdAt": "2026-10-22T17:10:52.215Z",
+      "updatedAt": "2026-10-22T17:10:52.215Z"
+    },
+    {
+      "id": "ws_agent_test_1792689053069",
+      "userId": "test_u1_1792689052135",
+      "name": "Autonomous Agent Test Workspace",
+      "description": "Verifies prompt parsing, observe-act-verify loop, and permission gates",
+      "createdAt": "2026-10-22T17:10:53.069Z",
+      "updatedAt": "2026-10-22T17:10:53.069Z"
+    },
+    {
+      "id": "ws_cowork_web_1792689053090",
+      "userId": "test_u1_1792689052135",
+      "name": "Food Shop Web Project",
+      "description": "Landing page test",
+      "createdAt": "2026-10-22T17:10:53.090Z",
+      "updatedAt": "2026-10-22T17:10:53.090Z"
+    },
+    {
+      "id": "ws_cowork_auto_1792689053094",
+      "userId": "test_u1_1792689052135",
+      "name": "Autonomous Food Shop Project",
+      "description": "Autonomous loop test",
+      "permissionMode": "approve_plan",
+      "createdAt": "2026-10-22T17:10:53.094Z",
+      "updatedAt": "2026-10-22T17:10:53.094Z"
+    },
+    {
+      "id": "ws_cowork_py_1792689053143",
+      "userId": "test_u1_1792689052135",
+      "name": "Python Food Shop Project",
+      "description": "Python test workspace",
+      "createdAt": "2026-10-22T17:10:53.143Z",
+      "updatedAt": "2026-10-22T17:10:53.143Z"
+    },
+    {
+      "id": "ws_cowork_py_auto_1792689053147",
+      "userId": "test_u1_1792689052135",
+      "name": "Python Auto Project",
+      "description": "Auto loop test",
+      "permissionMode": "approve_plan",
+      "createdAt": "2026-10-22T17:10:53.147Z",
+      "updatedAt": "2026-10-22T17:10:53.147Z"
+    },
+    {
+      "id": "ws_cowork_go_1792689053168",
+      "userId": "test_u1_1792689052135",
+      "name": "Go Food Shop",
+      "description": "Go workspace",
+      "createdAt": "2026-10-22T17:10:53.168Z",
+      "updatedAt": "2026-10-22T17:10:53.168Z"
+    },
+    {
+      "id": "ws_cowork_rs_1792689053172",
+      "userId": "test_u1_1792689052135",
+      "name": "Rust Food Shop",
+      "description": "Rust workspace",
+      "createdAt": "2026-10-22T17:10:53.172Z",
+      "updatedAt": "2026-10-22T17:10:53.172Z"
+    },
+    {
+      "id": "ws_cowork_java_1792689053176",
+      "userId": "test_u1_1792689052135",
+      "name": "Java Food Shop",
+      "description": "Java workspace",
+      "createdAt": "2026-10-22T17:10:53.176Z",
+      "updatedAt": "2026-10-22T17:10:53.176Z"
+    },
+    {
+      "id": "ws_cowork_react_1792689053179",
+      "userId": "test_u1_1792689052135",
+      "name": "React Food Shop",
+      "description": "React workspace",
+      "createdAt": "2026-10-22T17:10:53.179Z",
+      "updatedAt": "2026-10-22T17:10:53.179Z"
+    },
+    {
+      "id": "ws_cowork_env_1792689053183",
+      "userId": "test_u1_1792689052135",
+      "name": "Env Resilience Workspace",
+      "description": "Test env command resilience",
+      "createdAt": "2026-10-22T17:10:53.183Z",
+      "updatedAt": "2026-10-22T17:10:53.183Z"
     }
   ],
   "artifacts": [
@@ -3877,9 +4071,831 @@
       "version": 1,
       "createdAt": "2026-10-22T17:02:22.388Z",
       "updatedAt": "2026-10-22T17:02:22.388Z"
+    },
+    {
+      "id": "art_1792689052197_13q5c",
+      "workspaceId": "ws_test_1792689052195",
+      "title": "Config Map",
+      "fileName": "config.json",
+      "language": "json",
+      "content": "{\"env\": \"test\"}",
+      "version": 1,
+      "createdAt": "2026-10-22T17:10:52.197Z",
+      "updatedAt": "2026-10-22T17:10:52.197Z"
+    },
+    {
+      "id": "art_1792689053068_tqnga",
+      "workspaceId": "ws_repo_test_1792689052129",
+      "title": "Test Spec",
+      "fileName": "spec.md",
+      "language": "markdown",
+      "content": "# Backward Compatible",
+      "version": 1,
+      "createdAt": "2026-10-22T17:10:53.068Z",
+      "updatedAt": "2026-10-22T17:10:53.068Z"
+    },
+    {
+      "id": "art_1792689053080_8rbd7",
+      "workspaceId": "ws_agent_test_1792689053069",
+      "title": "oav_test_1792689053075.ts",
+      "fileName": "oav_test_1792689053075.ts",
+      "language": "typescript",
+      "content": "export const status = \"verified_modification\";\n",
+      "version": 2,
+      "createdAt": "2026-10-22T17:10:53.080Z",
+      "updatedAt": "2026-10-22T17:10:53.085Z"
+    },
+    {
+      "id": "art_1792689053103_ogixc",
+      "workspaceId": "ws_cowork_auto_1792689053094",
+      "title": "index.html",
+      "fileName": "index.html",
+      "language": "html",
+      "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>FreshBite — Artisan Kitchen & Gourmet Food Shop</title>\n  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n  <link href=\"https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap\" rel=\"stylesheet\">\n  <link rel=\"stylesheet\" href=\"styles.css\">\n</head>\n<body>\n  <header class=\"navbar\">\n    <div class=\"nav-container\">\n      <a href=\"#\" class=\"brand-logo\">\n        <span class=\"brand-icon\">🍕</span>\n        <span class=\"brand-name\">Fresh<span>Bite</span></span>\n      </a>\n      <nav class=\"nav-links\">\n        <a href=\"#menu\" class=\"active\">Menu</a>\n        <a href=\"#specials\">Today's Deals</a>\n        <a href=\"#about\">Story</a>\n      </nav>\n      <div class=\"nav-actions\">\n        <button id=\"cart-toggle-btn\" class=\"cart-btn\" aria-label=\"View Shopping Cart\">\n          <span class=\"cart-icon\">🛒</span>\n          <span class=\"cart-label\">Cart</span>\n          <span id=\"cart-counter\" class=\"cart-badge\">0</span>\n        </button>\n      </div>\n    </div>\n  </header>\n\n  <main>\n    <section class=\"hero-section\">\n      <div class=\"hero-container\">\n        <div class=\"hero-content\">\n          <div class=\"hero-pill\">🔥 100% Farm-to-Table & Chef Crafted</div>\n          <h1 class=\"hero-title\">Delicious Bites, Made with <span>Passion</span> & Pure Flavor</h1>\n          <p class=\"hero-subtitle\">Experience artisan pizzas, flame-grilled brioche burgers, nutrient-dense bowls, and fresh cold-pressed smoothies delivered steaming hot in 25 minutes.</p>\n          <div class=\"hero-cta-group\">\n            <a href=\"#menu\" class=\"btn btn-primary\">Explore Full Menu</a>\n            <a href=\"#specials\" class=\"btn btn-outline\">Claim 20% Discount</a>\n          </div>\n        </div>\n      </div>\n    </section>\n\n    <section id=\"menu\" class=\"menu-section\">\n      <div class=\"section-container\">\n        <div class=\"section-header\">\n          <span class=\"section-tag\">Chef's Selections</span>\n          <h2 class=\"section-title\">Discover Our Handcrafted Menu</h2>\n        </div>\n        <div id=\"food-grid\" class=\"food-grid\"></div>\n      </div>\n    </section>\n  </main>\n\n  <div id=\"cart-modal\" class=\"modal-backdrop\">\n    <div class=\"modal-card\">\n      <div class=\"modal-header\">\n        <h3>Your FreshBite Order</h3>\n        <button id=\"close-cart-btn\" class=\"close-btn\">&times;</button>\n      </div>\n      <div id=\"cart-items-container\" class=\"cart-items-list\"></div>\n      <div class=\"modal-footer\">\n        <div class=\"cart-summary-line total\">\n          <span>Total:</span>\n          <span id=\"cart-total\">$0.00</span>\n        </div>\n        <button id=\"checkout-btn\" class=\"btn btn-primary btn-block\">Confirm & Place Order</button>\n      </div>\n    </div>\n  </div>\n\n  <div id=\"toast-container\" class=\"toast-container\"></div>\n  <script src=\"script.js\"></script>\n</body>\n</html>",
+      "version": 1,
+      "createdAt": "2026-10-22T17:10:53.103Z",
+      "updatedAt": "2026-10-22T17:10:53.103Z"
+    },
+    {
+      "id": "art_1792689053107_a4ig7",
+      "workspaceId": "ws_cowork_auto_1792689053094",
+      "title": "styles.css",
+      "fileName": "styles.css",
+      "language": "css",
+      "content": ":root {\n  --primary: #ea580c;\n  --primary-hover: #c2410c;\n  --bg-main: #faf8f5;\n  --text-main: #1e293b;\n  --text-muted: #64748b;\n  --border: #e2e8f0;\n}\n* { margin: 0; padding: 0; box-sizing: border-box; }\nbody { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-main); color: var(--text-main); }\n.navbar { background: #fff; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }\n.nav-container { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; }\n.brand-logo { font-size: 1.25rem; font-weight: 800; color: var(--text-main); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; }\n.brand-logo span span { color: var(--primary); }\n.nav-links a { margin: 0 1rem; text-decoration: none; color: var(--text-muted); font-weight: 600; font-size: 0.9rem; }\n.nav-links a.active { color: var(--primary); }\n.cart-btn { background: var(--primary); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }\n.cart-badge { background: #fff; color: var(--primary); border-radius: 9999px; padding: 0.1rem 0.5rem; font-size: 0.75rem; }\n.hero-section { padding: 4rem 1.5rem; text-align: center; max-width: 800px; margin: 0 auto; }\n.hero-pill { display: inline-block; background: #fff7ed; color: var(--primary); padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; margin-bottom: 1rem; }\n.hero-title { font-size: 2.5rem; font-weight: 800; line-height: 1.2; margin-bottom: 1rem; }\n.hero-title span { color: var(--primary); }\n.hero-subtitle { color: var(--text-muted); font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem; }\n.hero-cta-group a { display: inline-block; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-weight: 700; margin: 0 0.5rem; }\n.btn-primary { background: var(--primary); color: #fff; }\n.btn-outline { border: 1px solid var(--border); color: var(--text-main); background: #fff; }\n.menu-section { max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem; }\n.section-header { text-align: center; margin-bottom: 2rem; }\n.section-tag { color: var(--primary); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; }\n.section-title { font-size: 2rem; font-weight: 800; }\n.food-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }\n.food-item-card { background: #fff; border-radius: 0.75rem; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }\n.food-item-thumb { width: 100%; height: 180px; object-fit: cover; }\n.food-item-body { padding: 1.25rem; flex: 1; display: flex; flex-direction: column; }\n.food-item-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }\n.food-item-desc { color: var(--text-muted); font-size: 0.85rem; flex: 1; margin-bottom: 1rem; line-height: 1.5; }\n.food-item-foot { display: flex; align-items: center; justify-content: space-between; }\n.food-item-price { font-size: 1.15rem; font-weight: 800; color: var(--primary); }\n.add-btn { background: #fff7ed; color: var(--primary); border: 1px solid #fed7aa; padding: 0.4rem 0.85rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }\n.add-btn:hover { background: var(--primary); color: #fff; }\n.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }\n.modal-backdrop.open { display: flex; }\n.modal-card { background: #fff; border-radius: 1rem; width: 100%; max-width: 480px; padding: 1.5rem; }\n.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }\n.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }\n.btn-block { width: 100%; padding: 0.75rem; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 700; margin-top: 1rem; }\n.toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200; }\n.toast { background: #1e293b; color: #fff; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 600; margin-top: 0.5rem; }\n",
+      "version": 1,
+      "createdAt": "2026-10-22T17:10:53.107Z",
+      "updatedAt": "2026-10-22T17:10:53.107Z"
+    },
+    {
+      "id": "art_1792689053115_fpol1",
+      "workspaceId": "ws_cowork_auto_1792689053094",
+      "title": "script.js",
+      "fileName": "script.js",
+      "language": "javascript",
+      "content": "const MENU = [\n  { id: 'item-1', name: 'Gourmet Truffle Burger', price: 14.99, desc: 'Aged cheddar, caramelized shallots, black truffle aioli', img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=80' },\n  { id: 'item-2', name: 'Woodfired Margherita Pizza', price: 16.50, desc: 'San Marzano tomatoes, buffalo mozzarella, fresh basil', img: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=500&auto=format&fit=crop&q=80' },\n  { id: 'item-3', name: 'Wild Salmon Bowl', price: 15.25, desc: 'Alaskan salmon, quinoa, avocado, citrus ponzu', img: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80' },\n  { id: 'item-4', name: 'Detox Green Juice', price: 6.50, desc: 'Kale, green apple, cucumber, ginger, lemon', img: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=500&auto=format&fit=crop&q=80' }\n];\n\nlet cart = [];\n\nfunction renderMenu() {\n  const grid = document.getElementById('food-grid');\n  if (!grid) return;\n  grid.innerHTML = MENU.map(function (item) {\n    return (\n      '<div class=\"food-item-card\">' +\n      '<img src=\"' + item.img + '\" alt=\"' + item.name + '\" class=\"food-item-thumb\">' +\n      '<div class=\"food-item-body\">' +\n      '<h4 class=\"food-item-title\">' + item.name + '</h4>' +\n      '<p class=\"food-item-desc\">' + item.desc + '</p>' +\n      '<div class=\"food-item-foot\">' +\n      '<span class=\"food-item-price\">$' + item.price.toFixed(2) + '</span>' +\n      '<button class=\"add-btn\" onclick=\"addToCart(\\'' + item.id + '\\')\">+ Add</button>' +\n      '</div></div></div>'\n    );\n  }).join('');\n}\n\nfunction addToCart(id) {\n  const item = MENU.find(function (m) { return m.id === id; });\n  if (!item) return;\n  const existing = cart.find(function (ci) { return ci.id === id; });\n  if (existing) {\n    existing.qty += 1;\n  } else {\n    cart.push({ id: item.id, name: item.name, price: item.price, qty: 1 });\n  }\n  updateCart();\n  showToast('Added ' + item.name + ' to order!');\n}\n\nfunction updateCart() {\n  const counter = document.getElementById('cart-counter');\n  if (counter) counter.textContent = cart.reduce(function (acc, ci) { return acc + ci.qty; }, 0);\n  const total = document.getElementById('cart-total');\n  if (total) {\n    const sum = cart.reduce(function (acc, ci) { return acc + ci.price * ci.qty; }, 0);\n    total.textContent = '$' + sum.toFixed(2);\n  }\n}\n\nfunction showToast(msg) {\n  const cont = document.getElementById('toast-container');\n  if (!cont) return;\n  const t = document.createElement('div');\n  t.className = 'toast';\n  t.textContent = msg;\n  cont.appendChild(t);\n  setTimeout(function () { t.remove(); }, 2500);\n}\n\ndocument.addEventListener('DOMContentLoaded', function () {\n  renderMenu();\n  const toggle = document.getElementById('cart-toggle-btn');\n  const modal = document.getElementById('cart-modal');\n  const close = document.getElementById('close-cart-btn');\n  if (toggle && modal) toggle.onclick = function () { modal.classList.add('open'); };\n  if (close && modal) close.onclick = function () { modal.classList.remove('open'); };\n});\n",
+      "version": 1,
+      "createdAt": "2026-10-22T17:10:53.115Z",
+      "updatedAt": "2026-10-22T17:10:53.115Z"
+    },
+    {
+      "id": "art_1792689053156_784g8",
+      "workspaceId": "ws_cowork_py_auto_1792689053147",
+      "title": "models.py",
+      "fileName": "models.py",
+      "language": "plaintext",
+      "content": "\"\"\"\nDomain Models for: create a food shop in python\nProduction-grade Python dataclasses and typed data contracts.\n\"\"\"\nfrom dataclasses import dataclass, field\nfrom typing import List, Dict, Optional\nfrom datetime import datetime\n\n@dataclass\nclass FoodItem:\n    id: str\n    name: str\n    category: str\n    price: float\n    description: str\n    is_available: bool = True\n    rating: float = 4.8\n    tags: List[str] = field(default_factory=list)\n\n    def to_dict(self) -> Dict:\n        return {\n            \"id\": self.id,\n            \"name\": self.name,\n            \"category\": self.category,\n            \"price\": self.price,\n            \"description\": self.description,\n            \"is_available\": self.is_available,\n            \"rating\": self.rating,\n            \"tags\": self.tags,\n        }\n\n@dataclass\nclass CartItem:\n    item: FoodItem\n    quantity: int = 1\n\n    @property\n    def subtotal(self) -> float:\n        return round(self.item.price * self.quantity, 2)\n\n@dataclass\nclass Order:\n    order_id: str\n    items: List[CartItem]\n    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())\n    discount_code: Optional[str] = None\n    discount_rate: float = 0.0\n\n    @property\n    def gross_total(self) -> float:\n        return round(sum(ci.subtotal for ci in self.items), 2)\n\n    @property\n    def discount_amount(self) -> float:\n        return round(self.gross_total * self.discount_rate, 2)\n\n    @property\n    def net_total(self) -> float:\n        return round(self.gross_total - self.discount_amount, 2)\n",
+      "version": 1,
+      "createdAt": "2026-10-22T17:10:53.156Z",
+      "updatedAt": "2026-10-22T17:10:53.156Z"
+    },
+    {
+      "id": "art_1792689053159_e709o",
+      "workspaceId": "ws_cowork_py_auto_1792689053147",
+      "title": "main.py",
+      "fileName": "main.py",
+      "language": "plaintext",
+      "content": "\"\"\"\nMain Application Driver for: create a food shop in python\nFeatures interactive culinary catalog, shopping cart management, and order checkout.\n\"\"\"\nimport sys\nimport uuid\nfrom typing import List, Optional\nfrom models import FoodItem, CartItem, Order\n\nclass FoodShopService:\n    def __init__(self, shop_name: str = \"FreshBite Artisan Food Shop\"):\n        self.shop_name = shop_name\n        self.catalog: List[FoodItem] = []\n        self.cart: List[CartItem] = []\n        self._seed_catalog()\n\n    def _seed_catalog(self):\n        self.catalog = [\n            FoodItem(\"item-1\", \"Gourmet Truffle Burger\", \"Burgers\", 14.99, \"Aged cheddar, caramelized shallots, black truffle aioli\", tags=[\"bestseller\", \"gourmet\"]),\n            FoodItem(\"item-2\", \"Woodfired Margherita Pizza\", \"Pizza\", 16.50, \"San Marzano tomatoes, fresh buffalo mozzarella, organic basil\", tags=[\"vegetarian\", \"woodfired\"]),\n            FoodItem(\"item-3\", \"Wild Salmon Superfood Bowl\", \"Bowls\", 15.25, \"Pan-seared Alaskan salmon, quinoa, avocado, edamame, citrus ponzu\", tags=[\"healthy\", \"gluten-free\"]),\n            FoodItem(\"item-4\", \"Smoked BBQ Bacon Stack\", \"Burgers\", 15.99, \"Double smashed patties, applewood bacon, house bourbon BBQ sauce\", tags=[\"popular\"]),\n            FoodItem(\"item-5\", \"Artisan Gelato Trio\", \"Desserts\", 7.99, \"Pistachio, dark chocolate Madagascar, salted caramel\", tags=[\"dessert\", \"sweet\"]),\n            FoodItem(\"item-6\", \"Cold-Pressed Detox Green Juice\", \"Drinks\", 6.50, \"Kale, green apple, cucumber, ginger, Meyer lemon\", tags=[\"cold-pressed\", \"vegan\"]),\n        ]\n\n    def list_menu(self, category: Optional[str] = None) -> List[FoodItem]:\n        if category:\n            return [it for it in self.catalog if it.category.lower() == category.lower()]\n        return self.catalog\n\n    def add_to_cart(self, item_id: str, quantity: int = 1) -> bool:\n        item = next((it for it in self.catalog if it.id == item_id), None)\n        if not item or quantity <= 0:\n            return False\n        existing = next((ci for ci in self.cart if ci.item.id == item_id), None)\n        if existing:\n            existing.quantity += quantity\n        else:\n            self.cart.append(CartItem(item, quantity))\n        return True\n\n    def calculate_total(self, discount_code: Optional[str] = None) -> Order:\n        order_id = f\"ORD-{uuid.uuid4().hex[:8].upper()}\"\n        rate = 0.20 if discount_code == \"FRESH20\" else 0.0\n        return Order(order_id=order_id, items=list(self.cart), discount_code=discount_code, discount_rate=rate)\n\n    def checkout(self, discount_code: Optional[str] = None) -> Order:\n        order = self.calculate_total(discount_code)\n        self.cart.clear()\n        return order\n\ndef main():\n    print(\"=\" * 64)\n    print(\"  FreshBite — Artisan Kitchen & Gourmet Food Shop (Python)\")\n    print(\"=\" * 64)\n    shop = FoodShopService()\n    print(f\"\\n[Catalog Loaded] {len(shop.catalog)} signature dishes ready.\")\n    for item in shop.list_menu():\n        print(f\"  * [{item.id}] {item.name:<32} ${item.price:>5.2f} ({item.category})\")\n\n    # Simulate standard ordering workflow\n    print(\"\\n[Ordering] Adding signature items to cart...\")\n    shop.add_to_cart(\"item-1\", 2) # 2x Truffle Burger\n    shop.add_to_cart(\"item-2\", 1) # 1x Margherita Pizza\n    shop.add_to_cart(\"item-6\", 2) # 2x Detox Juice\n\n    order = shop.checkout(\"FRESH20\")\n    print(f\"\\n[Checkout Successful]\")\n    print(f\"  Order ID    : {order.order_id}\")\n    print(f\"  Total Items : {sum(ci.quantity for ci in order.items)}\")\n    print(f\"  Gross Total : ${order.gross_total:.2f}\")\n    print(f\"  Discount    : -${order.discount_amount:.2f} (Coupon: FRESH20 - 20% off)\")\n    print(f\"  Net Total   : ${order.net_total:.2f}\")\n    print(\"=\" * 64)\n\nif __name__ == \"__main__\":\n    main()\n",
+      "version": 1,
+      "createdAt": "2026-10-22T17:10:53.159Z",
+      "updatedAt": "2026-10-22T17:10:53.159Z"
+    },
+    {
+      "id": "art_1792689053163_w8xo3",
+      "workspaceId": "ws_cowork_py_auto_1792689053147",
+      "title": "test_food_shop.py",
+      "fileName": "test_food_shop.py",
+      "language": "plaintext",
+      "content": "\"\"\"\nAutomated Unit Test Suite for: create a food shop in python\nVerifies catalog listing, cart updates, discount calculations, and checkout.\n\"\"\"\nimport unittest\nfrom main import FoodShopService\n\nclass TestFoodShopService(unittest.TestCase):\n    def setUp(self):\n        self.shop = FoodShopService()\n\n    def test_catalog_initialization(self):\n        catalog = self.shop.list_menu()\n        self.assertGreaterEqual(len(catalog), 5)\n        self.assertTrue(any(it.name == \"Gourmet Truffle Burger\" for it in catalog))\n\n    def test_add_to_cart_and_quantity(self):\n        success = self.shop.add_to_cart(\"item-1\", 3)\n        self.assertTrue(success)\n        self.assertEqual(len(self.shop.cart), 1)\n        self.assertEqual(self.shop.cart[0].quantity, 3)\n\n        # Adding same item increases quantity\n        self.shop.add_to_cart(\"item-1\", 2)\n        self.assertEqual(self.shop.cart[0].quantity, 5)\n\n    def test_coupon_discount_calculation(self):\n        self.shop.add_to_cart(\"item-1\", 1)  # $14.99\n        order = self.shop.calculate_total(\"FRESH20\")\n        self.assertEqual(order.discount_rate, 0.20)\n        expected_discount = round(14.99 * 0.20, 2)\n        self.assertEqual(order.discount_amount, expected_discount)\n        self.assertEqual(order.net_total, round(14.99 - expected_discount, 2))\n\n    def test_checkout_clears_cart(self):\n        self.shop.add_to_cart(\"item-2\", 1)\n        order = self.shop.checkout()\n        self.assertIsNotNone(order.order_id)\n        self.assertEqual(len(self.shop.cart), 0)\n\nif __name__ == '__main__':\n    unittest.main()\n",
+      "version": 1,
+      "createdAt": "2026-10-22T17:10:53.163Z",
+      "updatedAt": "2026-10-22T17:10:53.163Z"
     }
   ],
   "tasks": [
+    {
+      "id": "task_react_1792689053179",
+      "workspaceId": "ws_cowork_react_1792689053179",
+      "userId": "test_u1_1792689052135",
+      "title": "Create food shop in react",
+      "goal": "create a food shop app in react tsx",
+      "modelId": "gemini-3.8-flash",
+      "status": "planning",
+      "steps": [],
+      "artifactIds": [],
+      "createdAt": "2026-10-22T17:10:53.179Z",
+      "updatedAt": "2026-10-22T17:10:53.182Z",
+      "plannedFiles": [
+        "types.ts",
+        "App.tsx",
+        "styles.css"
+      ]
+    },
+    {
+      "id": "task_java_1792689053176",
+      "workspaceId": "ws_cowork_java_1792689053176",
+      "userId": "test_u1_1792689052135",
+      "title": "Create food shop in java",
+      "goal": "create a food shop application in java with spring boot design",
+      "modelId": "gemini-3.8-flash",
+      "status": "planning",
+      "steps": [],
+      "artifactIds": [],
+      "createdAt": "2026-10-22T17:10:53.176Z",
+      "updatedAt": "2026-10-22T17:10:53.179Z",
+      "plannedFiles": [
+        "Product.java",
+        "FoodShop.java",
+        "Main.java"
+      ]
+    },
+    {
+      "id": "task_rs_1792689053172",
+      "workspaceId": "ws_cowork_rs_1792689053172",
+      "userId": "test_u1_1792689052135",
+      "title": "Create food shop in rust",
+      "goal": "build a food shop cli in rust",
+      "modelId": "gemini-3.8-flash",
+      "status": "planning",
+      "steps": [],
+      "artifactIds": [],
+      "createdAt": "2026-10-22T17:10:53.172Z",
+      "updatedAt": "2026-10-22T17:10:53.175Z",
+      "plannedFiles": [
+        "Cargo.toml",
+        "src/main.rs"
+      ]
+    },
+    {
+      "id": "task_go_1792689053168",
+      "workspaceId": "ws_cowork_go_1792689053168",
+      "userId": "test_u1_1792689052135",
+      "title": "Create food shop in Go",
+      "goal": "build a food shop backend service in golang",
+      "modelId": "gemini-3.8-flash",
+      "status": "planning",
+      "steps": [],
+      "artifactIds": [],
+      "createdAt": "2026-10-22T17:10:53.168Z",
+      "updatedAt": "2026-10-22T17:10:53.171Z",
+      "plannedFiles": [
+        "models.go",
+        "main.go",
+        "main_test.go"
+      ]
+    },
+    {
+      "id": "task_py_auto_1792689053147",
+      "workspaceId": "ws_cowork_py_auto_1792689053147",
+      "userId": "test_u1_1792689052135",
+      "title": "Build Food Shop in Python",
+      "goal": "create a food shop in python",
+      "modelId": "gemini-3.8-flash",
+      "status": "completed",
+      "isPlanApproved": true,
+      "steps": [
+        {
+          "id": "step_1792689053151_1",
+          "title": "Inspect Repository Context & Python Environment",
+          "description": "Enumerate workspace files, check Python environment, and locate project dependencies.",
+          "status": "completed",
+          "operation": "read",
+          "tool": "workspace_list_files",
+          "toolInput": {},
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.151Z",
+          "toolOutput": {
+            "workspaceRoot": "D:\\Chat Application\\workspaces\\ws_cowork_py_auto_1792689053147",
+            "subDir": "",
+            "files": [],
+            "artifacts": [],
+            "totalCount": 0,
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.152Z",
+              "tool": "workspace_list_files",
+              "operation": "read"
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.154Z",
+              "summary": "Step completed and verified."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.154Z"
+        },
+        {
+          "id": "step_1792689053151_2",
+          "title": "Implement Python Data Models & Structures (models.py)",
+          "description": "Define typed Python dataclasses, food item attributes, shopping cart items, and order discount contracts for \"create a food shop in python\".",
+          "status": "completed",
+          "operation": "create",
+          "targetPath": "models.py",
+          "tool": "workspace_create_file",
+          "toolInput": {
+            "filePath": "models.py",
+            "content": "\"\"\"\nDomain Models for: create a food shop in python\nProduction-grade Python dataclasses and typed data contracts.\n\"\"\"\nfrom dataclasses import dataclass, field\nfrom typing import List, Dict, Optional\nfrom datetime import datetime\n\n@dataclass\nclass FoodItem:\n    id: str\n    name: str\n    category: str\n    price: float\n    description: str\n    is_available: bool = True\n    rating: float = 4.8\n    tags: List[str] = field(default_factory=list)\n\n    def to_dict(self) -> Dict:\n        return {\n            \"id\": self.id,\n            \"name\": self.name,\n            \"category\": self.category,\n            \"price\": self.price,\n            \"description\": self.description,\n            \"is_available\": self.is_available,\n            \"rating\": self.rating,\n            \"tags\": self.tags,\n        }\n\n@dataclass\nclass CartItem:\n    item: FoodItem\n    quantity: int = 1\n\n    @property\n    def subtotal(self) -> float:\n        return round(self.item.price * self.quantity, 2)\n\n@dataclass\nclass Order:\n    order_id: str\n    items: List[CartItem]\n    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())\n    discount_code: Optional[str] = None\n    discount_rate: float = 0.0\n\n    @property\n    def gross_total(self) -> float:\n        return round(sum(ci.subtotal for ci in self.items), 2)\n\n    @property\n    def discount_amount(self) -> float:\n        return round(self.gross_total * self.discount_rate, 2)\n\n    @property\n    def net_total(self) -> float:\n        return round(self.gross_total - self.discount_amount, 2)\n"
+          },
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.151Z",
+          "toolOutput": {
+            "path": "models.py",
+            "size": 1533,
+            "message": "Created file models.py successfully.",
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.154Z",
+              "tool": "workspace_create_file",
+              "operation": "create",
+              "targetPath": "models.py",
+              "preExisting": false
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.156Z",
+              "size": 1533,
+              "summary": "Verified file \"models.py\" created on filesystem (1533 bytes)."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.158Z"
+        },
+        {
+          "id": "step_1792689053151_3",
+          "title": "Implement Main Python Application & Catalog (main.py)",
+          "description": "Build complete Python service with catalog seed, menu listing, cart additions, discount calculation, and CLI runner.",
+          "status": "completed",
+          "operation": "create",
+          "targetPath": "main.py",
+          "tool": "workspace_create_file",
+          "toolInput": {
+            "filePath": "main.py",
+            "content": "\"\"\"\nMain Application Driver for: create a food shop in python\nFeatures interactive culinary catalog, shopping cart management, and order checkout.\n\"\"\"\nimport sys\nimport uuid\nfrom typing import List, Optional\nfrom models import FoodItem, CartItem, Order\n\nclass FoodShopService:\n    def __init__(self, shop_name: str = \"FreshBite Artisan Food Shop\"):\n        self.shop_name = shop_name\n        self.catalog: List[FoodItem] = []\n        self.cart: List[CartItem] = []\n        self._seed_catalog()\n\n    def _seed_catalog(self):\n        self.catalog = [\n            FoodItem(\"item-1\", \"Gourmet Truffle Burger\", \"Burgers\", 14.99, \"Aged cheddar, caramelized shallots, black truffle aioli\", tags=[\"bestseller\", \"gourmet\"]),\n            FoodItem(\"item-2\", \"Woodfired Margherita Pizza\", \"Pizza\", 16.50, \"San Marzano tomatoes, fresh buffalo mozzarella, organic basil\", tags=[\"vegetarian\", \"woodfired\"]),\n            FoodItem(\"item-3\", \"Wild Salmon Superfood Bowl\", \"Bowls\", 15.25, \"Pan-seared Alaskan salmon, quinoa, avocado, edamame, citrus ponzu\", tags=[\"healthy\", \"gluten-free\"]),\n            FoodItem(\"item-4\", \"Smoked BBQ Bacon Stack\", \"Burgers\", 15.99, \"Double smashed patties, applewood bacon, house bourbon BBQ sauce\", tags=[\"popular\"]),\n            FoodItem(\"item-5\", \"Artisan Gelato Trio\", \"Desserts\", 7.99, \"Pistachio, dark chocolate Madagascar, salted caramel\", tags=[\"dessert\", \"sweet\"]),\n            FoodItem(\"item-6\", \"Cold-Pressed Detox Green Juice\", \"Drinks\", 6.50, \"Kale, green apple, cucumber, ginger, Meyer lemon\", tags=[\"cold-pressed\", \"vegan\"]),\n        ]\n\n    def list_menu(self, category: Optional[str] = None) -> List[FoodItem]:\n        if category:\n            return [it for it in self.catalog if it.category.lower() == category.lower()]\n        return self.catalog\n\n    def add_to_cart(self, item_id: str, quantity: int = 1) -> bool:\n        item = next((it for it in self.catalog if it.id == item_id), None)\n        if not item or quantity <= 0:\n            return False\n        existing = next((ci for ci in self.cart if ci.item.id == item_id), None)\n        if existing:\n            existing.quantity += quantity\n        else:\n            self.cart.append(CartItem(item, quantity))\n        return True\n\n    def calculate_total(self, discount_code: Optional[str] = None) -> Order:\n        order_id = f\"ORD-{uuid.uuid4().hex[:8].upper()}\"\n        rate = 0.20 if discount_code == \"FRESH20\" else 0.0\n        return Order(order_id=order_id, items=list(self.cart), discount_code=discount_code, discount_rate=rate)\n\n    def checkout(self, discount_code: Optional[str] = None) -> Order:\n        order = self.calculate_total(discount_code)\n        self.cart.clear()\n        return order\n\ndef main():\n    print(\"=\" * 64)\n    print(\"  FreshBite — Artisan Kitchen & Gourmet Food Shop (Python)\")\n    print(\"=\" * 64)\n    shop = FoodShopService()\n    print(f\"\\n[Catalog Loaded] {len(shop.catalog)} signature dishes ready.\")\n    for item in shop.list_menu():\n        print(f\"  * [{item.id}] {item.name:<32} ${item.price:>5.2f} ({item.category})\")\n\n    # Simulate standard ordering workflow\n    print(\"\\n[Ordering] Adding signature items to cart...\")\n    shop.add_to_cart(\"item-1\", 2) # 2x Truffle Burger\n    shop.add_to_cart(\"item-2\", 1) # 1x Margherita Pizza\n    shop.add_to_cart(\"item-6\", 2) # 2x Detox Juice\n\n    order = shop.checkout(\"FRESH20\")\n    print(f\"\\n[Checkout Successful]\")\n    print(f\"  Order ID    : {order.order_id}\")\n    print(f\"  Total Items : {sum(ci.quantity for ci in order.items)}\")\n    print(f\"  Gross Total : ${order.gross_total:.2f}\")\n    print(f\"  Discount    : -${order.discount_amount:.2f} (Coupon: FRESH20 - 20% off)\")\n    print(f\"  Net Total   : ${order.net_total:.2f}\")\n    print(\"=\" * 64)\n\nif __name__ == \"__main__\":\n    main()\n"
+          },
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.151Z",
+          "toolOutput": {
+            "path": "main.py",
+            "size": 3766,
+            "message": "Created file main.py successfully.",
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.158Z",
+              "tool": "workspace_create_file",
+              "operation": "create",
+              "targetPath": "main.py",
+              "preExisting": false
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.159Z",
+              "size": 3766,
+              "summary": "Verified file \"main.py\" created on filesystem (3766 bytes)."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.161Z"
+        },
+        {
+          "id": "step_1792689053151_4",
+          "title": "Implement Automated Python Test Suite (test_food_shop.py)",
+          "description": "Write automated unit tests verifying catalog listing, quantity tracking, promo coupon discounts, and checkout.",
+          "status": "completed",
+          "operation": "create",
+          "targetPath": "test_food_shop.py",
+          "tool": "workspace_create_file",
+          "toolInput": {
+            "filePath": "test_food_shop.py",
+            "content": "\"\"\"\nAutomated Unit Test Suite for: create a food shop in python\nVerifies catalog listing, cart updates, discount calculations, and checkout.\n\"\"\"\nimport unittest\nfrom main import FoodShopService\n\nclass TestFoodShopService(unittest.TestCase):\n    def setUp(self):\n        self.shop = FoodShopService()\n\n    def test_catalog_initialization(self):\n        catalog = self.shop.list_menu()\n        self.assertGreaterEqual(len(catalog), 5)\n        self.assertTrue(any(it.name == \"Gourmet Truffle Burger\" for it in catalog))\n\n    def test_add_to_cart_and_quantity(self):\n        success = self.shop.add_to_cart(\"item-1\", 3)\n        self.assertTrue(success)\n        self.assertEqual(len(self.shop.cart), 1)\n        self.assertEqual(self.shop.cart[0].quantity, 3)\n\n        # Adding same item increases quantity\n        self.shop.add_to_cart(\"item-1\", 2)\n        self.assertEqual(self.shop.cart[0].quantity, 5)\n\n    def test_coupon_discount_calculation(self):\n        self.shop.add_to_cart(\"item-1\", 1)  # $14.99\n        order = self.shop.calculate_total(\"FRESH20\")\n        self.assertEqual(order.discount_rate, 0.20)\n        expected_discount = round(14.99 * 0.20, 2)\n        self.assertEqual(order.discount_amount, expected_discount)\n        self.assertEqual(order.net_total, round(14.99 - expected_discount, 2))\n\n    def test_checkout_clears_cart(self):\n        self.shop.add_to_cart(\"item-2\", 1)\n        order = self.shop.checkout()\n        self.assertIsNotNone(order.order_id)\n        self.assertEqual(len(self.shop.cart), 0)\n\nif __name__ == '__main__':\n    unittest.main()\n"
+          },
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.151Z",
+          "toolOutput": {
+            "path": "test_food_shop.py",
+            "size": 1568,
+            "message": "Created file test_food_shop.py successfully.",
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.162Z",
+              "tool": "workspace_create_file",
+              "operation": "create",
+              "targetPath": "test_food_shop.py",
+              "preExisting": false
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.163Z",
+              "size": 1568,
+              "summary": "Verified file \"test_food_shop.py\" created on filesystem (1568 bytes)."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.165Z"
+        },
+        {
+          "id": "step_1792689053151_5",
+          "title": "Verify Python Deliverables & File Syntax",
+          "description": "Verify models.py, main.py, and test_food_shop.py exist on filesystem and are ready for execution.",
+          "status": "completed",
+          "operation": "read",
+          "targetPath": "main.py",
+          "tool": "workspace_list_files",
+          "toolInput": {},
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.151Z",
+          "toolOutput": {
+            "workspaceRoot": "D:\\Chat Application\\workspaces\\ws_cowork_py_auto_1792689053147",
+            "subDir": "",
+            "files": [
+              {
+                "name": "main.py",
+                "path": "main.py",
+                "type": "file",
+                "size": 3766,
+                "updatedAt": "2026-10-22T17:10:53.160Z"
+              },
+              {
+                "name": "models.py",
+                "path": "models.py",
+                "type": "file",
+                "size": 1533,
+                "updatedAt": "2026-10-22T17:10:53.156Z"
+              },
+              {
+                "name": "test_food_shop.py",
+                "path": "test_food_shop.py",
+                "type": "file",
+                "size": 1568,
+                "updatedAt": "2026-10-22T17:10:53.164Z"
+              }
+            ],
+            "artifacts": [
+              {
+                "id": "art_1792689053156_784g8",
+                "title": "models.py",
+                "fileName": "models.py",
+                "language": "plaintext",
+                "version": 1,
+                "updatedAt": "2026-10-22T17:10:53.156Z"
+              },
+              {
+                "id": "art_1792689053159_e709o",
+                "title": "main.py",
+                "fileName": "main.py",
+                "language": "plaintext",
+                "version": 1,
+                "updatedAt": "2026-10-22T17:10:53.159Z"
+              },
+              {
+                "id": "art_1792689053163_w8xo3",
+                "title": "test_food_shop.py",
+                "fileName": "test_food_shop.py",
+                "language": "plaintext",
+                "version": 1,
+                "updatedAt": "2026-10-22T17:10:53.163Z"
+              }
+            ],
+            "totalCount": 6,
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.166Z",
+              "tool": "workspace_list_files",
+              "operation": "read",
+              "targetPath": "main.py"
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.167Z",
+              "summary": "Step completed and verified."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.167Z"
+        }
+      ],
+      "artifactIds": [
+        "art_1792689053156_784g8",
+        "art_1792689053159_e709o",
+        "art_1792689053163_w8xo3"
+      ],
+      "createdAt": "2026-10-22T17:10:53.147Z",
+      "updatedAt": "2026-10-22T17:10:53.167Z",
+      "plannedFiles": [
+        "models.py",
+        "main.py",
+        "test_food_shop.py"
+      ],
+      "summary": "Co-Work task \"Build Food Shop in Python\" has been successfully completed: 5/5 steps verified. Planned files: [models.py, main.py, test_food_shop.py]."
+    },
+    {
+      "id": "task_py_1792689053143",
+      "workspaceId": "ws_cowork_py_1792689053143",
+      "userId": "test_u1_1792689052135",
+      "title": "Create a food shop in python",
+      "goal": "create a food shop application in python with models and tests",
+      "modelId": "gemini-3.8-flash",
+      "status": "planning",
+      "steps": [],
+      "artifactIds": [],
+      "createdAt": "2026-10-22T17:10:53.143Z",
+      "updatedAt": "2026-10-22T17:10:53.147Z",
+      "plannedFiles": [
+        "models.py",
+        "main.py",
+        "test_food_shop.py"
+      ]
+    },
+    {
+      "id": "task_auto_loop_1792689053095",
+      "workspaceId": "ws_cowork_auto_1792689053094",
+      "userId": "test_u1_1792689052135",
+      "title": "Build Food Shop Landing Page",
+      "goal": "create a landing page for the food shop, in html and css, javascript",
+      "modelId": "gemini-3.8-flash",
+      "status": "completed",
+      "isPlanApproved": true,
+      "steps": [
+        {
+          "id": "step_1792689053098_1",
+          "title": "Inspect Repository Context",
+          "description": "Enumerate workspace files, analyze entry points, and discover existing project dependencies.",
+          "status": "completed",
+          "operation": "read",
+          "tool": "workspace_list_files",
+          "toolInput": {},
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.098Z",
+          "toolOutput": {
+            "workspaceRoot": "D:\\Chat Application\\workspaces\\ws_cowork_auto_1792689053094",
+            "subDir": "",
+            "files": [],
+            "artifacts": [],
+            "totalCount": 0,
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.099Z",
+              "tool": "workspace_list_files",
+              "operation": "read"
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.101Z",
+              "summary": "Step completed and verified."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.101Z"
+        },
+        {
+          "id": "step_1792689053098_2",
+          "title": "Implement Semantic HTML Structure (index.html)",
+          "description": "Build modern semantic markup with accessible navigation, hero section, interactive menu grid, filter tabs, shopping cart modal, and footer.",
+          "status": "completed",
+          "operation": "create",
+          "targetPath": "index.html",
+          "tool": "workspace_create_file",
+          "toolInput": {
+            "filePath": "index.html",
+            "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>FreshBite — Artisan Kitchen & Gourmet Food Shop</title>\n  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n  <link href=\"https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap\" rel=\"stylesheet\">\n  <link rel=\"stylesheet\" href=\"styles.css\">\n</head>\n<body>\n  <header class=\"navbar\">\n    <div class=\"nav-container\">\n      <a href=\"#\" class=\"brand-logo\">\n        <span class=\"brand-icon\">🍕</span>\n        <span class=\"brand-name\">Fresh<span>Bite</span></span>\n      </a>\n      <nav class=\"nav-links\">\n        <a href=\"#menu\" class=\"active\">Menu</a>\n        <a href=\"#specials\">Today's Deals</a>\n        <a href=\"#about\">Story</a>\n      </nav>\n      <div class=\"nav-actions\">\n        <button id=\"cart-toggle-btn\" class=\"cart-btn\" aria-label=\"View Shopping Cart\">\n          <span class=\"cart-icon\">🛒</span>\n          <span class=\"cart-label\">Cart</span>\n          <span id=\"cart-counter\" class=\"cart-badge\">0</span>\n        </button>\n      </div>\n    </div>\n  </header>\n\n  <main>\n    <section class=\"hero-section\">\n      <div class=\"hero-container\">\n        <div class=\"hero-content\">\n          <div class=\"hero-pill\">🔥 100% Farm-to-Table & Chef Crafted</div>\n          <h1 class=\"hero-title\">Delicious Bites, Made with <span>Passion</span> & Pure Flavor</h1>\n          <p class=\"hero-subtitle\">Experience artisan pizzas, flame-grilled brioche burgers, nutrient-dense bowls, and fresh cold-pressed smoothies delivered steaming hot in 25 minutes.</p>\n          <div class=\"hero-cta-group\">\n            <a href=\"#menu\" class=\"btn btn-primary\">Explore Full Menu</a>\n            <a href=\"#specials\" class=\"btn btn-outline\">Claim 20% Discount</a>\n          </div>\n        </div>\n      </div>\n    </section>\n\n    <section id=\"menu\" class=\"menu-section\">\n      <div class=\"section-container\">\n        <div class=\"section-header\">\n          <span class=\"section-tag\">Chef's Selections</span>\n          <h2 class=\"section-title\">Discover Our Handcrafted Menu</h2>\n        </div>\n        <div id=\"food-grid\" class=\"food-grid\"></div>\n      </div>\n    </section>\n  </main>\n\n  <div id=\"cart-modal\" class=\"modal-backdrop\">\n    <div class=\"modal-card\">\n      <div class=\"modal-header\">\n        <h3>Your FreshBite Order</h3>\n        <button id=\"close-cart-btn\" class=\"close-btn\">&times;</button>\n      </div>\n      <div id=\"cart-items-container\" class=\"cart-items-list\"></div>\n      <div class=\"modal-footer\">\n        <div class=\"cart-summary-line total\">\n          <span>Total:</span>\n          <span id=\"cart-total\">$0.00</span>\n        </div>\n        <button id=\"checkout-btn\" class=\"btn btn-primary btn-block\">Confirm & Place Order</button>\n      </div>\n    </div>\n  </div>\n\n  <div id=\"toast-container\" class=\"toast-container\"></div>\n  <script src=\"script.js\"></script>\n</body>\n</html>"
+          },
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.098Z",
+          "toolOutput": {
+            "path": "index.html",
+            "size": 3100,
+            "message": "Created file index.html successfully.",
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.102Z",
+              "tool": "workspace_create_file",
+              "operation": "create",
+              "targetPath": "index.html",
+              "preExisting": false
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.103Z",
+              "size": 3100,
+              "summary": "Verified file \"index.html\" created on filesystem (3100 bytes)."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.105Z"
+        },
+        {
+          "id": "step_1792689053098_3",
+          "title": "Implement Responsive CSS Styles (styles.css)",
+          "description": "Apply responsive CSS styling with custom properties, vibrant food gradients, glassmorphic cards, badge animations, and mobile layout support.",
+          "status": "completed",
+          "operation": "create",
+          "targetPath": "styles.css",
+          "tool": "workspace_create_file",
+          "toolInput": {
+            "filePath": "styles.css",
+            "content": ":root {\n  --primary: #ea580c;\n  --primary-hover: #c2410c;\n  --bg-main: #faf8f5;\n  --text-main: #1e293b;\n  --text-muted: #64748b;\n  --border: #e2e8f0;\n}\n* { margin: 0; padding: 0; box-sizing: border-box; }\nbody { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-main); color: var(--text-main); }\n.navbar { background: #fff; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }\n.nav-container { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; }\n.brand-logo { font-size: 1.25rem; font-weight: 800; color: var(--text-main); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; }\n.brand-logo span span { color: var(--primary); }\n.nav-links a { margin: 0 1rem; text-decoration: none; color: var(--text-muted); font-weight: 600; font-size: 0.9rem; }\n.nav-links a.active { color: var(--primary); }\n.cart-btn { background: var(--primary); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }\n.cart-badge { background: #fff; color: var(--primary); border-radius: 9999px; padding: 0.1rem 0.5rem; font-size: 0.75rem; }\n.hero-section { padding: 4rem 1.5rem; text-align: center; max-width: 800px; margin: 0 auto; }\n.hero-pill { display: inline-block; background: #fff7ed; color: var(--primary); padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; margin-bottom: 1rem; }\n.hero-title { font-size: 2.5rem; font-weight: 800; line-height: 1.2; margin-bottom: 1rem; }\n.hero-title span { color: var(--primary); }\n.hero-subtitle { color: var(--text-muted); font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem; }\n.hero-cta-group a { display: inline-block; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-weight: 700; margin: 0 0.5rem; }\n.btn-primary { background: var(--primary); color: #fff; }\n.btn-outline { border: 1px solid var(--border); color: var(--text-main); background: #fff; }\n.menu-section { max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem; }\n.section-header { text-align: center; margin-bottom: 2rem; }\n.section-tag { color: var(--primary); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; }\n.section-title { font-size: 2rem; font-weight: 800; }\n.food-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }\n.food-item-card { background: #fff; border-radius: 0.75rem; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }\n.food-item-thumb { width: 100%; height: 180px; object-fit: cover; }\n.food-item-body { padding: 1.25rem; flex: 1; display: flex; flex-direction: column; }\n.food-item-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }\n.food-item-desc { color: var(--text-muted); font-size: 0.85rem; flex: 1; margin-bottom: 1rem; line-height: 1.5; }\n.food-item-foot { display: flex; align-items: center; justify-content: space-between; }\n.food-item-price { font-size: 1.15rem; font-weight: 800; color: var(--primary); }\n.add-btn { background: #fff7ed; color: var(--primary); border: 1px solid #fed7aa; padding: 0.4rem 0.85rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }\n.add-btn:hover { background: var(--primary); color: #fff; }\n.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }\n.modal-backdrop.open { display: flex; }\n.modal-card { background: #fff; border-radius: 1rem; width: 100%; max-width: 480px; padding: 1.5rem; }\n.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }\n.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }\n.btn-block { width: 100%; padding: 0.75rem; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 700; margin-top: 1rem; }\n.toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200; }\n.toast { background: #1e293b; color: #fff; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 600; margin-top: 0.5rem; }\n"
+          },
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.098Z",
+          "toolOutput": {
+            "path": "styles.css",
+            "size": 4234,
+            "message": "Created file styles.css successfully.",
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.105Z",
+              "tool": "workspace_create_file",
+              "operation": "create",
+              "targetPath": "styles.css",
+              "preExisting": false
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.107Z",
+              "size": 4234,
+              "summary": "Verified file \"styles.css\" created on filesystem (4234 bytes)."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.109Z"
+        },
+        {
+          "id": "step_1792689053098_4",
+          "title": "Implement Interactive JavaScript Features (script.js)",
+          "description": "Implement interactive menu filtering, dynamic cart counter, add-to-cart toasts, order checkout modal, and smooth scrolling interactions.",
+          "status": "completed",
+          "operation": "create",
+          "targetPath": "script.js",
+          "tool": "workspace_create_file",
+          "toolInput": {
+            "filePath": "script.js",
+            "content": "const MENU = [\n  { id: 'item-1', name: 'Gourmet Truffle Burger', price: 14.99, desc: 'Aged cheddar, caramelized shallots, black truffle aioli', img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=80' },\n  { id: 'item-2', name: 'Woodfired Margherita Pizza', price: 16.50, desc: 'San Marzano tomatoes, buffalo mozzarella, fresh basil', img: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=500&auto=format&fit=crop&q=80' },\n  { id: 'item-3', name: 'Wild Salmon Bowl', price: 15.25, desc: 'Alaskan salmon, quinoa, avocado, citrus ponzu', img: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80' },\n  { id: 'item-4', name: 'Detox Green Juice', price: 6.50, desc: 'Kale, green apple, cucumber, ginger, lemon', img: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=500&auto=format&fit=crop&q=80' }\n];\n\nlet cart = [];\n\nfunction renderMenu() {\n  const grid = document.getElementById('food-grid');\n  if (!grid) return;\n  grid.innerHTML = MENU.map(function (item) {\n    return (\n      '<div class=\"food-item-card\">' +\n      '<img src=\"' + item.img + '\" alt=\"' + item.name + '\" class=\"food-item-thumb\">' +\n      '<div class=\"food-item-body\">' +\n      '<h4 class=\"food-item-title\">' + item.name + '</h4>' +\n      '<p class=\"food-item-desc\">' + item.desc + '</p>' +\n      '<div class=\"food-item-foot\">' +\n      '<span class=\"food-item-price\">$' + item.price.toFixed(2) + '</span>' +\n      '<button class=\"add-btn\" onclick=\"addToCart(\\'' + item.id + '\\')\">+ Add</button>' +\n      '</div></div></div>'\n    );\n  }).join('');\n}\n\nfunction addToCart(id) {\n  const item = MENU.find(function (m) { return m.id === id; });\n  if (!item) return;\n  const existing = cart.find(function (ci) { return ci.id === id; });\n  if (existing) {\n    existing.qty += 1;\n  } else {\n    cart.push({ id: item.id, name: item.name, price: item.price, qty: 1 });\n  }\n  updateCart();\n  showToast('Added ' + item.name + ' to order!');\n}\n\nfunction updateCart() {\n  const counter = document.getElementById('cart-counter');\n  if (counter) counter.textContent = cart.reduce(function (acc, ci) { return acc + ci.qty; }, 0);\n  const total = document.getElementById('cart-total');\n  if (total) {\n    const sum = cart.reduce(function (acc, ci) { return acc + ci.price * ci.qty; }, 0);\n    total.textContent = '$' + sum.toFixed(2);\n  }\n}\n\nfunction showToast(msg) {\n  const cont = document.getElementById('toast-container');\n  if (!cont) return;\n  const t = document.createElement('div');\n  t.className = 'toast';\n  t.textContent = msg;\n  cont.appendChild(t);\n  setTimeout(function () { t.remove(); }, 2500);\n}\n\ndocument.addEventListener('DOMContentLoaded', function () {\n  renderMenu();\n  const toggle = document.getElementById('cart-toggle-btn');\n  const modal = document.getElementById('cart-modal');\n  const close = document.getElementById('close-cart-btn');\n  if (toggle && modal) toggle.onclick = function () { modal.classList.add('open'); };\n  if (close && modal) close.onclick = function () { modal.classList.remove('open'); };\n});\n"
+          },
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.098Z",
+          "toolOutput": {
+            "path": "script.js",
+            "size": 3099,
+            "message": "Created file script.js successfully.",
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.109Z",
+              "tool": "workspace_create_file",
+              "operation": "create",
+              "targetPath": "script.js",
+              "preExisting": false
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.115Z",
+              "size": 3099,
+              "summary": "Verified file \"script.js\" created on filesystem (3099 bytes)."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.117Z"
+        },
+        {
+          "id": "step_1792689053098_5",
+          "title": "Verify Deliverables & Live Preview Readiness",
+          "description": "Inspect workspace files to ensure index.html, styles.css, and script.js exist, are linked, and render properly in live preview.",
+          "status": "completed",
+          "operation": "read",
+          "targetPath": "index.html",
+          "tool": "workspace_list_files",
+          "toolInput": {},
+          "requiresApproval": false,
+          "isApproved": false,
+          "createdAt": "2026-10-22T17:10:53.098Z",
+          "toolOutput": {
+            "workspaceRoot": "D:\\Chat Application\\workspaces\\ws_cowork_auto_1792689053094",
+            "subDir": "",
+            "files": [
+              {
+                "name": "index.html",
+                "path": "index.html",
+                "type": "file",
+                "size": 3100,
+                "updatedAt": "2026-10-22T17:10:53.104Z"
+              },
+              {
+                "name": "script.js",
+                "path": "script.js",
+                "type": "file",
+                "size": 3099,
+                "updatedAt": "2026-10-22T17:10:53.115Z"
+              },
+              {
+                "name": "styles.css",
+                "path": "styles.css",
+                "type": "file",
+                "size": 4234,
+                "updatedAt": "2026-10-22T17:10:53.108Z"
+              }
+            ],
+            "artifacts": [
+              {
+                "id": "art_1792689053103_ogixc",
+                "title": "index.html",
+                "fileName": "index.html",
+                "language": "html",
+                "version": 1,
+                "updatedAt": "2026-10-22T17:10:53.103Z"
+              },
+              {
+                "id": "art_1792689053107_a4ig7",
+                "title": "styles.css",
+                "fileName": "styles.css",
+                "language": "css",
+                "version": 1,
+                "updatedAt": "2026-10-22T17:10:53.107Z"
+              },
+              {
+                "id": "art_1792689053115_fpol1",
+                "title": "script.js",
+                "fileName": "script.js",
+                "language": "javascript",
+                "version": 1,
+                "updatedAt": "2026-10-22T17:10:53.115Z"
+              }
+            ],
+            "totalCount": 6,
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.117Z",
+              "tool": "workspace_list_files",
+              "operation": "read",
+              "targetPath": "index.html"
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.141Z",
+              "summary": "Step completed and verified."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.141Z"
+        }
+      ],
+      "artifactIds": [
+        "art_1792689053103_ogixc",
+        "art_1792689053107_a4ig7",
+        "art_1792689053115_fpol1"
+      ],
+      "createdAt": "2026-10-22T17:10:53.095Z",
+      "updatedAt": "2026-10-22T17:10:53.141Z",
+      "plannedFiles": [
+        "index.html",
+        "styles.css",
+        "script.js"
+      ],
+      "summary": "Co-Work task \"Build Food Shop Landing Page\" has been successfully completed: 5/5 steps verified. Planned files: [index.html, styles.css, script.js]."
+    },
+    {
+      "id": "task_food_shop_1792689053090",
+      "workspaceId": "ws_cowork_web_1792689053090",
+      "userId": "test_u1_1792689052135",
+      "title": "Create landing page for food shop in html css and javascript",
+      "goal": "create a landing page for the food shop, in html and css, javascript",
+      "modelId": "gemini-3.8-flash",
+      "status": "planning",
+      "steps": [],
+      "artifactIds": [],
+      "createdAt": "2026-10-22T17:10:53.090Z",
+      "updatedAt": "2026-10-22T17:10:53.094Z",
+      "plannedFiles": [
+        "index.html",
+        "styles.css",
+        "script.js"
+      ]
+    },
+    {
+      "id": "task_oav_1792689053075",
+      "workspaceId": "ws_agent_test_1792689053069",
+      "userId": "test_u1_1792689052135",
+      "title": "Observe-Act-Verify Test Task",
+      "goal": "Create and update oav_test_1792689053075.ts",
+      "status": "completed",
+      "permissionMode": "session_edit",
+      "modelId": "gemini-3.8-flash",
+      "plannedFiles": [
+        "oav_test_1792689053075.ts"
+      ],
+      "steps": [
+        {
+          "id": "s_create_1792689053075",
+          "title": "Create Test File",
+          "description": "Create initial oav_test_1792689053075.ts",
+          "status": "completed",
+          "operation": "create",
+          "targetPath": "oav_test_1792689053075.ts",
+          "tool": "workspace_create_file",
+          "toolInput": {
+            "filePath": "oav_test_1792689053075.ts",
+            "content": "export const status = \"initial\";\n"
+          },
+          "createdAt": "2026-10-22T17:10:53.075Z",
+          "toolOutput": {
+            "path": "oav_test_1792689053075.ts",
+            "size": 33,
+            "message": "Created file oav_test_1792689053075.ts successfully.",
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.076Z",
+              "tool": "workspace_create_file",
+              "operation": "create",
+              "targetPath": "oav_test_1792689053075.ts",
+              "preExisting": false
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.080Z",
+              "size": 33,
+              "summary": "Verified file \"oav_test_1792689053075.ts\" created on filesystem (33 bytes)."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.082Z"
+        },
+        {
+          "id": "s_edit_1792689053075",
+          "title": "Edit Test File",
+          "description": "Modify oav_test_1792689053075.ts",
+          "status": "completed",
+          "operation": "edit",
+          "targetPath": "oav_test_1792689053075.ts",
+          "tool": "workspace_edit_file",
+          "toolInput": {
+            "filePath": "oav_test_1792689053075.ts",
+            "content": "export const status = \"verified_modification\";\n"
+          },
+          "createdAt": "2026-10-22T17:10:53.075Z",
+          "toolOutput": {
+            "path": "oav_test_1792689053075.ts",
+            "size": 47,
+            "message": "Updated file oav_test_1792689053075.ts successfully.",
+            "observation": {
+              "observedAt": "2026-10-22T17:10:53.082Z",
+              "tool": "workspace_edit_file",
+              "operation": "edit",
+              "targetPath": "oav_test_1792689053075.ts",
+              "preExisting": true,
+              "preSize": 33,
+              "preSnippet": "export const status = \"initial\";\n"
+            },
+            "verification": {
+              "verified": true,
+              "verifiedAt": "2026-10-22T17:10:53.086Z",
+              "size": 47,
+              "summary": "Verified file \"oav_test_1792689053075.ts\" modified on filesystem (47 bytes)."
+            }
+          },
+          "completedAt": "2026-10-22T17:10:53.087Z"
+        }
+      ],
+      "artifactIds": [
+        "art_1792689053080_8rbd7"
+      ],
+      "createdAt": "2026-10-22T17:10:53.075Z",
+      "updatedAt": "2026-10-22T17:10:53.087Z",
+      "summary": "Co-Work task \"Observe-Act-Verify Test Task\" has been successfully completed: 2/2 steps verified. Planned files: [oav_test_1792689053075.ts]."
+    },
+    {
+      "id": "task_plan_test_1792689053069",
+      "workspaceId": "ws_agent_test_1792689053069",
+      "userId": "test_u1_1792689052135",
+      "title": "Prompt Analysis Goal Test",
+      "goal": "Add JWT verification in src/auth.ts and create test in tests/auth.test.ts",
+      "status": "planning",
+      "modelId": "gemini-3.8-flash",
+      "steps": [],
+      "artifactIds": [],
+      "createdAt": "2026-10-22T17:10:53.069Z",
+      "updatedAt": "2026-10-22T17:10:53.074Z",
+      "plannedFiles": [
+        "src/auth.ts",
+        "tests/auth.test.ts",
+        "types.ts",
+        "shop.ts",
+        "index.ts",
+        "solution.ts"
+      ]
+    },
+    {
+      "id": "task_recover_1792689053067",
+      "workspaceId": "ws_repo_test_1792689052129",
+      "userId": "test_u1_1792689052135",
+      "title": "Recovery Resilience Test",
+      "goal": "Test crash recovery",
+      "status": "running",
+      "modelId": "gemini-3.8-flash",
+      "steps": [
+        {
+          "id": "s1",
+          "title": "Step 1",
+          "description": "Inspect",
+          "status": "completed",
+          "createdAt": "2026-10-22T17:10:53.067Z"
+        },
+        {
+          "id": "s2",
+          "title": "Step 2",
+          "description": "Modify",
+          "status": "running",
+          "createdAt": "2026-10-22T17:10:53.067Z"
+        }
+      ],
+      "artifactIds": [],
+      "createdAt": "2026-10-22T17:10:53.067Z",
+      "updatedAt": "2026-10-22T17:10:53.067Z"
+    },
     {
       "id": "task_react_1792688542404",
       "workspaceId": "ws_cowork_react_1792688542404",
@@ -10506,6 +11522,36 @@
   ],
   "checkpoints": [],
   "notifications": [
+    {
+      "id": "notif_task_1792689053167",
+      "userId": "test_u1_1792689052135",
+      "title": "Co-Work Task Completed",
+      "message": "Task \"Build Food Shop in Python\" finished all steps and produced verified changes.",
+      "channel": "in_app",
+      "type": "task_completed",
+      "read": false,
+      "createdAt": "2026-10-22T17:10:53.167Z"
+    },
+    {
+      "id": "notif_task_1792689053141",
+      "userId": "test_u1_1792689052135",
+      "title": "Co-Work Task Completed",
+      "message": "Task \"Build Food Shop Landing Page\" finished all steps and produced verified changes.",
+      "channel": "in_app",
+      "type": "task_completed",
+      "read": false,
+      "createdAt": "2026-10-22T17:10:53.141Z"
+    },
+    {
+      "id": "notif_task_1792689053087",
+      "userId": "test_u1_1792689052135",
+      "title": "Co-Work Task Completed",
+      "message": "Task \"Observe-Act-Verify Test Task\" finished all steps and produced verified changes.",
+      "channel": "in_app",
+      "type": "task_completed",
+      "read": false,
+      "createdAt": "2026-10-22T17:10:53.087Z"
+    },
     {
       "id": "notif_task_1792688542392",
       "userId": "test_u1_1792688540898",

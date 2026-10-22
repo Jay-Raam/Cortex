@@ -27,10 +27,17 @@ export function isDesktopApp(): boolean {
     }
   }
 
-  // 4. Query param override for preview testing (?platform=desktop)
-  if (typeof window !== 'undefined' && window.location && window.location.search) {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('platform') === 'desktop') return true;
+  // 4. Query param override for preview testing (?platform=desktop) or localStorage toggle
+  if (typeof window !== 'undefined') {
+    try {
+      if (window.localStorage && window.localStorage.getItem('cortex_force_desktop') === 'true') {
+        return true;
+      }
+      if (window.location && window.location.search) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('platform') === 'desktop') return true;
+      }
+    } catch {}
   }
 
   return false;

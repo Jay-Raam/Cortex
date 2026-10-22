@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isDesktopApp } from '../lib/platform';
 import {
   ChevronDown,
   MoreHorizontal,
@@ -86,17 +87,19 @@ export const TopNav: React.FC<TopNavProps> = ({
           >
             Chat
           </button>
-          <button
-            onClick={() => onNavigate('cowork')}
-            className={`flex items-center gap-1.5 px-3.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              currentView === 'cowork'
-                ? 'bg-white text-[#EA580C] shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5 text-[#EA580C]" />
-            <span>Cowork</span>
-          </button>
+          {isDesktopApp() && (
+            <button
+              onClick={() => onNavigate('cowork')}
+              className={`flex items-center gap-1.5 px-3.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                currentView === 'cowork'
+                  ? 'bg-white text-[#EA580C] shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-[#EA580C]" />
+              <span>Cowork</span>
+            </button>
+          )}
         </div>
 
         {/* Secondary feature tabs */}
