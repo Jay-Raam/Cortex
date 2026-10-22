@@ -20,6 +20,7 @@ import { executionRunner } from '../src/server/cowork/execution-runner';
 import { contextManager } from '../src/server/cowork/context-manager';
 import { User, Conversation, Message, AgentTask } from '../src/server/types';
 import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
+import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/language-generators';
 
 describe('Cortex AI Automated Test Suite', () => {
   let testUser1: User;
@@ -1231,6 +1232,99 @@ print(fibonacci(10))
         assert.ok(res.output.environmentNotice.includes('runtime is not installed on this local host'));
         assert.strictEqual(res.success, true);
       }
+    });
+  });
+
+  describe('14. Dynamic Web Domain Generation (Barber, Gym, Healthcare, Portfolio, SaaS, E-Commerce)', () => {
+    it('accurately detects web domains from user prompts including typo "barbeer"', () => {
+      assert.strictEqual(detectWebDomain('write landing page for the barbeer shop'), 'barber');
+      assert.strictEqual(detectWebDomain('create a website for modern barber shop and grooming salon'), 'barber');
+      assert.strictEqual(detectWebDomain('landing page for crossfit gym and personal fitness trainer'), 'gym');
+      assert.strictEqual(detectWebDomain('portfolio website for senior fullstack software engineer'), 'portfolio');
+      assert.strictEqual(detectWebDomain('dental clinic and pediatric doctor healthcare landing page'), 'healthcare');
+      assert.strictEqual(detectWebDomain('cloud analytics saas platform landing page'), 'saas');
+      assert.strictEqual(detectWebDomain('online streetwear apparel and fashion boutique shop'), 'ecommerce');
+      assert.strictEqual(detectWebDomain('gourmet artisan pizza and burger restaurant'), 'restaurant');
+      assert.strictEqual(detectWebDomain('create a landing page for our business'), 'generic');
+    });
+
+    it('generates authentic barber shop HTML and never includes food shop content for barber goals', () => {
+      const html = generateDynamicWebHtml('write landing page for the barbeer shop');
+      assert.ok(html.includes('Apex & Blade'), 'Must include barber brand Apex & Blade');
+      assert.ok(html.includes('Barber'), 'Must include Barber terminology');
+      assert.ok(html.includes('Grooming'), 'Must include Grooming terminology');
+      assert.ok(html.includes('Hot Towel Straight Shave'), 'Must include authentic barber services');
+      assert.ok(html.includes('booking-modal'), 'Must include appointment booking modal');
+      // Anti-regression: Must NEVER contain food shop items
+      assert.ok(!html.includes('FreshBite'), 'Must NOT contain FreshBite');
+      assert.ok(!html.includes('pizza'), 'Must NOT contain pizza');
+      assert.ok(!html.includes('burger'), 'Must NOT contain burger');
+      assert.ok(!html.includes('Farm-to-Table'), 'Must NOT contain Farm-to-Table');
+    });
+
+    it('plans and executes end-to-end Co-Work workspace task for "write landing page for the barbeer shop"', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_barber_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Apex Barber Shop Project',
+        description: 'Barber landing page workspace',
+        permissionMode: 'approve_plan',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_barber_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'write landing page for the barbeer shop.',
+        goal: 'write landing page for the barbeer shop.',
+        modelId: 'anthropic/claude-3.5-sonnet',
+        status: 'running',
+        isPlanApproved: true,
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+      assert.strictEqual(steps.length, 5, 'Must generate 5 structured steps');
+      assert.ok(task.plannedFiles?.includes('index.html'), 'Must plan index.html');
+      assert.ok(task.plannedFiles?.includes('styles.css'), 'Must plan styles.css');
+      assert.ok(task.plannedFiles?.includes('script.js'), 'Must plan script.js');
+
+      // Verify the generated index.html step has barber content
+      const htmlStep = steps.find((s) => s.targetPath === 'index.html');
+      assert.ok(htmlStep, 'index.html step must exist');
+      assert.ok(htmlStep?.toolInput?.content.includes('Apex & Blade'), 'HTML step must generate barber shop markup');
+      assert.ok(!htmlStep?.toolInput?.content.includes('FreshBite'), 'HTML step must NOT generate FreshBite');
+
+      db.updateTask(task.id, testUser1.id, { steps, isPlanApproved: true, status: 'running' });
+
+      // Run autonomous loop
+      const completedTask = await coworkEngine.runTaskLoop(task.id, testUser1.id);
+      assert.strictEqual(completedTask.status, 'completed', 'Barber task must complete autonomously');
+      assert.strictEqual(completedTask.steps.every((s) => s.status === 'completed'), true, 'All 5 steps must complete');
+
+      // Verify the created artifacts
+      const artifacts = db.getArtifacts(ws.id, testUser1.id);
+      const indexArtifact = artifacts.find((a) => a.fileName === 'index.html');
+      const cssArtifact = artifacts.find((a) => a.fileName === 'styles.css');
+      const jsArtifact = artifacts.find((a) => a.fileName === 'script.js');
+
+      assert.ok(indexArtifact, 'index.html artifact must exist in workspace');
+      assert.ok(cssArtifact, 'styles.css artifact must exist in workspace');
+      assert.ok(jsArtifact, 'script.js artifact must exist in workspace');
+
+      assert.ok(indexArtifact?.content.includes('Apex & Blade'), 'Artifact must contain Apex & Blade');
+      assert.ok(indexArtifact?.content.includes('Executive Razor Fade'), 'Artifact must contain haircut service');
+      assert.ok(!indexArtifact?.content.includes('FreshBite'), 'Artifact must NOT contain FreshBite');
+      assert.ok(!indexArtifact?.content.includes('pizza'), 'Artifact must NOT contain pizza');
+
+      assert.ok(cssArtifact?.content.includes('--gold'), 'CSS must include luxury barber theme variables');
+      assert.ok(jsArtifact?.content.toLowerCase().includes('appointment'), 'JS must include appointment booking logic');
     });
   });
 });

@@ -11,6 +11,11 @@ import {
   TechnologyDetection,
   detectTargetTechnology,
   generateLanguageSteps,
+  detectWebDomain,
+  getDomainLabel,
+  generateDynamicWebHtml,
+  generateDynamicWebCss,
+  generateDynamicWebJs,
   isWebDevelopmentGoal as isWebDevelopmentGoalShared,
   generateFoodShopHtml as generateFoodShopHtmlShared,
   generateFoodShopCss as generateFoodShopCssShared,
@@ -20,12 +25,12 @@ import {
 /**
  * Unified AI completion helper with multi-provider resilience.
  * Tries Google Gemini first if configured with a valid key,
- * then falls back to OpenRouter (deepseek-chat or llama-3.3) if available.
+ * then falls back to OpenRouter (prioritizing active zero-cost models) if available.
  */
 async function generateAICompletion(prompt: string, systemInstruction?: string): Promise<string> {
-  // 1. Try Gemini (if valid Google API key starting with AIzaSy)
+  // 1. Try Gemini (if valid Google API key)
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey && geminiKey.startsWith('AIzaSy')) {
+  if (geminiKey && geminiKey.trim().length > 10 && !geminiKey.startsWith('ci-test')) {
     try {
       const res = await generateGeminiContent('gemini-3.8-flash', prompt, systemInstruction);
       if (res && res.trim().length > 0) return res;
@@ -34,13 +39,14 @@ async function generateAICompletion(prompt: string, systemInstruction?: string):
     }
   }
 
-  // 2. Try OpenRouter (if valid key starting with sk-or-)
+  // 2. Try OpenRouter (prioritizing verified active free-first models)
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   if (openRouterKey && openRouterKey.startsWith('sk-or-')) {
     const candidateModels = [
+      'nvidia/nemotron-3.5-lightning:free',
+      'google/gemma-4-26b-a4b-it:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
       'deepseek/deepseek-chat',
-      'meta-llama/llama-3.3-70b-instruct',
-      'google/gemini-2.0-flash-001',
     ];
     for (const modelId of candidateModels) {
       try {

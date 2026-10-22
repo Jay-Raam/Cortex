@@ -1092,11 +1092,412 @@ int main() {
 }
 
 // ============================================================================
-// HTML / CSS / JAVASCRIPT GENERATORS
+// DYNAMIC MULTI-DOMAIN HTML / CSS / JAVASCRIPT GENERATORS
 // ============================================================================
 
-export function generateFoodShopHtml(goal = 'Food Shop Landing Page'): string {
-  return `<!DOCTYPE html>
+export type WebDomain =
+  | 'barber'
+  | 'gym'
+  | 'portfolio'
+  | 'restaurant'
+  | 'healthcare'
+  | 'saas'
+  | 'ecommerce'
+  | 'generic';
+
+export function detectWebDomain(goal: string): WebDomain {
+  const g = (goal || '').toLowerCase();
+  if (/barber|barbeer|barbershop|salon|haircut|shav|grooming|fade|stylist|beard|pomade/.test(g)) {
+    return 'barber';
+  }
+  if (/gym|fitness|workout|crossfit|bodybuilding|trainer|yoga|pilates|muscle|athlete|lifting/.test(g)) {
+    return 'gym';
+  }
+  if (/portfolio|resume|\bcv\b|personal site|freelance|developer portfolio|designer portfolio/.test(g)) {
+    return 'portfolio';
+  }
+  if (/food|restaurant|cafe|pizza|burger|bakery|dining|bistro|coffee|snack|culinary|kitchen/.test(g)) {
+    return 'restaurant';
+  }
+  if (/doctor|clinic|dental|dentist|hospital|medical|physio|healthcare|pharma|patient/.test(g)) {
+    return 'healthcare';
+  }
+  if (/\b(shop|store|ecommerce|e-commerce|fashion|clothing|boutique|merch|apparel|shoes)\b/.test(g)) {
+    return 'ecommerce';
+  }
+  if (/\b(saas|software|tech|app|startup|cloud|analytics|api|platform|crm|dashboard|devtools)\b/.test(g)) {
+    return 'saas';
+  }
+  return 'generic';
+}
+
+export function getDomainLabel(domain: WebDomain): string {
+  switch (domain) {
+    case 'barber':
+      return 'Barber Shop & Grooming Lounge';
+    case 'gym':
+      return 'Fitness Center & Gym';
+    case 'portfolio':
+      return 'Professional Portfolio Showcase';
+    case 'restaurant':
+      return 'Artisan Kitchen & Food Shop';
+    case 'healthcare':
+      return 'Medical & Health Clinic';
+    case 'saas':
+      return 'Modern Cloud SaaS Platform';
+    case 'ecommerce':
+      return 'E-Commerce Boutique & Store';
+    default:
+      return 'Modern Business Showcase';
+  }
+}
+
+export function generateDynamicWebHtml(goal = 'Modern Landing Page'): string {
+  const domain = detectWebDomain(goal);
+
+  // 1. BARBER SHOP & GROOMING
+  if (domain === 'barber') {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex & Blade — Artisan Barber Shop & Men's Grooming</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="#" class="brand-logo">
+        <span class="brand-icon">✂️</span>
+        <span class="brand-name">Apex<span>Barber</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="#services" class="active">Services</a>
+        <a href="#barbers">Master Barbers</a>
+        <a href="#pricing">Rates</a>
+        <a href="#about">Heritage</a>
+      </nav>
+      <div class="nav-actions">
+        <button id="action-toggle-btn" class="action-btn" aria-label="Book an Appointment">
+          <span class="action-icon">📅</span>
+          <span class="action-label">Book Appointment</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero-section">
+      <div class="hero-container">
+        <div class="hero-content">
+          <div class="hero-pill">💈 Master Craftsmen · Est. 2026</div>
+          <h1 class="hero-title">Masterful Cuts, Precision Fades & <span>Timeless Grooming</span></h1>
+          <p class="hero-subtitle">Crafting sharp silhouettes, hot-towel straight razor shaves, tailored beard sculpting, and premium scalp treatments in a relaxed, classic lounge environment.</p>
+          <div class="hero-cta-group">
+            <a href="#services" class="btn btn-primary">Book Your Chair</a>
+            <a href="#pricing" class="btn btn-outline">Explore Grooming Rates</a>
+          </div>
+          <div class="hero-stats">
+            <div class="stat-item">
+              <span class="stat-number">4.9 ★</span>
+              <span class="stat-label">5,000+ Gentlemen</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">15+ yrs</span>
+              <span class="stat-label">Master Barbers</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">100%</span>
+              <span class="stat-label">Satisfaction</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="services-section">
+      <div class="section-container">
+        <div class="section-header">
+          <span class="section-tag">Signature Services</span>
+          <h2 class="section-title">Handcrafted Cuts & Classic Shaves</h2>
+          <p class="section-desc">Every haircut and shave is tailored to your head shape, facial structure, and personal style.</p>
+        </div>
+        <div id="items-grid" class="items-grid"></div>
+      </div>
+    </section>
+
+    <section id="barbers" class="barbers-section">
+      <div class="section-container">
+        <div class="section-header">
+          <span class="section-tag">The Craftsmen</span>
+          <h2 class="section-title">Meet Our Master Barbers</h2>
+        </div>
+        <div class="barbers-grid">
+          <div class="barber-card">
+            <img src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&auto=format&fit=crop&q=80" alt="Marcus Vance" class="barber-thumb">
+            <h4>Marcus 'The Blade' Vance</h4>
+            <p>Master Barber with 12 years of experience specializing in classic low-skin fades and traditional straight-edge shaves.</p>
+          </div>
+          <div class="barber-card">
+            <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&auto=format&fit=crop&q=80" alt="Elena Rostova" class="barber-thumb">
+            <h4>Elena Rostova</h4>
+            <p>Senior Stylist and scissor work master specializing in modern textured crops and facial hair contouring.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Interactive Booking Modal -->
+  <div id="action-modal" class="modal-backdrop booking-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Reserve Your Chair at Apex Barber</h3>
+        <button id="close-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <form id="booking-form" class="modal-body">
+        <div class="form-group">
+          <label>Select Grooming Service</label>
+          <select id="service-select" class="form-control" required>
+            <option value="Signature Razor Fade & Haircut">Signature Razor Fade & Haircut ($35.00)</option>
+            <option value="Executive Razor Fade">Executive Razor Fade ($40.00)</option>
+            <option value="Classic Hot Towel Straight Shave">Classic Hot Towel Straight Shave ($28.00)</option>
+            <option value="Beard Sculpting & Razor Line-Up">Beard Sculpting & Razor Line-Up ($22.00)</option>
+            <option value="The Royal Treatment Package">The Royal Treatment Package ($55.00)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Preferred Master Barber</label>
+          <select id="barber-select" class="form-control">
+            <option value="Marcus 'The Blade' Vance">Marcus 'The Blade' Vance</option>
+            <option value="Elena Rostova">Elena Rostova</option>
+            <option value="Any Available Craftsman">Any Available Craftsman</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Preferred Date</label>
+            <input type="date" id="booking-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Time Slot</label>
+            <select id="booking-time" class="form-control">
+              <option>10:00 AM</option>
+              <option>11:30 AM</option>
+              <option>02:00 PM</option>
+              <option>04:30 PM</option>
+              <option>06:00 PM</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Your Full Name</label>
+          <input type="text" id="client-name" class="form-control" placeholder="e.g. James Wilson" required>
+        </div>
+        <div class="form-group">
+          <label>Mobile Number</label>
+          <input type="tel" id="client-phone" class="form-control" placeholder="e.g. (555) 234-5678" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Confirm Appointment Booking</button>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="nav-container">
+      <div class="brand-logo">
+        <span class="brand-icon">✂️</span>
+        <span class="brand-name">Apex<span>Barber</span></span>
+      </div>
+      <p class="footer-copy">&copy; 2026 Apex Barber & Co. 442 Heritage Lane, Suite 100 · (555) 392-8172 · Tue–Sat 9AM–8PM</p>
+    </div>
+  </footer>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script src="script.js"></script>
+</body>
+</html>`;
+  }
+
+  // 2. GYM & FITNESS
+  if (domain === 'gym') {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Titan Fitness — High-Performance Strength & Conditioning Gym</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="#" class="brand-logo">
+        <span class="brand-icon">⚡</span>
+        <span class="brand-name">Titan<span>Fit</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="#services" class="active">Programs</a>
+        <a href="#trainers">Coaches</a>
+        <a href="#membership">Membership</a>
+      </nav>
+      <div class="nav-actions">
+        <button id="action-toggle-btn" class="action-btn">
+          <span class="action-icon">💪</span>
+          <span class="action-label">Claim Free Pass</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero-section">
+      <div class="hero-container">
+        <div class="hero-content">
+          <div class="hero-pill">⚡ 24/7 Elite Training Facility</div>
+          <h1 class="hero-title">Forge Peak Strength, Power & <span>Relentless Grit</span></h1>
+          <p class="hero-subtitle">Olympic lifting platforms, world-class strength coaching, high-intensity functional conditioning, and recovery saunas designed for serious athletes.</p>
+          <div class="hero-cta-group">
+            <a href="#services" class="btn btn-primary">Explore Programs</a>
+            <a href="#membership" class="btn btn-outline">View Membership Plans</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="services-section">
+      <div class="section-container">
+        <div class="section-header">
+          <span class="section-tag">Elite Programs</span>
+          <h2 class="section-title">Designed for Maximum Results</h2>
+        </div>
+        <div id="items-grid" class="items-grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="action-modal" class="modal-backdrop gym-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Claim Your 3-Day Free Titan Pass</h3>
+        <button id="close-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <form id="booking-form" class="modal-body">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="client-name" class="form-control" required placeholder="e.g. Chris Hemsworth">
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="client-email" class="form-control" required placeholder="name@email.com">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Activate Free Guest Pass</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script src="script.js"></script>
+</body>
+</html>`;
+  }
+
+  // 3. DEVELOPER PORTFOLIO
+  if (domain === 'portfolio') {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alex Morgan — Principal Software Architect & Product Engineer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="#" class="brand-logo">
+        <span class="brand-icon">💻</span>
+        <span class="brand-name">Alex<span>Morgan</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="#services" class="active">Projects</a>
+        <a href="#about">Experience</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <button id="action-toggle-btn" class="action-btn">
+          <span class="action-icon">✉️</span>
+          <span class="action-label">Get in Touch</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero-section">
+      <div class="hero-container">
+        <div class="hero-content">
+          <div class="hero-pill">🚀 Senior Full-Stack & AI Systems Architect</div>
+          <h1 class="hero-title">Architecting Resilient Systems & <span>High-Impact Products</span></h1>
+          <p class="hero-subtitle">10+ years specializing in distributed TypeScript microservices, real-time agentic workflows, sub-second vector search, and clean design systems.</p>
+          <div class="hero-cta-group">
+            <a href="#services" class="btn btn-primary">View Featured Projects</a>
+            <a href="#contact" class="btn btn-outline">Schedule Technical Call</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="services-section">
+      <div class="section-container">
+        <div class="section-header">
+          <span class="section-tag">Engineering Showcase</span>
+          <h2 class="section-title">Selected Production Works</h2>
+        </div>
+        <div id="items-grid" class="items-grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="action-modal" class="modal-backdrop contact-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Start a Conversation</h3>
+        <button id="close-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <form id="booking-form" class="modal-body">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="client-name" class="form-control" required placeholder="Alex Turner">
+        </div>
+        <div class="form-group">
+          <label>Project Scope or Question</label>
+          <textarea id="client-message" class="form-control" rows="3" placeholder="Tell me about your architectural goals..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Send Message</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script src="script.js"></script>
+</body>
+</html>`;
+  }
+
+  // 4. RESTAURANT & FOOD (DEFAULT FOR FOOD GOALS)
+  if (domain === 'restaurant') {
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1115,14 +1516,14 @@ export function generateFoodShopHtml(goal = 'Food Shop Landing Page'): string {
         <span class="brand-name">Fresh<span>Bite</span></span>
       </a>
       <nav class="nav-links">
-        <a href="#menu" class="active">Menu</a>
+        <a href="#services" class="active">Menu</a>
         <a href="#specials">Today's Deals</a>
         <a href="#about">Story</a>
       </nav>
       <div class="nav-actions">
-        <button id="cart-toggle-btn" class="cart-btn" aria-label="View Shopping Cart">
-          <span class="cart-icon">🛒</span>
-          <span class="cart-label">Cart</span>
+        <button id="action-toggle-btn" class="action-btn">
+          <span class="action-icon">🛒</span>
+          <span class="action-label">Cart</span>
           <span id="cart-counter" class="cart-badge">0</span>
         </button>
       </div>
@@ -1137,29 +1538,29 @@ export function generateFoodShopHtml(goal = 'Food Shop Landing Page'): string {
           <h1 class="hero-title">Delicious Bites, Made with <span>Passion</span> & Pure Flavor</h1>
           <p class="hero-subtitle">Experience artisan pizzas, flame-grilled brioche burgers, nutrient-dense bowls, and fresh cold-pressed smoothies delivered steaming hot in 25 minutes.</p>
           <div class="hero-cta-group">
-            <a href="#menu" class="btn btn-primary">Explore Full Menu</a>
+            <a href="#services" class="btn btn-primary">Explore Full Menu</a>
             <a href="#specials" class="btn btn-outline">Claim 20% Discount</a>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="menu" class="menu-section">
+    <section id="services" class="services-section">
       <div class="section-container">
         <div class="section-header">
           <span class="section-tag">Chef's Selections</span>
           <h2 class="section-title">Discover Our Handcrafted Menu</h2>
         </div>
-        <div id="food-grid" class="food-grid"></div>
+        <div id="items-grid" class="items-grid"></div>
       </div>
     </section>
   </main>
 
-  <div id="cart-modal" class="modal-backdrop">
+  <div id="action-modal" class="modal-backdrop cart-modal">
     <div class="modal-card">
       <div class="modal-header">
         <h3>Your FreshBite Order</h3>
-        <button id="close-cart-btn" class="close-btn">&times;</button>
+        <button id="close-modal-btn" class="close-btn">&times;</button>
       </div>
       <div id="cart-items-container" class="cart-items-list"></div>
       <div class="modal-footer">
@@ -1176,62 +1577,415 @@ export function generateFoodShopHtml(goal = 'Food Shop Landing Page'): string {
   <script src="script.js"></script>
 </body>
 </html>`;
+  }
+
+  // 5. GENERIC MODERN LANDING PAGE (ADAPTIVE TO USER PROMPT)
+  const safeGoal = goal.replace(/["'<>]/g, '');
+  const brandWord = safeGoal.split(' ').find((w) => w.length > 3) || 'Cortex';
+  const brandTitle = brandWord.charAt(0).toUpperCase() + brandWord.slice(1);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${brandTitle} — ${safeGoal}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="#" class="brand-logo">
+        <span class="brand-icon">✨</span>
+        <span class="brand-name">${brandTitle}<span>Hub</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="#services" class="active">Features</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <button id="action-toggle-btn" class="action-btn">
+          <span class="action-icon">🚀</span>
+          <span class="action-label">Get Started</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero-section">
+      <div class="hero-container">
+        <div class="hero-content">
+          <div class="hero-pill">✨ Modern High-Performance Experience</div>
+          <h1 class="hero-title">${safeGoal.charAt(0).toUpperCase() + safeGoal.slice(1)}</h1>
+          <p class="hero-subtitle">Discover premium quality, modern responsive craftsmanship, and seamless user experiences tailored to your everyday needs.</p>
+          <div class="hero-cta-group">
+            <a href="#services" class="btn btn-primary">Explore Solutions</a>
+            <a href="#action-modal" class="btn btn-outline" onclick="openModal()">Get in Touch</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="services-section">
+      <div class="section-container">
+        <div class="section-header">
+          <span class="section-tag">Featured Solutions</span>
+          <h2 class="section-title">Built for Your Success</h2>
+        </div>
+        <div id="items-grid" class="items-grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="action-modal" class="modal-backdrop inquiry-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Connect with ${brandTitle}</h3>
+        <button id="close-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <form id="booking-form" class="modal-body">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="client-name" class="form-control" required placeholder="Jordan Smith">
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="client-email" class="form-control" required placeholder="jordan@company.com">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Submit Inquiry</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script src="script.js"></script>
+</body>
+</html>`;
 }
 
-export function generateFoodShopCss(): string {
+export function generateDynamicWebCss(domain: WebDomain, _goal = ''): string {
+  // Palettes by domain
+  let primary = '#2563eb';
+  let primaryHover = '#1d4ed8';
+  let bgMain = '#f8fafc';
+  let bgCard = '#ffffff';
+  let textMain = '#0f172a';
+  let textMuted = '#64748b';
+  let border = '#e2e8f0';
+
+  if (domain === 'barber') {
+    primary = '#d4af37'; // Antique gold
+    primaryHover = '#c29b28';
+    bgMain = '#0e0f12'; // Deep luxury slate
+    bgCard = '#16181f';
+    textMain = '#f3f4f6';
+    textMuted = '#9ca3af';
+    border = '#262833';
+  } else if (domain === 'gym') {
+    primary = '#06b6d4'; // Electric cyan
+    primaryHover = '#0891b2';
+    bgMain = '#090d16';
+    bgCard = '#111827';
+    textMain = '#f9fafb';
+    textMuted = '#94a3b8';
+    border = '#1f2937';
+  } else if (domain === 'portfolio') {
+    primary = '#6366f1'; // Indigo
+    primaryHover = '#4f46e5';
+    bgMain = '#0b0f19';
+    bgCard = '#131a2a';
+    textMain = '#f8fafc';
+    textMuted = '#94a3b8';
+    border = '#1e293b';
+  } else if (domain === 'restaurant') {
+    primary = '#ea580c'; // Warm orange
+    primaryHover = '#c2410c';
+    bgMain = '#faf8f5';
+    bgCard = '#ffffff';
+    textMain = '#1e293b';
+    textMuted = '#64748b';
+    border = '#e2e8f0';
+  }
+
+  const isDark = domain === 'barber' || domain === 'gym' || domain === 'portfolio';
+
   return `:root {
-  --primary: #ea580c;
-  --primary-hover: #c2410c;
-  --bg-main: #faf8f5;
-  --text-main: #1e293b;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
+  --primary: ${primary};
+  --primary-hover: ${primaryHover};
+  --gold: #d4af37;
+  --bg-main: ${bgMain};
+  --bg-card: ${bgCard};
+  --text-main: ${textMain};
+  --text-muted: ${textMuted};
+  --border: ${border};
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-main); color: var(--text-main); }
-.navbar { background: #fff; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-main); color: var(--text-main); line-height: 1.5; }
+.navbar { background: var(--bg-card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
 .nav-container { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; }
 .brand-logo { font-size: 1.25rem; font-weight: 800; color: var(--text-main); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; }
 .brand-logo span span { color: var(--primary); }
-.nav-links a { margin: 0 1rem; text-decoration: none; color: var(--text-muted); font-weight: 600; font-size: 0.9rem; }
-.nav-links a.active { color: var(--primary); }
-.cart-btn { background: var(--primary); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+.nav-links a { margin: 0 1rem; text-decoration: none; color: var(--text-muted); font-weight: 600; font-size: 0.9rem; transition: color 0.2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--primary); }
+.action-btn { background: var(--primary); color: ${isDark ? '#000' : '#fff'}; border: none; padding: 0.55rem 1.15rem; border-radius: 9999px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; transition: transform 0.15s, opacity 0.2s; }
+.action-btn:hover { opacity: 0.92; transform: translateY(-1px); }
 .cart-badge { background: #fff; color: var(--primary); border-radius: 9999px; padding: 0.1rem 0.5rem; font-size: 0.75rem; }
-.hero-section { padding: 4rem 1.5rem; text-align: center; max-width: 800px; margin: 0 auto; }
-.hero-pill { display: inline-block; background: #fff7ed; color: var(--primary); padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; margin-bottom: 1rem; }
-.hero-title { font-size: 2.5rem; font-weight: 800; line-height: 1.2; margin-bottom: 1rem; }
+.hero-section { padding: 4.5rem 1.5rem 3.5rem; text-align: center; max-width: 840px; margin: 0 auto; }
+.hero-pill { display: inline-block; background: ${isDark ? 'rgba(212, 175, 55, 0.1)' : '#fff7ed'}; color: var(--primary); padding: 0.4rem 1rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; margin-bottom: 1.25rem; border: 1px solid var(--primary); }
+.hero-title { font-size: 2.75rem; font-weight: 800; line-height: 1.2; margin-bottom: 1.25rem; letter-spacing: -0.02em; }
 .hero-title span { color: var(--primary); }
-.hero-subtitle { color: var(--text-muted); font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem; }
-.hero-cta-group a { display: inline-block; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-weight: 700; margin: 0 0.5rem; }
-.btn-primary { background: var(--primary); color: #fff; }
-.btn-outline { border: 1px solid var(--border); color: var(--text-main); background: #fff; }
-.menu-section { max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem; }
-.section-header { text-align: center; margin-bottom: 2rem; }
-.section-tag { color: var(--primary); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; }
-.section-title { font-size: 2rem; font-weight: 800; }
-.food-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
-.food-item-card { background: #fff; border-radius: 0.75rem; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
-.food-item-thumb { width: 100%; height: 180px; object-fit: cover; }
-.food-item-body { padding: 1.25rem; flex: 1; display: flex; flex-direction: column; }
-.food-item-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
-.food-item-desc { color: var(--text-muted); font-size: 0.85rem; flex: 1; margin-bottom: 1rem; line-height: 1.5; }
-.food-item-foot { display: flex; align-items: center; justify-content: space-between; }
-.food-item-price { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
-.add-btn { background: #fff7ed; color: var(--primary); border: 1px solid #fed7aa; padding: 0.4rem 0.85rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }
-.add-btn:hover { background: var(--primary); color: #fff; }
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }
+.hero-subtitle { color: var(--text-muted); font-size: 1.15rem; line-height: 1.6; margin-bottom: 2rem; }
+.hero-cta-group a { display: inline-block; padding: 0.85rem 1.75rem; border-radius: 0.5rem; text-decoration: none; font-weight: 700; margin: 0 0.5rem; transition: all 0.2s; }
+.btn-primary { background: var(--primary); color: ${isDark ? '#000' : '#fff'}; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-outline { border: 1px solid var(--border); color: var(--text-main); background: transparent; }
+.btn-outline:hover { background: var(--bg-card); border-color: var(--primary); }
+.hero-stats { display: flex; justify-content: center; gap: 2.5rem; margin-top: 3rem; }
+.stat-item { display: flex; flex-direction: column; align-items: center; }
+.stat-number { font-size: 1.75rem; font-weight: 800; color: var(--primary); }
+.stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.services-section, .barbers-section { max-width: 1200px; margin: 0 auto; padding: 3.5rem 1.5rem; }
+.section-header { text-align: center; margin-bottom: 2.5rem; }
+.section-tag { color: var(--primary); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.section-title { font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem; }
+.section-desc { color: var(--text-muted); font-size: 1rem; margin-top: 0.5rem; }
+.items-grid, .barbers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.75rem; }
+.item-card, .barber-card { background: var(--bg-card); border-radius: 0.75rem; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s; }
+.item-card:hover, .barber-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+.item-thumb, .barber-thumb { width: 100%; height: 190px; object-fit: cover; }
+.item-body, .barber-card p { padding: 1.25rem; flex: 1; display: flex; flex-direction: column; }
+.item-title, .barber-card h4 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
+.item-desc { color: var(--text-muted); font-size: 0.88rem; flex: 1; margin-bottom: 1.25rem; line-height: 1.5; }
+.item-foot { display: flex; align-items: center; justify-content: space-between; }
+.item-price { font-size: 1.2rem; font-weight: 800; color: var(--primary); }
+.action-btn-sm { background: var(--primary); color: ${isDark ? '#000' : '#fff'}; border: none; padding: 0.45rem 1rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s; }
+.action-btn-sm:hover { opacity: 0.9; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
 .modal-backdrop.open { display: flex; }
-.modal-card { background: #fff; border-radius: 1rem; width: 100%; max-width: 480px; padding: 1.5rem; }
-.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
-.btn-block { width: 100%; padding: 0.75rem; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 700; margin-top: 1rem; }
+.modal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 1rem; width: 100%; max-width: 500px; padding: 2rem; color: var(--text-main); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
+.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.35rem; color: var(--text-muted); }
+.form-control { width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-main); border: 1px solid var(--border); border-radius: 0.5rem; color: var(--text-main); font-size: 0.9rem; outline: none; }
+.form-control:focus { border-color: var(--primary); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.btn-block { width: 100%; padding: 0.85rem; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 700; margin-top: 1rem; }
+.footer { border-top: 1px solid var(--border); padding: 2.5rem 0; text-align: center; font-size: 0.85rem; color: var(--text-muted); }
 .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200; }
-.toast { background: #1e293b; color: #fff; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 600; margin-top: 0.5rem; }
+.toast { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--primary); padding: 0.85rem 1.35rem; border-radius: 0.5rem; font-size: 0.9rem; font-weight: 600; margin-top: 0.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
 `;
 }
 
-export function generateFoodShopJs(): string {
-  return `const MENU = [
+export function generateDynamicWebJs(domain: WebDomain, _goal = ''): string {
+  if (domain === 'barber') {
+    return `const SERVICES = [
+  { id: 'srv-1', name: 'Signature Razor Fade & Haircut', price: 35.00, desc: 'Precision skin fade, scissor work, wash & style with premium matte clay.', img: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=500&auto=format&fit=crop&q=80' },
+  { id: 'srv-2', name: 'Classic Hot Towel Straight Shave', price: 28.00, desc: 'Warm botanical pre-shave lather, straight razor glide, and cold eucalyptus towel finish.', img: 'https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=500&auto=format&fit=crop&q=80' },
+  { id: 'srv-3', name: 'Beard Sculpting & Razor Line-Up', price: 22.00, desc: 'Facial hair contouring, razor sharp cheek lines, and organic sandalwood beard oil.', img: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=500&auto=format&fit=crop&q=80' },
+  { id: 'srv-4', name: 'The Royal Treatment Package', price: 55.00, desc: 'Full signature haircut, hot towel straight shave, energizing scalp massage, and styling.', img: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=500&auto=format&fit=crop&q=80' }
+];
+
+function renderServices() {
+  const grid = document.getElementById('items-grid');
+  if (!grid) return;
+  grid.innerHTML = SERVICES.map(function(item) {
+    return '<div class="item-card">' +
+      '<img src="' + item.img + '" alt="' + item.name + '" class="item-thumb">' +
+      '<div class="item-body">' +
+      '<h4 class="item-title">' + item.name + '</h4>' +
+      '<p class="item-desc">' + item.desc + '</p>' +
+      '<div class="item-foot">' +
+      '<span class="item-price">$' + item.price.toFixed(2) + '</span>' +
+      '<button class="action-btn-sm" onclick="selectAndBook(\\'' + item.name + '\\')">Book Service</button>' +
+      '</div></div></div>';
+  }).join('');
+}
+
+function selectAndBook(serviceName) {
+  const sel = document.getElementById('service-select');
+  if (sel) sel.value = serviceName;
+  openModal();
+}
+
+function openModal() {
+  const modal = document.getElementById('action-modal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeModal() {
+  const modal = document.getElementById('action-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function showToast(msg) {
+  const cont = document.getElementById('toast-container');
+  if (!cont) return;
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  cont.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3500);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  renderServices();
+  const toggleBtn = document.getElementById('action-toggle-btn');
+  const closeBtn = document.getElementById('close-modal-btn');
+  const form = document.getElementById('booking-form');
+
+  if (toggleBtn) toggleBtn.onclick = openModal;
+  if (closeBtn) closeBtn.onclick = closeModal;
+
+  if (form) {
+    // Interactive appointment booking handler
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      const clientName = document.getElementById('client-name').value;
+      const srv = document.getElementById('service-select').value;
+      closeModal();
+      showToast('Appointment confirmed for ' + clientName + ' (' + srv + ')! See you at Apex Barber. ✂️');
+    };
+  }
+});
+`;
+  }
+
+  // 2. GYM
+  if (domain === 'gym') {
+    return `const PROGRAMS = [
+  { id: 'fit-1', name: 'High-Intensity CrossFit', price: 49.00, desc: 'Functional strength, metabolic conditioning, barbell cycling, and gymnastics.', img: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&auto=format&fit=crop&q=80' },
+  { id: 'fit-2', name: 'Olympic Weightlifting', price: 65.00, desc: 'Snatch, clean & jerk technique under certified national weightlifting coaches.', img: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&auto=format&fit=crop&q=80' },
+  { id: 'fit-3', name: '1-on-1 Personal Training', price: 120.00, desc: 'Tailored macro plans, bi-weekly body composition scans, and bespoke progression.', img: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=500&auto=format&fit=crop&q=80' },
+  { id: 'fit-4', name: 'Athletic Recovery & Sauna', price: 35.00, desc: 'Infrared cedar sauna, cold plunge tubs, and guided mobility recovery.', img: 'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=500&auto=format&fit=crop&q=80' }
+];
+
+function renderPrograms() {
+  const grid = document.getElementById('items-grid');
+  if (!grid) return;
+  grid.innerHTML = PROGRAMS.map(function(p) {
+    return '<div class="item-card">' +
+      '<img src="' + p.img + '" alt="' + p.name + '" class="item-thumb">' +
+      '<div class="item-body">' +
+      '<h4 class="item-title">' + p.name + '</h4>' +
+      '<p class="item-desc">' + p.desc + '</p>' +
+      '<div class="item-foot">' +
+      '<span class="item-price">$' + p.price.toFixed(2) + '/mo</span>' +
+      '<button class="action-btn-sm" onclick="openModal()">Enroll Now</button>' +
+      '</div></div></div>';
+  }).join('');
+}
+
+function openModal() {
+  const m = document.getElementById('action-modal');
+  if (m) m.classList.add('open');
+}
+
+function closeModal() {
+  const m = document.getElementById('action-modal');
+  if (m) m.classList.remove('open');
+}
+
+function showToast(msg) {
+  const cont = document.getElementById('toast-container');
+  if (!cont) return;
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  cont.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3500);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  renderPrograms();
+  const toggleBtn = document.getElementById('action-toggle-btn');
+  const closeBtn = document.getElementById('close-modal-btn');
+  const form = document.getElementById('booking-form');
+  if (toggleBtn) toggleBtn.onclick = openModal;
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (form) {
+    // Interactive appointment booking handler
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      closeModal();
+      showToast('Titan Free Pass activated! Check your email for gym entry barcode. ⚡');
+    };
+  }
+});
+`;
+  }
+
+  // 3. PORTFOLIO
+  if (domain === 'portfolio') {
+    return `const PROJECTS = [
+  { id: 'proj-1', name: 'Cortex Agentic Workspace', price: 0, desc: 'Multi-model agent orchestrator with sandboxed file diffing, Observe-Act-Verify loop, and live preview.', img: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=500&auto=format&fit=crop&q=80' },
+  { id: 'proj-2', name: 'Neural Vector Gateway', price: 0, desc: 'High-throughput semantic similarity engine processing 10,000 queries per second with Sub-10ms latency.', img: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=80' },
+  { id: 'proj-3', name: 'Real-Time Telemetry Pipeline', price: 0, desc: 'Distributed event ingestion built with Go and Kafka delivering live dashboards for 1M concurrent users.', img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&auto=format&fit=crop&q=80' },
+  { id: 'proj-4', name: 'Autonomous Test Harness', price: 0, desc: 'Self-healing end-to-end integration test framework with automated regression bisecting.', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80' }
+];
+
+function renderProjects() {
+  const grid = document.getElementById('items-grid');
+  if (!grid) return;
+  grid.innerHTML = PROJECTS.map(function(p) {
+    return '<div class="item-card">' +
+      '<img src="' + p.img + '" alt="' + p.name + '" class="item-thumb">' +
+      '<div class="item-body">' +
+      '<h4 class="item-title">' + p.name + '</h4>' +
+      '<p class="item-desc">' + p.desc + '</p>' +
+      '<div class="item-foot">' +
+      '<button class="action-btn-sm" onclick="openModal()">Case Study</button>' +
+      '</div></div></div>';
+  }).join('');
+}
+
+function openModal() {
+  const m = document.getElementById('action-modal');
+  if (m) m.classList.add('open');
+}
+
+function closeModal() {
+  const m = document.getElementById('action-modal');
+  if (m) m.classList.remove('open');
+}
+
+function showToast(msg) {
+  const cont = document.getElementById('toast-container');
+  if (!cont) return;
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  cont.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3500);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  renderProjects();
+  const toggleBtn = document.getElementById('action-toggle-btn');
+  const closeBtn = document.getElementById('close-modal-btn');
+  const form = document.getElementById('booking-form');
+  if (toggleBtn) toggleBtn.onclick = openModal;
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (form) {
+    // Interactive appointment booking handler
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      closeModal();
+      showToast('Thank you for reaching out! Alex will respond within 24 hours. ✉️');
+    };
+  }
+});
+`;
+  }
+
+  // 4. RESTAURANT
+  if (domain === 'restaurant') {
+    return `const MENU = [
   { id: 'item-1', name: 'Gourmet Truffle Burger', price: 14.99, desc: 'Aged cheddar, caramelized shallots, black truffle aioli', img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=80' },
   { id: 'item-2', name: 'Woodfired Margherita Pizza', price: 16.50, desc: 'San Marzano tomatoes, buffalo mozzarella, fresh basil', img: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=500&auto=format&fit=crop&q=80' },
   { id: 'item-3', name: 'Wild Salmon Bowl', price: 15.25, desc: 'Alaskan salmon, quinoa, avocado, citrus ponzu', img: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80' },
@@ -1241,18 +1995,18 @@ export function generateFoodShopJs(): string {
 let cart = [];
 
 function renderMenu() {
-  const grid = document.getElementById('food-grid');
+  const grid = document.getElementById('items-grid');
   if (!grid) return;
   grid.innerHTML = MENU.map(function (item) {
     return (
-      '<div class="food-item-card">' +
-      '<img src="' + item.img + '" alt="' + item.name + '" class="food-item-thumb">' +
-      '<div class="food-item-body">' +
-      '<h4 class="food-item-title">' + item.name + '</h4>' +
-      '<p class="food-item-desc">' + item.desc + '</p>' +
-      '<div class="food-item-foot">' +
-      '<span class="food-item-price">$' + item.price.toFixed(2) + '</span>' +
-      '<button class="add-btn" onclick="addToCart(\\'' + item.id + '\\')">+ Add</button>' +
+      '<div class="item-card">' +
+      '<img src="' + item.img + '" alt="' + item.name + '" class="item-thumb">' +
+      '<div class="item-body">' +
+      '<h4 class="item-title">' + item.name + '</h4>' +
+      '<p class="item-desc">' + item.desc + '</p>' +
+      '<div class="item-foot">' +
+      '<span class="item-price">$' + item.price.toFixed(2) + '</span>' +
+      '<button class="action-btn-sm" onclick="addToCart(\\'' + item.id + '\\')">+ Add</button>' +
       '</div></div></div>'
     );
   }).join('');
@@ -1293,13 +2047,88 @@ function showToast(msg) {
 
 document.addEventListener('DOMContentLoaded', function () {
   renderMenu();
-  const toggle = document.getElementById('cart-toggle-btn');
-  const modal = document.getElementById('cart-modal');
-  const close = document.getElementById('close-cart-btn');
+  const toggle = document.getElementById('action-toggle-btn');
+  const modal = document.getElementById('action-modal');
+  const close = document.getElementById('close-modal-btn');
   if (toggle && modal) toggle.onclick = function () { modal.classList.add('open'); };
   if (close && modal) close.onclick = function () { modal.classList.remove('open'); };
 });
 `;
+  }
+
+  // 5. GENERIC
+  return `const FEATURES = [
+  { id: 'f-1', name: 'Smart Workflow Automation', desc: 'Accelerate productivity with intelligent autonomous routines.', img: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=500&auto=format&fit=crop&q=80' },
+  { id: 'f-2', name: 'Real-Time Insights & Metrics', desc: 'Monitor throughput, engagement, and KPIs with sub-second accuracy.', img: 'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=500&auto=format&fit=crop&q=80' },
+  { id: 'f-3', name: 'Enterprise Security & Isolation', desc: 'End-to-end encrypted tunnels with zero credentials leakage.', img: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=500&auto=format&fit=crop&q=80' },
+  { id: 'f-4', name: 'Cloud Integration & Sync', desc: 'Deploy across web, desktop, and mobile with seamless state synchronization.', img: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500&auto=format&fit=crop&q=80' }
+];
+
+function renderFeatures() {
+  const grid = document.getElementById('items-grid');
+  if (!grid) return;
+  grid.innerHTML = FEATURES.map(function(f) {
+    return '<div class="item-card">' +
+      '<img src="' + f.img + '" alt="' + f.name + '" class="item-thumb">' +
+      '<div class="item-body">' +
+      '<h4 class="item-title">' + f.name + '</h4>' +
+      '<p class="item-desc">' + f.desc + '</p>' +
+      '<div class="item-foot">' +
+      '<button class="action-btn-sm" onclick="openModal()">Learn More</button>' +
+      '</div></div></div>';
+  }).join('');
+}
+
+function openModal() {
+  const m = document.getElementById('action-modal');
+  if (m) m.classList.add('open');
+}
+
+function closeModal() {
+  const m = document.getElementById('action-modal');
+  if (m) m.classList.remove('open');
+}
+
+function showToast(msg) {
+  const cont = document.getElementById('toast-container');
+  if (!cont) return;
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  cont.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3500);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  renderFeatures();
+  const toggleBtn = document.getElementById('action-toggle-btn');
+  const closeBtn = document.getElementById('close-modal-btn');
+  const form = document.getElementById('booking-form');
+  if (toggleBtn) toggleBtn.onclick = openModal;
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (form) {
+    // Interactive appointment booking handler
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      closeModal();
+      showToast('Thank you! Your inquiry has been received. 🚀');
+    };
+  }
+});
+`;
+}
+
+// Backward compatibility aliases
+export function generateFoodShopHtml(goal = 'Food Shop Landing Page'): string {
+  return generateDynamicWebHtml(goal);
+}
+
+export function generateFoodShopCss(): string {
+  return generateDynamicWebCss('restaurant');
+}
+
+export function generateFoodShopJs(): string {
+  return generateDynamicWebJs('restaurant');
 }
 
 // ============================================================================
@@ -1761,6 +2590,8 @@ export function generateLanguageSteps(
 
   // 7. WEB FRONTEND (HTML / CSS / JS)
   if (tech === 'html_css_js') {
+    const domain = detectWebDomain(goal);
+    const domainLabel = getDomainLabel(domain);
     return [
       {
         id: `step_${Date.now()}_1`,
@@ -1777,14 +2608,14 @@ export function generateLanguageSteps(
       {
         id: `step_${Date.now()}_2`,
         title: 'Implement Semantic HTML Structure (index.html)',
-        description: 'Build modern semantic markup with accessible navigation, hero section, interactive menu grid, filter tabs, shopping cart modal, and footer.',
+        description: `Build modern semantic markup for ${domainLabel} with accessible navigation, hero section, interactive services grid, booking/action modal, and footer.`,
         status: 'pending',
         operation: 'create',
         targetPath: 'index.html',
         tool: 'workspace_create_file',
         toolInput: {
           filePath: 'index.html',
-          content: generateFoodShopHtml(goal),
+          content: generateDynamicWebHtml(goal),
         },
         requiresApproval: false,
         isApproved: false,
@@ -1793,14 +2624,14 @@ export function generateLanguageSteps(
       {
         id: `step_${Date.now()}_3`,
         title: 'Implement Responsive CSS Styles (styles.css)',
-        description: 'Apply responsive CSS styling with custom properties, vibrant food gradients, glassmorphic cards, badge animations, and mobile layout support.',
+        description: `Apply responsive CSS styling with custom properties, ${domainLabel} color palette, glassmorphic cards, badge animations, and mobile layout support.`,
         status: 'pending',
         operation: 'create',
         targetPath: 'styles.css',
         tool: 'workspace_create_file',
         toolInput: {
           filePath: 'styles.css',
-          content: generateFoodShopCss(),
+          content: generateDynamicWebCss(domain, goal),
         },
         requiresApproval: false,
         isApproved: false,
@@ -1809,14 +2640,14 @@ export function generateLanguageSteps(
       {
         id: `step_${Date.now()}_4`,
         title: 'Implement Interactive JavaScript Features (script.js)',
-        description: 'Implement interactive menu filtering, dynamic cart counter, add-to-cart toasts, order checkout modal, and smooth scrolling interactions.',
+        description: `Implement interactive ${domainLabel} feature cards, dynamic booking/action modal, toasts, and smooth scrolling interactions.`,
         status: 'pending',
         operation: 'create',
         targetPath: 'script.js',
         tool: 'workspace_create_file',
         toolInput: {
           filePath: 'script.js',
-          content: generateFoodShopJs(),
+          content: generateDynamicWebJs(domain, goal),
         },
         requiresApproval: false,
         isApproved: false,
