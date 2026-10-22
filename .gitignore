@@ -8,5 +8,7 @@ coverage/
 !.env.example
 uploads/
 workspaces/
+release/
+electron/embedded-server.cjs
 Our Chat/
 .dart_tool/

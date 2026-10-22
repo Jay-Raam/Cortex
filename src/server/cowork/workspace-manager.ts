@@ -40,7 +40,7 @@ export class WorkspaceManager {
         return resolved;
       }
     }
-    const defaultRoot = path.resolve(process.cwd(), 'workspaces', workspace.id);
+    const defaultRoot = path.resolve(process.env.CORTEX_WORKSPACES_DIR || path.resolve(process.cwd(), 'workspaces'), workspace.id);
     if (!fs.existsSync(defaultRoot)) {
       fs.mkdirSync(defaultRoot, { recursive: true });
     }

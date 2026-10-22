@@ -31,7 +31,7 @@ interface DatabaseSchema {
   preferences: NotificationPreferences[];
 }
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.CORTEX_DATA_DIR || path.resolve(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'cortex_db.json');
 
 const INITIAL_SKILLS: Skill[] = [

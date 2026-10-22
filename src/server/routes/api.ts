@@ -18,7 +18,7 @@ export const apiRouter = express.Router();
 const COOKIE_NAME = 'cortex_access_token';
 const IS_PROD = process.env.NODE_ENV === 'production';
 
-const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
+const UPLOADS_DIR = process.env.CORTEX_UPLOADS_DIR || path.resolve(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
