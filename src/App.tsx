@@ -17,6 +17,7 @@ import { ShareModal } from './components/ShareModal';
 import { AuthPage } from './components/AuthPage';
 import { ProfileModal } from './components/ProfileModal';
 import { UsageModal } from './components/UsageModal';
+import { CreateProjectModal } from './components/CreateProjectModal';
 import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser, renameConversationApi } from './lib/api';
 import {
   Conversation,
@@ -75,6 +76,7 @@ export default function App() {
   const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const stopStreamRef = useRef<(() => void) | null>(null);
@@ -337,6 +339,82 @@ export default function App() {
       }
     } catch (err) {
       console.error('Failed to delete conversation', err);
+    }
+  };
+
+  const handleCreateBlankProject = async (name: string, description: string) => {
+    try {
+      const data = await fetchGraphQL(`
+        mutation CreateWorkspace($name: String!, $description: String!) {
+          createWorkspace(name: $name, description: $description) {
+            id
+            name
+            description
+            createdAt
+            updatedAt
+          }
+        }
+      `, { name, description: description || '' });
+      if (data?.createWorkspace) {
+        setWorkspaces((prev) => [data.createWorkspace, ...prev]);
+        setActiveWorkspace(data.createWorkspace);
+        setCurrentView('cowork');
+      }
+    } catch (err) {
+      console.error('Failed to create workspace', err);
+    }
+  };
+
+  const handleImportLocalProject = async (
+    name: string,
+    folderName: string,
+    files: Array<{ path: string; content: string }>,
+    originalPath?: string
+  ) => {
+    try {
+      const res = await fetch('/api/cowork/workspaces/import-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name || folderName || 'Local Project',
+          folderName,
+          originalPath: originalPath || folderName,
+          files,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.workspace) {
+        setWorkspaces((prev) => [data.workspace, ...prev]);
+        setActiveWorkspace(data.workspace);
+        setCurrentView('cowork');
+      } else {
+        alert(data.error || 'Failed to import local folder');
+      }
+    } catch (err: any) {
+      alert(`Error importing folder: ${err.message}`);
+    }
+  };
+
+  const handleBindLocalProjectPath = async (folderPath: string, name?: string) => {
+    try {
+      const res = await fetch('/api/cowork/workspaces/bind-local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folderPath: folderPath.trim(),
+          name: name?.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.workspace) {
+        setWorkspaces((prev) => [data.workspace, ...prev]);
+        setActiveWorkspace(data.workspace);
+        setCurrentView('cowork');
+      } else {
+        alert(data.error || 'Failed to bind local folder');
+      }
+    } catch (err: any) {
+      alert(`Error binding folder: ${err.message}`);
     }
   };
 
@@ -621,7 +699,7 @@ export default function App() {
             setActiveWorkspace(ws);
             setCurrentView('cowork');
           }}
-          onNewWorkspace={() => setCurrentView('cowork')}
+          onNewWorkspace={() => setIsCreateProjectModalOpen(true)}
           onDeleteWorkspace={handleDeleteWorkspace}
           onSelectConversation={(id) => setActiveConversationId(id)}
           onNewConversation={handleNewConversation}
@@ -898,6 +976,15 @@ export default function App() {
         selectedMode={selectedMode}
         onSelectModel={(id) => setSelectedModelId(id)}
         onSelectMode={(mode) => setSelectedMode(mode)}
+      />
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={isCreateProjectModalOpen}
+        onClose={() => setIsCreateProjectModalOpen(false)}
+        onCreateBlank={handleCreateBlankProject}
+        onImportLocalFolder={handleImportLocalProject}
+        onBindLocalPath={handleBindLocalProjectPath}
       />
 
       <NotificationModal
