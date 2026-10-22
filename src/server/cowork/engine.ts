@@ -3,8 +3,63 @@ import path from 'node:path';
 import { db } from '../db/database';
 import { AgentTask, AgentTaskStep, WorkspaceArtifact, ApprovalRequest, PermissionMode } from '../types';
 import { generateGeminiContent } from '../providers/gemini';
+import { streamOpenAICompatibleResponse } from '../providers/openai-compatible';
 import { workspaceManager } from './workspace-manager';
 import { executionRunner } from './execution-runner';
+import {
+  TargetTechnology,
+  TechnologyDetection,
+  detectTargetTechnology,
+  generateLanguageSteps,
+  isWebDevelopmentGoal as isWebDevelopmentGoalShared,
+  generateFoodShopHtml as generateFoodShopHtmlShared,
+  generateFoodShopCss as generateFoodShopCssShared,
+  generateFoodShopJs as generateFoodShopJsShared,
+} from './language-generators';
+
+/**
+ * Unified AI completion helper with multi-provider resilience.
+ * Tries Google Gemini first if configured with a valid key,
+ * then falls back to OpenRouter (deepseek-chat or llama-3.3) if available.
+ */
+async function generateAICompletion(prompt: string, systemInstruction?: string): Promise<string> {
+  // 1. Try Gemini (if valid Google API key starting with AIzaSy)
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey && geminiKey.startsWith('AIzaSy')) {
+    try {
+      const res = await generateGeminiContent('gemini-3.8-flash', prompt, systemInstruction);
+      if (res && res.trim().length > 0) return res;
+    } catch (err) {
+      console.warn('Gemini AI completion failed:', err);
+    }
+  }
+
+  // 2. Try OpenRouter (if valid key starting with sk-or-)
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (openRouterKey && openRouterKey.startsWith('sk-or-')) {
+    const candidateModels = [
+      'deepseek/deepseek-chat',
+      'meta-llama/llama-3.3-70b-instruct',
+      'google/gemini-2.0-flash-001',
+    ];
+    for (const modelId of candidateModels) {
+      try {
+        const res = await streamOpenAICompatibleResponse(
+          { baseUrl: 'https://openrouter.ai/api/v1', apiKey: openRouterKey },
+          modelId,
+          [{ role: 'user', content: prompt }],
+          systemInstruction,
+          { onDelta: () => {} }
+        );
+        if (res && res.trim().length > 0) return res;
+      } catch (err: any) {
+        console.warn(`OpenRouter model ${modelId} failed:`, err?.message || err);
+      }
+    }
+  }
+
+  throw new Error('No functional AI provider configured');
+}
 
 // Helper generator functions for full-stack web applications
 function isWebDevelopmentGoal(goal: string): boolean {
@@ -2165,12 +2220,17 @@ export class CoworkEngine {
       }
     }
 
-    const prompt = `You are an AI Principal Software Engineer. Formulate a 3 to 4 step execution plan for the following development task.
+    const detectedTech = detectTargetTechnology(task.goal, task.constraints, task.desiredOutput);
+
+    const prompt = `You are an AI Principal Software Engineer. Formulate a 3 to 5 step execution plan for the following development task.
+Requested Technology / Language: ${detectedTech.displayName} (${detectedTech.primaryExtension})
 Project Framework: ${structure.framework}
 Has Tests: ${structure.hasTests}
 Goal: ${task.goal}
 Constraints: ${task.constraints || 'None'}
-Desired Output: ${task.desiredOutput || 'Production implementation'}
+Desired Output: ${task.desiredOutput || 'Production implementation in ' + detectedTech.displayName}
+
+CRITICAL: All code files MUST be written in ${detectedTech.displayName} (e.g. ${detectedTech.plannedFiles.join(', ')}). Do NOT use HTML/CSS/JavaScript unless specifically requested.
 
 Return ONLY a JSON array of step objects with fields:
 - "title": string (concise step title)
@@ -2178,15 +2238,19 @@ Return ONLY a JSON array of step objects with fields:
 - "operation": string ("create" | "edit" | "delete" | "read" | "command")
 - "targetPath": string (target file or command)
 - "tool": string (one of: workspace_list_files, workspace_read_file, workspace_create_file, workspace_apply_patch, workspace_create_artifact, terminal_execute_command, code_diff_analyzer)
-- "toolInput": object (optional initial arguments)
+- "toolInput": object (must include "filePath" and full, functional, production-ready "content" in ${detectedTech.displayName} for file creation)
 - "requiresApproval": boolean (true for terminal commands, file deletions, or destructive actions; false for read-only or non-destructive edits)
 No markdown fences or extra text.`;
 
     let steps: AgentTaskStep[] = [];
 
     try {
-      if (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith('ci-test')) {
-        const raw = await generateGeminiContent('gemini-3.8-flash', prompt);
+      if (
+        process.env.NODE_ENV !== 'test' &&
+        !process.env.CI &&
+        !process.env.GEMINI_API_KEY?.startsWith('ci-test')
+      ) {
+        const raw = await generateAICompletion(prompt);
         const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleaned);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -2212,140 +2276,13 @@ No markdown fences or extra text.`;
       console.warn('AI planning fallback triggered:', err);
     }
 
-    // Default structured plan
+    // Default structured plan tailored to requested language/technology
     if (steps.length === 0) {
-      if (isWebDevelopmentGoal(task.goal)) {
-        if (!mentionedFiles.includes('index.html')) mentionedFiles.push('index.html');
-        if (!mentionedFiles.includes('styles.css')) mentionedFiles.push('styles.css');
-        if (!mentionedFiles.includes('script.js')) mentionedFiles.push('script.js');
-
-        steps = [
-          {
-            id: `step_${Date.now()}_1`,
-            title: 'Inspect Repository Context',
-            description: 'Enumerate workspace files, analyze entry points, and discover existing project dependencies.',
-            status: 'running',
-            operation: 'read',
-            tool: 'workspace_list_files',
-            toolInput: {},
-            requiresApproval: false,
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: `step_${Date.now()}_2`,
-            title: 'Implement Semantic HTML Structure (index.html)',
-            description: 'Build modern semantic markup with accessible navigation, hero section, interactive menu grid, filter tabs, shopping cart modal, and footer.',
-            status: 'pending',
-            operation: 'create',
-            targetPath: 'index.html',
-            tool: 'workspace_create_file',
-            toolInput: {
-              filePath: 'index.html',
-              content: generateFoodShopHtml(task.goal),
-            },
-            requiresApproval: false,
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: `step_${Date.now()}_3`,
-            title: 'Implement Responsive CSS Styles (styles.css)',
-            description: 'Apply responsive CSS styling with custom properties, vibrant food gradients, glassmorphic cards, badge animations, and mobile layout support.',
-            status: 'pending',
-            operation: 'create',
-            targetPath: 'styles.css',
-            tool: 'workspace_create_file',
-            toolInput: {
-              filePath: 'styles.css',
-              content: generateFoodShopCss(),
-            },
-            requiresApproval: false,
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: `step_${Date.now()}_4`,
-            title: 'Implement Interactive JavaScript Features (script.js)',
-            description: 'Implement interactive menu filtering, dynamic cart counter, add-to-cart toasts, order checkout modal, and smooth scrolling interactions.',
-            status: 'pending',
-            operation: 'create',
-            targetPath: 'script.js',
-            tool: 'workspace_create_file',
-            toolInput: {
-              filePath: 'script.js',
-              content: generateFoodShopJs(),
-            },
-            requiresApproval: false,
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: `step_${Date.now()}_5`,
-            title: 'Verify Deliverables & Live Preview Readiness',
-            description: 'Inspect workspace files to ensure index.html, styles.css, and script.js exist, are linked, and render properly in live preview.',
-            status: 'pending',
-            operation: 'read',
-            targetPath: 'index.html',
-            tool: 'workspace_list_files',
-            toolInput: {},
-            requiresApproval: false,
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          },
-        ];
-      } else {
-        const targetSolutionFile = mentionedFiles[0] || 'solution.ts';
-        steps = [
-          {
-            id: `step_${Date.now()}_1`,
-            title: 'Inspect Repository Context',
-            description: 'Enumerate workspace files, analyze entry points, and discover existing project dependencies.',
-            status: 'running',
-            operation: 'read',
-            tool: 'workspace_list_files',
-            toolInput: {},
-            requiresApproval: false,
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: `step_${Date.now()}_2`,
-            title: 'Implement Solution & File Modifications',
-            description: `Implement coordinated changes for goal: "${task.goal}".`,
-            status: 'pending',
-            operation: 'create',
-            targetPath: targetSolutionFile,
-            tool: 'workspace_create_file',
-            toolInput: {
-              filePath: targetSolutionFile,
-              content: `// Solution for: ${task.goal}\nexport function execute() {\n  return { success: true, timestamp: new Date().toISOString() };\n}\n`,
-            },
-            requiresApproval: false,
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: `step_${Date.now()}_3`,
-            title: 'Run Quality Checks & Verification',
-            description: structure.hasTests
-              ? 'Execute package test suite and verify changes pass all assertions.'
-              : 'Review git change status and verify unified diff.',
-            status: 'pending',
-            operation: structure.hasTests ? 'command' : 'read',
-            targetPath: structure.hasTests ? 'npm test' : undefined,
-            tool: structure.hasTests ? 'terminal_execute_command' : 'workspace_get_git_status',
-            toolInput: structure.hasTests ? { command: 'npm test' } : {},
-            requiresApproval: structure.hasTests,
-            isApproved: false,
-            createdAt: new Date().toISOString(),
-          },
-        ];
-      }
+      steps = generateLanguageSteps(detectedTech, task.goal, task.constraints);
     }
 
     // Tag and extract planned files
-    const plannedFilesSet = new Set<string>(mentionedFiles);
+    const plannedFilesSet = new Set<string>([...mentionedFiles, ...detectedTech.plannedFiles]);
     for (const s of steps) {
       if (!s.operation) {
         const inf = this.inferOperationAndTarget(s.tool || '', s.toolInput || {});

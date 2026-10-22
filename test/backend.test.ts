@@ -1,9 +1,12 @@
+process.env.NODE_ENV = 'test';
+process.env.CI = 'true';
+
 import dotenv from 'dotenv';
 dotenv.config();
 
 // Ensure test environment mock credentials exist for deterministic CI pipeline runs
 process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'ci-test-mock-gemini-key';
-process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'ci-test-mock-openrouter-key';
+process.env.OPENROUTER_API_KEY = 'ci-test-mock-openrouter-key';
 
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
@@ -982,6 +985,226 @@ print(fibonacci(10))
       assert.ok(artifacts.some((a) => a.fileName === 'index.html'), 'index.html artifact must be stored');
       assert.ok(artifacts.some((a) => a.fileName === 'styles.css'), 'styles.css artifact must be stored');
       assert.ok(artifacts.some((a) => a.fileName === 'script.js'), 'script.js artifact must be stored');
+    });
+  });
+
+  describe('13. Language-Specific Code Generation & Multi-Language Cowork Execution', () => {
+    it('detects requested technology and plans full Python application (models.py, main.py, test_food_shop.py)', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_py_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Python Food Shop Project',
+        description: 'Python test workspace',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_py_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Create a food shop in python',
+        goal: 'create a food shop application in python with models and tests',
+        modelId: 'gemini-3.8-flash',
+        status: 'planning',
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+
+      assert.strictEqual(steps.length, 5, 'Python plan must have 5 structured steps');
+      assert.ok(task.plannedFiles?.includes('models.py'), 'Must plan models.py');
+      assert.ok(task.plannedFiles?.includes('main.py'), 'Must plan main.py');
+      assert.ok(task.plannedFiles?.includes('test_food_shop.py'), 'Must plan test_food_shop.py');
+      assert.ok(!task.plannedFiles?.includes('index.html'), 'Must NOT generate HTML when Python requested');
+      assert.ok(!task.plannedFiles?.includes('solution.ts'), 'Must NOT generate TypeScript when Python requested');
+
+      // Verify Python content contains real Python code
+      const mainStep = steps.find((s) => s.targetPath === 'main.py');
+      assert.ok(mainStep?.toolInput?.content.includes('class FoodShopService:'), 'main.py must contain FoodShopService class');
+      assert.ok(mainStep?.toolInput?.content.includes('def add_to_cart('), 'main.py must contain add_to_cart method');
+
+      const testStep = steps.find((s) => s.targetPath === 'test_food_shop.py');
+      assert.ok(testStep?.toolInput?.content.includes('import unittest'), 'test_food_shop.py must import unittest');
+    });
+
+    it('executes Python task autonomously to 100% completion with verified filesystem artifacts', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_py_auto_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Python Auto Project',
+        description: 'Auto loop test',
+        permissionMode: 'approve_plan',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_py_auto_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Build Food Shop in Python',
+        goal: 'create a food shop in python',
+        modelId: 'gemini-3.8-flash',
+        status: 'running',
+        isPlanApproved: true,
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+      db.updateTask(task.id, testUser1.id, { steps, isPlanApproved: true, status: 'running' });
+
+      const completed = await coworkEngine.runTaskLoop(task.id, testUser1.id);
+
+      assert.strictEqual(completed.status, 'completed', 'Python task must complete');
+      assert.strictEqual(completed.steps.every((s) => s.status === 'completed'), true, 'All Python steps must complete');
+
+      const artifacts = db.getArtifacts(ws.id, testUser1.id);
+      assert.ok(artifacts.some((a) => a.fileName === 'models.py'), 'models.py artifact must exist');
+      assert.ok(artifacts.some((a) => a.fileName === 'main.py'), 'main.py artifact must exist');
+      assert.ok(artifacts.some((a) => a.fileName === 'test_food_shop.py'), 'test_food_shop.py artifact must exist');
+    });
+
+    it('detects Go language and plans Go files (models.go, main.go, main_test.go)', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_go_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Go Food Shop',
+        description: 'Go workspace',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_go_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Create food shop in Go',
+        goal: 'build a food shop backend service in golang',
+        modelId: 'gemini-3.8-flash',
+        status: 'planning',
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+
+      assert.ok(task.plannedFiles?.includes('models.go'), 'Must plan models.go');
+      assert.ok(task.plannedFiles?.includes('main.go'), 'Must plan main.go');
+      assert.ok(task.plannedFiles?.includes('main_test.go'), 'Must plan main_test.go');
+      assert.ok(!task.plannedFiles?.includes('index.html'), 'Must not generate HTML');
+
+      const goStep = steps.find((s) => s.targetPath === 'main.go');
+      assert.ok(goStep?.toolInput?.content.includes('package main'), 'main.go must contain package main');
+    });
+
+    it('detects Rust language and plans Cargo.toml and src/main.rs', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_rs_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Rust Food Shop',
+        description: 'Rust workspace',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_rs_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Create food shop in rust',
+        goal: 'build a food shop cli in rust',
+        modelId: 'gemini-3.8-flash',
+        status: 'planning',
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+
+      assert.ok(task.plannedFiles?.includes('Cargo.toml'), 'Must plan Cargo.toml');
+      assert.ok(task.plannedFiles?.includes('src/main.rs'), 'Must plan src/main.rs');
+      assert.ok(!task.plannedFiles?.includes('index.html'), 'Must not generate HTML');
+    });
+
+    it('detects Java language and plans Product.java, FoodShop.java, Main.java', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_java_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Java Food Shop',
+        description: 'Java workspace',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_java_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Create food shop in java',
+        goal: 'create a food shop application in java with spring boot design',
+        modelId: 'gemini-3.8-flash',
+        status: 'planning',
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+
+      assert.ok(task.plannedFiles?.includes('Product.java'), 'Must plan Product.java');
+      assert.ok(task.plannedFiles?.includes('FoodShop.java'), 'Must plan FoodShop.java');
+      assert.ok(task.plannedFiles?.includes('Main.java'), 'Must plan Main.java');
+      assert.ok(!task.plannedFiles?.includes('index.html'), 'Must not generate HTML');
+    });
+
+    it('detects React and plans types.ts, App.tsx, styles.css', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_react_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'React Food Shop',
+        description: 'React workspace',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_react_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Create food shop in react',
+        goal: 'create a food shop app in react tsx',
+        modelId: 'gemini-3.8-flash',
+        status: 'planning',
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+
+      assert.ok(task.plannedFiles?.includes('types.ts'), 'Must plan types.ts');
+      assert.ok(task.plannedFiles?.includes('App.tsx'), 'Must plan App.tsx');
+      assert.ok(task.plannedFiles?.includes('styles.css'), 'Must plan styles.css');
+      assert.ok(!task.plannedFiles?.includes('index.html'), 'Must not generate HTML');
     });
   });
 });

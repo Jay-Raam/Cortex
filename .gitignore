@@ -8,4 +8,5 @@ coverage/
 !.env.example
 uploads/
 workspaces/
+Our Chat/
 .dart_tool/
