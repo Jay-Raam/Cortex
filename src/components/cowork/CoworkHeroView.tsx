@@ -27,9 +27,25 @@ export const CoworkHeroView: React.FC<CoworkHeroViewProps> = ({
   contextBudget,
   onChangeContextPreference,
   onUpdatePermissionMode,
+  selectedModelId,
+  setSelectedModelId,
+  onToggleTasks,
+  tasksCount = 0,
 }) => {
   return (
     <div className="flex-1 min-w-0 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 max-w-2xl mx-auto w-full my-auto animate-in fade-in duration-200">
+      {onToggleTasks && tasksCount > 0 && (
+        <div className="w-full flex justify-start mb-2 xl:hidden">
+          <button
+            type="button"
+            onClick={onToggleTasks}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-[#E5E0D8] bg-white text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+          >
+            <span>View Tasks ({tasksCount})</span>
+          </button>
+        </div>
+      )}
+
       {/* Terracotta Star Emblem & Serif Headline */}
       <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
         <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C] mb-4 shadow-xs">
@@ -129,6 +145,22 @@ export const CoworkHeroView: React.FC<CoworkHeroViewProps> = ({
               >
                 <Plus className="w-4 h-4" />
               </button>
+
+              {/* AI Model Selector Pill */}
+              <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-[#E5E0D8] px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs shrink-0">
+                <Sparkles className="w-3.5 h-3.5 text-[#EA580C] shrink-0" />
+                <select
+                  value={selectedModelId}
+                  onChange={(e) => setSelectedModelId(e.target.value)}
+                  className="bg-transparent font-semibold text-slate-700 text-xs focus:outline-none cursor-pointer"
+                  title="Select AI Model"
+                >
+                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Free)</option>
+                  <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (Free)</option>
+                  <option value="nvidia/llama-3.1-nemotron-70b-instruct:free">Nemotron 70B (Free)</option>
+                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                </select>
+              </div>
 
               {/* Mode Selector Pill in Prompt Composer */}
               <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-[#E5E0D8] px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs shrink-0">

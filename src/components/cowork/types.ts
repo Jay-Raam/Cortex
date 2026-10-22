@@ -31,6 +31,10 @@ export interface CoworkHeroViewProps {
   contextBudget: any;
   onChangeContextPreference: (pref: string) => void;
   onUpdatePermissionMode: (mode: string) => void;
+  selectedModelId: string;
+  setSelectedModelId: (modelId: string) => void;
+  onToggleTasks?: () => void;
+  tasksCount?: number;
 }
 
 export interface CoworkCanvasProps {
@@ -63,6 +67,16 @@ export interface CoworkCanvasProps {
   isExecutingCommand: boolean;
   terminalOutput: ExecutionCommandResult | null;
   onExecuteTerminal: (cmd?: string) => void;
+  onAdvanceTask: (taskId: string) => void;
+  onApprovePlan: (taskId: string) => void;
+  onRejectPlan: (taskId: string) => void;
+  selectedModelId: string;
+  setSelectedModelId: (modelId: string) => void;
+  inlinePrompt: string;
+  setInlinePrompt: (val: string) => void;
+  isInlineSubmitting: boolean;
+  onInlinePromptSubmit: (customPrompt?: string) => void;
+  onToggleTasks?: () => void;
 }
 
 export interface CoworkSidecarProps {
