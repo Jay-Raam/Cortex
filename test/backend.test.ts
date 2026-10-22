@@ -899,5 +899,90 @@ print(fibonacci(10))
       }
     });
   });
+
+  describe('12. Claude Cowork End-to-End Workflow: Web Generation & Autonomous Loop', () => {
+    it('plans multi-file web app (index.html, styles.css, script.js) for food shop prompts instead of solution.ts', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_web_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Food Shop Web Project',
+        description: 'Landing page test',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_food_shop_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Create landing page for food shop in html css and javascript',
+        goal: 'create a landing page for the food shop, in html and css, javascript',
+        modelId: 'gemini-3.8-flash',
+        status: 'planning',
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+
+      assert.strictEqual(steps.length, 5, 'Must generate 5 structured steps');
+      assert.ok(task.plannedFiles?.includes('index.html'), 'Planned files must include index.html');
+      assert.ok(task.plannedFiles?.includes('styles.css'), 'Planned files must include styles.css');
+      assert.ok(task.plannedFiles?.includes('script.js'), 'Planned files must include script.js');
+      assert.ok(!task.plannedFiles?.includes('solution.ts'), 'Must never fallback to solution.ts for web prompts');
+
+      // Verify HTML step has rich content
+      const htmlStep = steps.find((s) => s.targetPath === 'index.html');
+      assert.ok(htmlStep, 'index.html step must exist');
+      assert.ok(htmlStep?.toolInput?.content.includes('FreshBite'), 'HTML must include restaurant title');
+      assert.ok(htmlStep?.toolInput?.content.includes('cart-modal'), 'HTML must include cart modal markup');
+    });
+
+    it('executes all steps autonomously via runTaskLoop without hanging on step 2', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_auto_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Autonomous Food Shop Project',
+        description: 'Autonomous loop test',
+        permissionMode: 'approve_plan',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_auto_loop_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Build Food Shop Landing Page',
+        goal: 'create a landing page for the food shop, in html and css, javascript',
+        modelId: 'gemini-3.8-flash',
+        status: 'running',
+        isPlanApproved: true,
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+      db.updateTask(task.id, testUser1.id, { steps, isPlanApproved: true, status: 'running' });
+
+      // Run autonomous loop
+      const completedTask = await coworkEngine.runTaskLoop(task.id, testUser1.id);
+
+      assert.strictEqual(completedTask.status, 'completed', 'Task must complete autonomously');
+      assert.strictEqual(completedTask.steps.every((s) => s.status === 'completed'), true, 'All steps must be completed');
+
+      // Verify artifacts are stored in DB
+      const artifacts = db.getArtifacts(ws.id, testUser1.id);
+      assert.ok(artifacts.some((a) => a.fileName === 'index.html'), 'index.html artifact must be stored');
+      assert.ok(artifacts.some((a) => a.fileName === 'styles.css'), 'styles.css artifact must be stored');
+      assert.ok(artifacts.some((a) => a.fileName === 'script.js'), 'script.js artifact must be stored');
+    });
+  });
 });
 

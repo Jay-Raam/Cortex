@@ -447,7 +447,7 @@ export const schema = createSchema({
           step.status = 'running';
         }
         db.updateTask(task.id, context.user.id, { status: 'running', steps: task.steps });
-        return coworkEngine.advanceTask(task.id, context.user.id);
+        return coworkEngine.runTaskLoop(task.id, context.user.id);
       },
 
       cancelAgentTask: (_: any, args: { taskId: string }, context: { user: User }) => {

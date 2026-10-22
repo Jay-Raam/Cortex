@@ -947,6 +947,8 @@ export default function App() {
           {currentView === 'cowork' && (
             <CoworkWorkspace
               workspace={activeWorkspace}
+              workspaces={workspaces}
+              onNewWorkspace={() => setIsCreateProjectModalOpen(true)}
               onRefreshWorkspace={loadInitialData}
               onSelectWorkspace={(ws) => setActiveWorkspace(ws)}
               onDeleteWorkspace={handleDeleteWorkspace}

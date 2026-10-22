@@ -450,7 +450,7 @@ apiRouter.post('/cowork/tasks/:id/approve', async (req: Request, res: Response) 
   }
 
   try {
-    const advanced = await coworkEngine.advanceTask(id, user.id);
+    const advanced = await coworkEngine.runTaskLoop(id, user.id);
     res.json({ success: true, task: advanced });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -484,7 +484,7 @@ apiRouter.post('/cowork/tasks/:id/plan/approve', async (req: Request, res: Respo
   });
 
   try {
-    const advanced = await coworkEngine.advanceTask(id, user.id);
+    const advanced = await coworkEngine.runTaskLoop(id, user.id);
     res.json({ success: true, task: advanced, plannedFiles: extractedFiles });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

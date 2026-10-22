@@ -11,6 +11,12 @@ import {
   PanelLeftClose,
   PanelRight,
   PanelRightClose,
+  ArrowLeft,
+  Search,
+  ChevronDown,
+  Layers,
+  File,
+  Folder,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact, WorkspaceFileNode, ExecutionCommandResult } from '../server/types';
 import { fetchGraphQL, advanceTaskApi } from '../lib/api';
@@ -26,7 +32,12 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   onRefreshWorkspace,
   onSelectWorkspace,
   onDeleteWorkspace,
+  workspaces = [],
+  onNewWorkspace,
 }) => {
+  // Projects Hub state
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
+  const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
   // Tasks state
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -646,98 +657,327 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
     }
   };
 
+  if (!workspace) {
+    const list = workspaces && workspaces.length > 0 ? workspaces : availableWorkspaces;
+    const filteredWorkspaces = list.filter(
+      (w) =>
+        w.name.toLowerCase().includes(projectSearchQuery.toLowerCase()) ||
+        (w.projectRoot && w.projectRoot.toLowerCase().includes(projectSearchQuery.toLowerCase()))
+    );
+
+    return (
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto bg-[#FAF8F5] p-6 md:p-10 select-none">
+        <div className="max-w-4xl mx-auto w-full space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EBE7DF] pb-6">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-8 h-8 rounded-xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C]">
+                  <Briefcase className="w-4 h-4" />
+                </span>
+                <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-slate-900">Projects</h1>
+              </div>
+              <p className="text-xs text-slate-500">
+                Manage project workspaces, automate code workflows, and inspect live previews.
+              </p>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsBindingLocal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-[#E5E0D8] text-slate-700 rounded-xl text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-[#EA580C]" />
+                <span>Open Folder</span>
+              </button>
+              {onNewWorkspace && (
+                <button
+                  type="button"
+                  onClick={onNewWorkspace}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Project</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+            <input
+              type="text"
+              placeholder="Search projects by name or directory path..."
+              value={projectSearchQuery}
+              onChange={(e) => setProjectSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl bg-white border border-[#E5E0D8] focus:outline-none focus:border-[#EA580C] shadow-2xs"
+            />
+          </div>
+
+          {/* Projects Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {filteredWorkspaces.map((ws) => (
+              <div
+                key={ws.id}
+                onClick={() => onSelectWorkspace && onSelectWorkspace(ws)}
+                className="p-4 rounded-2xl bg-white border border-[#E5E0D8] hover:border-[#FED7AA] hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C] group-hover:scale-105 transition-transform">
+                      <Folder className="w-4 h-4" />
+                    </div>
+                    {onDeleteWorkspace && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete project "${ws.name}"?`)) {
+                            onDeleteWorkspace(ws.id);
+                          }
+                        }}
+                        className="text-slate-300 hover:text-rose-600 p-1 rounded transition-colors"
+                        title="Delete project"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#EA580C] transition-colors truncate mb-1">
+                    {ws.name}
+                  </h3>
+                  {ws.projectRoot && (
+                    <p className="text-[11px] text-slate-400 font-mono truncate mb-2" title={ws.projectRoot}>
+                      {ws.projectRoot}
+                    </p>
+                  )}
+                  {ws.description && (
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed mb-3">
+                      {ws.description}
+                    </p>
+                  )}
+                </div>
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>{new Date(ws.updatedAt).toLocaleDateString()}</span>
+                  <span className="font-semibold text-[#EA580C] group-hover:translate-x-0.5 transition-transform inline-flex items-center gap-0.5">
+                    Open Workspace →
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {filteredWorkspaces.length === 0 && (
+              <div className="col-span-full py-16 text-center text-slate-400 space-y-3">
+                <Briefcase className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs">No projects found. Create or open a project to get started.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <FolderBindingModal
+          isOpen={isBindingLocal}
+          onClose={() => {
+            setIsBindingLocal(false);
+            setPickedFiles([]);
+            setPickedFolderName('');
+          }}
+          pickedFolderName={pickedFolderName}
+          pickedFiles={pickedFiles}
+          localFolderPath={localFolderPath}
+          setLocalFolderPath={setLocalFolderPath}
+          localWorkspaceName={localWorkspaceName}
+          setLocalWorkspaceName={setLocalWorkspaceName}
+          availableWorkspaces={availableWorkspaces}
+          isReadingFolder={isReadingFolder}
+          isBindingSubmitting={isBindingSubmitting}
+          onPickFolderFromDisk={handlePickFolderFromDisk}
+          onSubmit={handleBindLocalFolder}
+          folderInputRef={folderInputRef}
+          onFolderInputChange={handleFolderInputChange}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full w-full bg-[#FAF8F5] select-none overflow-hidden font-sans text-slate-800">
-      {/* Main Claude Cowork Body */}
-      <div className="flex-1 flex overflow-hidden bg-[#FAF8F5] relative">
-        {/* Panel 1: Task List */}
-        <CoworkTaskList
-          tasks={tasks}
-          selectedTaskId={selectedTaskId}
-          onSelectTask={(id) => {
-            setSelectedTaskId(id);
-            if (typeof window !== 'undefined' && window.innerWidth < 1280) setIsTasksOpen(false);
-          }}
-          onNewTaskClick={() => {
-            setSelectedTaskId(null);
-            setIsCreatingTask(false);
-            if (typeof window !== 'undefined' && window.innerWidth < 1280) setIsTasksOpen(false);
-          }}
-          workspace={workspace}
-          isTasksOpen={isTasksOpen}
-          onCloseTasks={() => setIsTasksOpen(false)}
-        />
+      {/* Workspace Top Subheader */}
+      <div className="h-12 border-b border-[#EBE7DF] bg-[#FAF8F5] px-4 flex items-center justify-between shrink-0 gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {onSelectWorkspace && (
+            <button
+              onClick={() => onSelectWorkspace(null as any)}
+              className="text-slate-400 hover:text-slate-700 p-1 rounded-lg transition-colors cursor-pointer shrink-0"
+              title="Back to Projects Hub"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
 
-        {/* Panel 2: Center Canvas / Workspace Notebook */}
-        <div
-          className="flex-1 min-w-0 flex flex-col overflow-y-auto relative bg-[#FAF8F5]"
-          style={{
-            backgroundImage: 'radial-gradient(#E8E3DA 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-          }}
-        >
-          {!selectedTask ? (
-            <CoworkHeroView
-              workspace={workspace}
-              inlinePrompt={inlinePrompt}
-              setInlinePrompt={setInlinePrompt}
-              isInlineSubmitting={isInlineSubmitting}
-              onInlinePromptSubmit={handleInlinePromptSubmit}
-              isExplorerOpen={isExplorerOpen}
-              setIsExplorerOpen={setIsExplorerOpen}
-              contextPreference={contextPreference}
-              contextBudget={contextBudget}
-              onChangeContextPreference={handleChangeContextPreference}
-              onUpdatePermissionMode={handleUpdatePermissionMode}
-              selectedModelId={selectedModelId}
-              setSelectedModelId={setSelectedModelId}
-              onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
-              tasksCount={tasks.length}
-            />
-          ) : (
-            <CoworkCanvas
-              workspace={workspace}
-              selectedTask={selectedTask}
-              selectedFilePath={selectedFilePath}
-              selectedFileContent={selectedFileContent}
-              editedFileContent={editedFileContent}
-              setEditedFileContent={setEditedFileContent}
-              isSavingFile={isSavingFile}
-              onSaveFile={handleSaveFile}
-              rightViewMode={rightViewMode}
-              setRightViewMode={setRightViewMode}
-              artifacts={artifacts}
-              isExplorerOpen={isExplorerOpen}
-              setIsExplorerOpen={setIsExplorerOpen}
-              fileTree={fileTree}
-              onSelectFile={handleSelectFile}
-              fileSearchQuery={fileSearchQuery}
-              setFileSearchQuery={setFileSearchQuery}
-              gitStatus={gitStatus}
-              onLoadProjectTree={loadProjectTree}
-              isSyncingFiles={isSyncingFiles}
-              onSyncFolderInputChange={handleSyncFolderInputChange}
-              syncFolderInputRef={syncFolderInputRef}
-              isTerminalOpen={isTerminalOpen}
-              setIsTerminalOpen={setIsTerminalOpen}
-              terminalCommand={terminalCommand}
-              setTerminalCommand={setTerminalCommand}
-              isExecutingCommand={isExecutingCommand}
-              terminalOutput={terminalOutput}
-              onExecuteTerminal={handleExecuteTerminal}
-              onAdvanceTask={handleAdvanceTask}
-              onApprovePlan={handleApprovePlan}
-              onRejectPlan={handleRejectPlan}
-              selectedModelId={selectedModelId}
-              setSelectedModelId={setSelectedModelId}
-              inlinePrompt={inlinePrompt}
-              setInlinePrompt={setInlinePrompt}
-              isInlineSubmitting={isInlineSubmitting}
-              onInlinePromptSubmit={handleInlinePromptSubmit}
-              onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
-            />
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-7 h-7 rounded-lg bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C] shrink-0 font-bold text-xs">
+              <Briefcase className="w-3.5 h-3.5" />
+            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-bold text-slate-900 truncate">{workspace.name}</span>
+              {workspace.projectRoot && (
+                <span className="text-[10px] text-slate-400 font-mono truncate max-w-[180px] sm:max-w-[280px]">
+                  {workspace.projectRoot}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Task Selector Pill */}
+          {tasks.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsTaskDropdownOpen(!isTaskDropdownOpen)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#E5E0D8] text-xs font-semibold text-slate-700 hover:border-slate-300 shadow-2xs transition-colors cursor-pointer"
+              >
+                <Layers className="w-3.5 h-3.5 text-[#EA580C]" />
+                <span className="truncate max-w-[130px] sm:max-w-[220px]">
+                  {selectedTask ? selectedTask.title : 'All Tasks'}
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {isTaskDropdownOpen && (
+                <div className="absolute left-0 mt-1 w-72 max-h-80 overflow-y-auto bg-white rounded-xl border border-[#E5E0D8] shadow-lg z-50 p-1.5 space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTaskId(null);
+                      setIsTaskDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-bold text-[#EA580C] hover:bg-[#FFF7ED] transition-colors cursor-pointer text-left"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ New Task / Prompt</span>
+                  </button>
+                  <div className="border-t border-slate-100 my-1" />
+                  {tasks.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTaskId(t.id);
+                        setIsTaskDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-start gap-2 p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                        t.id === selectedTaskId
+                          ? 'bg-slate-100 font-bold text-slate-900'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                          t.status === 'completed'
+                            ? 'bg-emerald-500'
+                            : t.status === 'running'
+                            ? 'bg-amber-500 animate-pulse'
+                            : 'bg-slate-300'
+                        }`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs truncate block">{t.title}</span>
+                        <span className="text-[10px] text-slate-400 capitalize">
+                          {t.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTaskId(null);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">New Task</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Split Body: Center Canvas / Workspace Notebook */}
+      <div
+        className="flex-1 min-w-0 flex flex-col overflow-y-auto relative bg-[#FAF8F5]"
+        style={{
+          backgroundImage: 'radial-gradient(#E8E3DA 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      >
+        {!selectedTask ? (
+          <CoworkHeroView
+            workspace={workspace}
+            inlinePrompt={inlinePrompt}
+            setInlinePrompt={setInlinePrompt}
+            isInlineSubmitting={isInlineSubmitting}
+            onInlinePromptSubmit={handleInlinePromptSubmit}
+            isExplorerOpen={isExplorerOpen}
+            setIsExplorerOpen={setIsExplorerOpen}
+            contextPreference={contextPreference}
+            contextBudget={contextBudget}
+            onChangeContextPreference={handleChangeContextPreference}
+            onUpdatePermissionMode={handleUpdatePermissionMode}
+            selectedModelId={selectedModelId}
+            setSelectedModelId={setSelectedModelId}
+            onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
+            tasksCount={tasks.length}
+          />
+        ) : (
+          <CoworkCanvas
+            workspace={workspace}
+            selectedTask={selectedTask}
+            selectedFilePath={selectedFilePath}
+            selectedFileContent={selectedFileContent}
+            editedFileContent={editedFileContent}
+            setEditedFileContent={setEditedFileContent}
+            isSavingFile={isSavingFile}
+            onSaveFile={handleSaveFile}
+            rightViewMode={rightViewMode}
+            setRightViewMode={setRightViewMode}
+            artifacts={artifacts}
+            isExplorerOpen={isExplorerOpen}
+            setIsExplorerOpen={setIsExplorerOpen}
+            fileTree={fileTree}
+            onSelectFile={handleSelectFile}
+            fileSearchQuery={fileSearchQuery}
+            setFileSearchQuery={setFileSearchQuery}
+            gitStatus={gitStatus}
+            onLoadProjectTree={loadProjectTree}
+            isSyncingFiles={isSyncingFiles}
+            onSyncFolderInputChange={handleSyncFolderInputChange}
+            syncFolderInputRef={syncFolderInputRef}
+            isTerminalOpen={isTerminalOpen}
+            setIsTerminalOpen={setIsTerminalOpen}
+            terminalCommand={terminalCommand}
+            setTerminalCommand={setTerminalCommand}
+            isExecutingCommand={isExecutingCommand}
+            terminalOutput={terminalOutput}
+            onExecuteTerminal={handleExecuteTerminal}
+            onAdvanceTask={handleAdvanceTask}
+            onApprovePlan={handleApprovePlan}
+            onRejectPlan={handleRejectPlan}
+            selectedModelId={selectedModelId}
+            setSelectedModelId={setSelectedModelId}
+            inlinePrompt={inlinePrompt}
+            setInlinePrompt={setInlinePrompt}
+            isInlineSubmitting={isInlineSubmitting}
+            onInlinePromptSubmit={handleInlinePromptSubmit}
+            onToggleTasks={() => setIsTasksOpen(!isTasksOpen)}
+          />
+        )}
       </div>
 
       {/* Bind Local Folder Modal */}

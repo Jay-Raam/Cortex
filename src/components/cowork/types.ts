@@ -5,9 +5,11 @@ export interface CoworkWorkspaceProps {
   onRefreshWorkspace: () => void;
   onSelectWorkspace?: (ws: Workspace) => void;
   onDeleteWorkspace?: (id: string) => void;
+  workspaces?: Workspace[];
+  onNewWorkspace?: () => void;
 }
 
-export type RightViewMode = 'editor' | 'diff' | 'artifacts';
+export type RightViewMode = 'editor' | 'preview' | 'diff' | 'artifacts';
 
 export interface CoworkTaskListProps {
   tasks: AgentTask[];
