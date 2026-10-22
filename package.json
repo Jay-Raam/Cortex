@@ -3,14 +3,18 @@
   "description": "Cortex - Next-Gen Multi-Model AI Chat & Autonomous Co-Work Platform",
   "version": "1.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
     "start": "tsx server.ts",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "rm -rf dist server.js release",
     "test": "tsx --test test/backend.test.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "electron": "cross-env NODE_ENV=development electron electron/main.cjs",
+    "build:electron": "vite build && electron-builder --win --dir",
+    "dist:win": "vite build && electron-builder --win nsis"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -46,8 +50,41 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "ai.nexa.cortex",
+    "productName": "Cortex",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "data/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Cortex"
+    }
   }
 }

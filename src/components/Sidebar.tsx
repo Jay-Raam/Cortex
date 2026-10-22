@@ -20,9 +20,11 @@ import {
   FolderPlus,
   ChevronDown,
   ChevronRight,
+  Monitor,
 } from 'lucide-react';
 import { Conversation, User, Workspace } from '../server/types';
 import { CognivoLogo } from './CognivoLogo';
+import { DesktopPromoModal } from './DesktopPromoModal';
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -74,6 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenProfile,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isDesktopModalOpen, setIsDesktopModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
@@ -639,6 +642,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={() => {
                   setShowUserMenu(false);
+                  setIsDesktopModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer text-left"
+              >
+                <Monitor className="w-3.5 h-3.5 text-slate-500" />
+                <span>Get Windows App</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserMenu(false);
                   if (onLogout) onLogout();
                 }}
                 className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer text-left"
@@ -650,6 +664,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
       </div>
+      <DesktopPromoModal
+        isOpen={isDesktopModalOpen}
+        onClose={() => setIsDesktopModalOpen(false)}
+      />
     </aside>
     </>
   );

@@ -4,7 +4,6 @@ import {
   MoreHorizontal,
   Link2,
   Share2,
-  Sparkles,
   Layers,
   Wrench,
   FileText,
