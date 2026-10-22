@@ -305,6 +305,9 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                     placeholder="e.g. D:\Chat Application or C:\Users\dev\portfolio"
                     className="w-full px-3 py-2 text-xs border border-[#E5E0D8] rounded-xl focus:outline-none focus:border-[#EA580C] bg-slate-50/50 font-mono"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Enter an existing folder path, or enter a new project name. Cortex will bind or create the project folder automatically.
+                  </p>
                 </div>
 
                 <div>

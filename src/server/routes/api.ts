@@ -695,7 +695,22 @@ apiRouter.post('/cowork/workspaces/bind-local', async (req: Request, res: Respon
       resolvedPath = cloudWsDir;
       isDir = true;
     } else {
-      return res.status(400).json({ error: `Folder does not exist or is not a directory: "${resolvedPath}"` });
+      // On local environments: automatically initialize the requested project directory
+      try {
+        fs.mkdirSync(resolvedPath, { recursive: true });
+        isDir = true;
+        const readmeContent = `# ${name?.trim() || folderName}\n\nWorkspace initialized for project: \`${cleanInputPath}\`\n\n*Created with Cortex AI Cowork.*`;
+        fs.writeFileSync(path.join(resolvedPath, 'README.md'), readmeContent, 'utf8');
+      } catch {
+        // Fallback to managed workspace directory
+        const wsId = `ws_local_${Date.now()}`;
+        const fallbackWsDir = path.resolve(process.cwd(), 'workspaces', wsId);
+        fs.mkdirSync(fallbackWsDir, { recursive: true });
+        const readmeContent = `# ${name?.trim() || folderName}\n\nWorkspace initialized for project: \`${cleanInputPath}\``;
+        fs.writeFileSync(path.join(fallbackWsDir, 'README.md'), readmeContent, 'utf8');
+        resolvedPath = fallbackWsDir;
+        isDir = true;
+      }
     }
   }
 
@@ -736,9 +751,10 @@ apiRouter.post('/cowork/workspaces/import-folder', async (req: Request, res: Res
   let savedCount = 0;
   for (const file of files) {
     if (!file.path || typeof file.path !== 'string') continue;
-    if (file.path.includes('..') || file.path.includes('\0')) continue;
+    const normalizedFilePath = file.path.replace(/\\/g, '/');
+    if (normalizedFilePath.includes('..') || normalizedFilePath.includes('\0')) continue;
     try {
-      const safePath = workspaceManager.resolveSafePath(wsRoot, file.path);
+      const safePath = workspaceManager.resolveSafePath(wsRoot, normalizedFilePath);
       fs.mkdirSync(path.dirname(safePath), { recursive: true });
       fs.writeFileSync(safePath, typeof file.content === 'string' ? file.content : '', 'utf8');
       savedCount++;
@@ -796,9 +812,10 @@ apiRouter.post('/cowork/workspaces/:id/sync-files', async (req: Request, res: Re
   let syncedCount = 0;
   for (const file of files) {
     if (!file.path || typeof file.path !== 'string') continue;
-    if (file.path.includes('..') || file.path.includes('\0')) continue;
+    const normalizedFilePath = file.path.replace(/\\/g, '/');
+    if (normalizedFilePath.includes('..') || normalizedFilePath.includes('\0')) continue;
     try {
-      const safePath = workspaceManager.resolveSafePath(wsRoot, file.path);
+      const safePath = workspaceManager.resolveSafePath(wsRoot, normalizedFilePath);
       fs.mkdirSync(path.dirname(safePath), { recursive: true });
       fs.writeFileSync(safePath, typeof file.content === 'string' ? file.content : '', 'utf8');
       syncedCount++;
