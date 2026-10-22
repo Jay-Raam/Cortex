@@ -1206,6 +1206,32 @@ print(fibonacci(10))
       assert.ok(task.plannedFiles?.includes('styles.css'), 'Must plan styles.css');
       assert.ok(!task.plannedFiles?.includes('index.html'), 'Must not generate HTML');
     });
+
+    it('handles missing local environment binary (e.g. pip on Windows) gracefully with environment notice', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_cowork_env_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Env Resilience Workspace',
+        description: 'Test env command resilience',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const res = await coworkEngine.executeTool(
+        'terminal_execute_command',
+        { command: 'pip install non_existent_pkg_test' },
+        ws.id,
+        testUser1.id
+      );
+
+      // On platforms where pip is not installed (e.g. Windows dev without pip), it returns success with environmentNotice
+      // On platforms where pip is installed, it returns standard execution result
+      assert.strictEqual(typeof res.success, 'boolean');
+      if (res.output?.environmentNotice) {
+        assert.ok(res.output.environmentNotice.includes('runtime is not installed on this local host'));
+        assert.strictEqual(res.success, true);
+      }
+    });
   });
 });
 

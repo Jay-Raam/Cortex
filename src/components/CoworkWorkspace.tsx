@@ -19,7 +19,7 @@ import {
   Folder,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact, WorkspaceFileNode, ExecutionCommandResult } from '../server/types';
-import { fetchGraphQL, advanceTaskApi } from '../lib/api';
+import { fetchGraphQL, advanceTaskApi, approveStepApi } from '../lib/api';
 import { CoworkWorkspaceProps, RightViewMode } from './cowork/types';
 import { CoworkTaskList } from './cowork/CoworkTaskList';
 import { CoworkHeroView } from './cowork/CoworkHeroView';
@@ -610,6 +610,17 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
     }
   };
 
+  // Approve a pending step
+  const handleApproveStep = async (taskId: string, stepId?: string, approvalId?: string) => {
+    try {
+      await approveStepApi(taskId, stepId, approvalId);
+      await loadWorkspaceData();
+      await loadProjectTree();
+    } catch (err) {
+      console.error('Failed to approve step:', err);
+    }
+  };
+
   // Approve Complete Plan (Mode B)
   const handleApprovePlan = async (taskId: string) => {
     try {
@@ -967,6 +978,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
             terminalOutput={terminalOutput}
             onExecuteTerminal={handleExecuteTerminal}
             onAdvanceTask={handleAdvanceTask}
+            onApproveStep={handleApproveStep}
             onApprovePlan={handleApprovePlan}
             onRejectPlan={handleRejectPlan}
             selectedModelId={selectedModelId}

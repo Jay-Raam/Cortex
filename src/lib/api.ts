@@ -195,3 +195,18 @@ export async function advanceTaskApi(taskId: string): Promise<AgentTask> {
   if (!json.success) throw new Error(json.error || 'Failed to advance task');
   return json.task;
 }
+
+export async function approveStepApi(taskId: string, stepId?: string, approvalId?: string): Promise<AgentTask> {
+  const token = localStorage.getItem('nexa_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/cowork/tasks/${taskId}/approve`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ stepId, approvalId }),
+  });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to approve step');
+  return json.task;
+}

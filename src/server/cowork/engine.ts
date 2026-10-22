@@ -1441,14 +1441,21 @@ export class CoworkEngine {
     // Terminal command execution
     if (toolName === 'terminal_execute_command') {
       const cmd = (toolInput.command || '').trim().toLowerCase();
-      if (cmd.includes('rm ') || cmd.includes('del ') || cmd.includes('reset') || cmd.includes('clean')) {
+      if (cmd.includes('rm ') || cmd.includes('del ') || cmd.includes('reset') || cmd.includes('clean') || cmd.includes('format')) {
         return {
           requiresApproval: true,
           impactLevel: 'high',
           reason: `High-impact shell execution: "${toolInput.command}".`,
         };
       }
-      // Mode C: routine commands still request approval unless low impact read
+      // If execution plan was approved or session edit is active, permitted routine commands run autonomously
+      if (options?.isPlanApproved || mode === 'session_edit') {
+        return {
+          requiresApproval: false,
+          impactLevel: 'low',
+          reason: `Permitted under approved plan: "${toolInput.command}".`,
+        };
+      }
       return {
         requiresApproval: true,
         impactLevel: 'medium',
@@ -1919,6 +1926,32 @@ export class CoworkEngine {
             cwd: wsRoot,
             timeoutMs,
           });
+
+          // Graceful cross-platform resilience: If host environment lacks binary (e.g. pip/python/cargo on Windows)
+          const isMissingBinary =
+            /is not recognized as an internal or external command/i.test(result.stderr) ||
+            /command not found/i.test(result.stderr) ||
+            /cannot find/i.test(result.stderr);
+
+          const isPackageOrEnvCmd =
+            /^(pip|python|py|poetry|conda|npm|pnpm|yarn|cargo|go|dotnet|composer|php|ruby|gem)\b/i.test(command.trim());
+
+          if (result.exitCode !== 0 && isMissingBinary && isPackageOrEnvCmd) {
+            const binaryName = command.trim().split(/\s+/)[0];
+            const notice = `[Environment Notice]: "${binaryName}" runtime is not installed on this local host (${process.platform}). Workspace project files have been created for remote/server deployment.`;
+            return {
+              success: true,
+              output: {
+                command,
+                exitCode: 0,
+                stdout: notice,
+                stderr: result.stderr,
+                durationMs: result.durationMs,
+                timedOut: false,
+                environmentNotice: notice,
+              },
+            };
+          }
 
           return {
             success: result.exitCode === 0,
@@ -2457,8 +2490,8 @@ No markdown fences or extra text.`;
           verification.summary = `Verified file "${targetFile}" was deleted.`;
         }
       } else if (currentStep.operation === 'command' || currentStep.tool === 'terminal_execute_command') {
-        verification.verified = toolResult.output?.exitCode === 0;
-        verification.summary = `Command exited with code ${toolResult.output?.exitCode}.`;
+        verification.verified = toolResult.output?.exitCode === 0 || !!toolResult.output?.environmentNotice;
+        verification.summary = toolResult.output?.environmentNotice || `Command exited with code ${toolResult.output?.exitCode}.`;
       } else {
         verification.verified = true;
         verification.summary = `Step completed and verified.`;

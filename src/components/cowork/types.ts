@@ -70,6 +70,7 @@ export interface CoworkCanvasProps {
   terminalOutput: ExecutionCommandResult | null;
   onExecuteTerminal: (cmd?: string) => void;
   onAdvanceTask: (taskId: string) => void;
+  onApproveStep?: (taskId: string, stepId?: string, approvalId?: string) => void;
   onApprovePlan: (taskId: string) => void;
   onRejectPlan: (taskId: string) => void;
   selectedModelId: string;
@@ -92,6 +93,7 @@ export interface CoworkSidecarProps {
   isSidecarOpen: boolean;
   onCloseSidecar: () => void;
   onAdvanceTask: (taskId: string) => void;
+  onApproveStep?: (taskId: string, stepId?: string, approvalId?: string) => void;
   onApprovePlan: (taskId: string) => void;
   onRejectPlan: (taskId: string) => void;
   onSelectFile: (filePath: string) => void;
