@@ -1,0 +1,291 @@
+import React, { useState } from 'react';
+import {
+  X,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  ShieldAlert,
+  CheckCircle2,
+  RefreshCw,
+  Clock,
+} from 'lucide-react';
+import { CoworkSidecarProps } from './types';
+
+export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
+  workspace,
+  selectedTask,
+  artifacts,
+  projectStack,
+  gitStatus,
+  contextPreference,
+  contextBudget,
+  isSidecarOpen,
+  onCloseSidecar,
+  onAdvanceTask,
+  onApprovePlan,
+  onRejectPlan,
+  onSelectFile,
+  onChangeContextPreference,
+  onUpdatePermissionMode,
+}) => {
+  const [isProgressOpen, setIsProgressOpen] = useState(true);
+  const [isArtifactsOpen, setIsArtifactsOpen] = useState(true);
+  const [isContextOpen, setIsContextOpen] = useState(true);
+
+  return (
+    <>
+      {isSidecarOpen && (
+        <div
+          className="fixed inset-0 bg-black/25 backdrop-blur-2xs z-30 2xl:hidden"
+          onClick={onCloseSidecar}
+        />
+      )}
+      <div
+        className={`${
+          isSidecarOpen
+            ? 'fixed inset-y-0 right-0 z-40 2xl:static flex'
+            : 'hidden 2xl:flex'
+        } w-72 xl:w-80 border-l border-[#EBE7DF] bg-[#FAF8F5] flex-col shrink-0 overflow-y-auto p-3 space-y-3 no-scrollbar shadow-xl 2xl:shadow-none animate-in slide-in-from-right duration-200`}
+      >
+        <div className="flex items-center justify-between pb-1 2xl:hidden border-b border-slate-100">
+          <span className="text-xs font-bold text-slate-700">Sidecar & Progress</span>
+          <button
+            type="button"
+            onClick={onCloseSidecar}
+            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-md transition-colors cursor-pointer"
+            title="Close sidecar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Card 1: Progress */}
+        <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsProgressOpen(!isProgressOpen)}
+            className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <div>
+              <h4 className="text-xs font-bold text-slate-800">Progress</h4>
+              <p className="text-[10px] text-slate-500">Steps will show as the task unfolds.</p>
+            </div>
+            {isProgressOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+          </button>
+
+          {isProgressOpen && (
+            <div className="px-3.5 pb-3.5 pt-1 space-y-2.5 border-t border-slate-100">
+              {selectedTask ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase font-mono">
+                      {selectedTask.title}
+                    </span>
+                    {selectedTask.status !== 'completed' && (
+                      <button
+                        type="button"
+                        onClick={() => onAdvanceTask(selectedTask.id)}
+                        className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-2xs cursor-pointer"
+                      >
+                        <Play className="w-2.5 h-2.5 fill-current" />
+                        <span>Advance</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Mode B: Plan Approval Callout */}
+                  {(workspace?.permissionMode || 'approve_plan') === 'approve_plan' &&
+                    !selectedTask.isPlanApproved &&
+                    selectedTask.status !== 'completed' &&
+                    selectedTask.status !== 'cancelled' && (
+                      <div className="p-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs space-y-2">
+                        <div className="flex items-center gap-1 font-bold text-amber-950 text-[11px]">
+                          <ShieldAlert className="w-3.5 h-3.5 text-[#D97706]" />
+                          <span>Plan Review Required</span>
+                        </div>
+                        {selectedTask.plannedFiles && selectedTask.plannedFiles.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {selectedTask.plannedFiles.map((f) => (
+                              <button
+                                key={f}
+                                type="button"
+                                onClick={() => onSelectFile(f)}
+                                className="px-1.5 py-0.5 bg-white text-amber-900 border border-amber-300 rounded text-[9px] font-mono font-semibold"
+                              >
+                                {f}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => onApprovePlan(selectedTask.id)}
+                            className="px-2.5 py-1 bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold rounded text-[10px]"
+                          >
+                            Approve Plan
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRejectPlan(selectedTask.id)}
+                            className="px-2.5 py-1 text-amber-900 hover:bg-amber-100 rounded text-[10px]"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Steps list */}
+                  <div className="space-y-2">
+                    {selectedTask.steps.map((step, idx) => (
+                      <div key={step.id} className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-semibold text-slate-800 truncate">
+                            {idx + 1}. {step.title}
+                          </span>
+                          {step.status === 'completed' ? (
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : step.status === 'running' ? (
+                            <RefreshCw className="w-3 h-3 text-[#EA580C] animate-spin shrink-0" />
+                          ) : (
+                            <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                          )}
+                        </div>
+                        {step.targetPath && (
+                          <button
+                            type="button"
+                            onClick={() => onSelectFile(step.targetPath!)}
+                            className="text-[9px] font-mono text-[#EA580C] bg-orange-50/60 px-1 py-0.2 rounded hover:underline block truncate"
+                          >
+                            {step.targetPath}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-[11px] text-slate-400 italic py-2">
+                  No active steps. Start a task to unfold progress.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Card 2: Artifacts */}
+        <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsArtifactsOpen(!isArtifactsOpen)}
+            className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <div>
+              <h4 className="text-xs font-bold text-slate-800">Artifacts</h4>
+              <p className="text-[10px] text-slate-500">Outputs created during the task land here.</p>
+            </div>
+            {isArtifactsOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+          </button>
+
+          {isArtifactsOpen && (
+            <div className="px-3.5 pb-3.5 pt-1 space-y-1.5 border-t border-slate-100">
+              {artifacts.map((art) => (
+                <div key={art.id} className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] flex items-center justify-between">
+                  <span className="font-semibold text-slate-800 truncate">{art.title}</span>
+                  <span className="font-mono text-[9px] text-slate-400">v{art.version}</span>
+                </div>
+              ))}
+              {artifacts.length === 0 && (
+                <div className="text-[11px] text-slate-400 italic py-2">
+                  No outputs created yet.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Card 3: Context */}
+        <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsContextOpen(!isContextOpen)}
+            className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <div>
+              <h4 className="text-xs font-bold text-slate-800">Context</h4>
+              <p className="text-[10px] text-slate-500">Track the tools and files in use as Cortex works.</p>
+            </div>
+            {isContextOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+          </button>
+
+          {isContextOpen && (
+            <div className="px-3.5 pb-3.5 pt-1 space-y-2.5 border-t border-slate-100 text-xs">
+              {/* Context Window Selector inside Context Card */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  Context Window
+                </label>
+                <select
+                  value={contextPreference}
+                  onChange={(e) => onChangeContextPreference(e.target.value)}
+                  className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800 cursor-pointer focus:outline-none"
+                >
+                  <option value="auto">Auto (1M Tokens)</option>
+                  <option value="32k">32K Tokens</option>
+                  <option value="64k">64K Tokens</option>
+                  <option value="128k">128K Tokens</option>
+                  <option value="200k">200K Tokens</option>
+                  <option value="500k">500K Tokens</option>
+                  <option value="1m">1M Tokens</option>
+                </select>
+                {contextBudget && (
+                  <div className="text-[10px] text-slate-500 font-mono mt-1 flex justify-between">
+                    <span>Utilization: {contextBudget.utilizationPercent}%</span>
+                    <span>Rem: {(contextBudget.remainingTokens / 1024).toFixed(0)}K</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Permission Mode Selector inside Context Card */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  Permission Policy
+                </label>
+                <select
+                  value={workspace?.permissionMode || 'approve_plan'}
+                  onChange={(e) => onUpdatePermissionMode(e.target.value)}
+                  className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800 cursor-pointer focus:outline-none"
+                >
+                  <option value="approve_plan">Mode B: Approve Plan (Default)</option>
+                  <option value="ask_every_change">Mode A: Ask Every Change</option>
+                  <option value="session_edit">Mode C: Session Edit</option>
+                </select>
+              </div>
+
+              {/* Tech Stack & Git info */}
+              <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[10px] font-mono space-y-1">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Root:</span>
+                  <span className="truncate max-w-[140px] font-bold">{workspace?.name}</span>
+                </div>
+                {projectStack && (
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Stack:</span>
+                    <span className="text-[#EA580C] font-semibold">{projectStack.framework}</span>
+                  </div>
+                )}
+                {gitStatus?.isGit && (
+                  <div className="flex items-center justify-between text-emerald-700">
+                    <span>Git:</span>
+                    <span className="font-semibold">{gitStatus.branch || 'main'}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};

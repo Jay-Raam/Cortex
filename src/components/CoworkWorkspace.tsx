@@ -1,59 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Briefcase,
-  Play,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  FileCode,
-  FileText,
-  Copy,
-  Download,
   Plus,
   RefreshCw,
-  GitCommit,
-  Check,
-  ChevronRight,
-  ChevronDown,
-  Layers,
-  Terminal,
   Trash2,
   X,
-  Zap,
-  Folder,
   FolderOpen,
-  FolderUp,
-  UploadCloud,
-  File,
   GitBranch,
-  Save,
-  RotateCcw,
-  ShieldAlert,
-  Search,
-  Eye,
-  Send,
   PanelLeft,
   PanelLeftClose,
   PanelRight,
   PanelRightClose,
-  ListTodo,
-  ChevronUp,
-  Sparkles,
-  BarChart3,
-  Monitor,
-  Sunrise,
-  MessageSquare,
-  ArrowRight,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact, WorkspaceFileNode, ExecutionCommandResult } from '../server/types';
 import { fetchGraphQL, advanceTaskApi } from '../lib/api';
-
-interface CoworkWorkspaceProps {
-  workspace: Workspace | null;
-  onRefreshWorkspace: () => void;
-  onSelectWorkspace?: (ws: Workspace) => void;
-  onDeleteWorkspace?: (id: string) => void;
-}
+import { CoworkWorkspaceProps, RightViewMode } from './cowork/types';
+import { CoworkTaskList } from './cowork/CoworkTaskList';
+import { CoworkHeroView } from './cowork/CoworkHeroView';
+import { CoworkCanvas } from './cowork/CoworkCanvas';
+import { CoworkSidecar } from './cowork/CoworkSidecar';
+import { FolderBindingModal } from './cowork/FolderBindingModal';
 
 export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   workspace,
@@ -85,32 +51,24 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
 
   // Artifacts state (backward compatibility)
   const [artifacts, setArtifacts] = useState<WorkspaceArtifact[]>([]);
-  const [selectedArtifact, setSelectedArtifact] = useState<WorkspaceArtifact | null>(null);
-  const [copiedArtId, setCopiedArtId] = useState<string | null>(null);
 
   // Right panel view mode: 'editor' | 'diff' | 'artifacts'
-  const [rightViewMode, setRightViewMode] = useState<'editor' | 'diff' | 'artifacts'>('editor');
+  const [rightViewMode, setRightViewMode] = useState<RightViewMode>('editor');
 
   // Responsive drawer overlay state for smaller viewports
   const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [isSidecarOpen, setIsSidecarOpen] = useState(false);
 
-  // Canvas drawer & inline prompt state (Claude Cowork / ChatGPT Canvas layout)
+  // Canvas drawer & inline prompt state
   const [isExplorerOpen, setIsExplorerOpen] = useState(true);
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [inlinePrompt, setInlinePrompt] = useState('');
   const [isInlineSubmitting, setIsInlineSubmitting] = useState(false);
 
-  // Right Sidecar widgets state (Claude Cowork Image 3 layout)
-  const [isProgressOpen, setIsProgressOpen] = useState(true);
-  const [isArtifactsOpen, setIsArtifactsOpen] = useState(true);
-  const [isContextOpen, setIsContextOpen] = useState(true);
-
   // Terminal state
   const [terminalCommand, setTerminalCommand] = useState('');
   const [isExecutingCommand, setIsExecutingCommand] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState<ExecutionCommandResult | null>(null);
-  const [terminalHistory, setTerminalHistory] = useState<Array<{ command: string; result: ExecutionCommandResult }>>([]);
 
   // Project stack & local folder binding state
   const [projectStack, setProjectStack] = useState<any>(null);
@@ -118,7 +76,6 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   const [localFolderPath, setLocalFolderPath] = useState('');
   const [localWorkspaceName, setLocalWorkspaceName] = useState('');
   const [availableWorkspaces, setAvailableWorkspaces] = useState<Workspace[]>([]);
-  const [isSelectingWorkspace, setIsSelectingWorkspace] = useState(false);
   const [isBindingSubmitting, setIsBindingSubmitting] = useState(false);
   const [pickedFiles, setPickedFiles] = useState<Array<{ path: string; content: string }>>([]);
   const [pickedFolderName, setPickedFolderName] = useState('');
@@ -130,7 +87,6 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   // Configurable Context Window state
   const [contextPreference, setContextPreference] = useState<string>(workspace?.contextWindowPreference || 'auto');
   const [contextBudget, setContextBudget] = useState<any>(null);
-  const [contextOptions, setContextOptions] = useState<Array<{ id: string; label: string; disabled: boolean }>>([]);
 
   // Load Context Budget
   const loadContextBudget = async (pref = contextPreference) => {
@@ -148,9 +104,6 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
       const data = await res.json();
       if (data.success) {
         setContextBudget(data.budget);
-        if (data.options) {
-          setContextOptions(data.options);
-        }
       }
     } catch (err) {
       console.warn('Failed to load context budget:', err);
@@ -313,7 +266,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         const file = fileList[i];
         const relPath = file.webkitRelativePath || file.name;
         const segments = relPath.split('/');
-        if (segments.some((s) => ['node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.cache'].includes(s))) {
+        if (segments.some((s) => ['node_modules', '.git', 'dist', 'build', '.next', 'coverage'].includes(s))) {
           continue;
         }
         if (file.size > 2 * 1024 * 1024) continue;
@@ -404,7 +357,6 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   const handleSelectFile = async (filePath: string) => {
     if (!workspace) return;
     setSelectedFilePath(filePath);
-    setSelectedArtifact(null);
     setRightViewMode('editor');
     setIsFileLoading(true);
 
@@ -466,7 +418,6 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
       const data = await res.json();
       if (data.result) {
         setTerminalOutput(data.result);
-        setTerminalHistory((prev) => [{ command: cmd.trim(), result: data.result }, ...prev.slice(0, 9)]);
       }
       setTerminalCommand('');
       await loadProjectTree();
@@ -645,21 +596,6 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
     }
   };
 
-  // Server-Enforced Approval
-  const handleApproveStep = async (taskId: string, stepId: string) => {
-    try {
-      await fetch(`/api/cowork/tasks/${taskId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stepId }),
-      });
-      await loadWorkspaceData();
-      await loadProjectTree();
-    } catch (err) {
-      console.error('Failed to approve step:', err);
-    }
-  };
-
   // Approve Complete Plan (Mode B)
   const handleApprovePlan = async (taskId: string) => {
     try {
@@ -705,67 +641,6 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
     } catch (err) {
       console.error('Failed to update permission mode:', err);
     }
-  };
-
-  // Server-Enforced Rejection
-  const handleRejectStep = async (taskId: string, stepId: string) => {
-    try {
-      await fetch(`/api/cowork/tasks/${taskId}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stepId, reason: 'Rejected by developer' }),
-      });
-      await loadWorkspaceData();
-    } catch (err) {
-      console.error('Failed to reject step:', err);
-    }
-  };
-
-  // Cancel Task
-  const handleCancelTask = async (taskId: string) => {
-    try {
-      await fetch(`/api/cowork/tasks/${taskId}/cancel`, { method: 'POST' });
-      await loadWorkspaceData();
-    } catch (err) {
-      console.error('Failed to cancel task:', err);
-    }
-  };
-
-  // Render tree node component
-  const renderFileNode = (node: WorkspaceFileNode, depth = 0) => {
-    const isSelected = selectedFilePath === node.path;
-    const isDir = node.type === 'directory';
-
-    return (
-      <div key={node.path} style={{ paddingLeft: `${depth * 12}px` }}>
-        <button
-          type="button"
-          onClick={() => {
-            if (!isDir) {
-              handleSelectFile(node.path);
-            }
-          }}
-          className={`w-full flex items-center gap-1.5 py-1 px-2 rounded text-xs font-mono transition-colors text-left cursor-pointer ${
-            isSelected
-              ? 'bg-[#FFF7ED] text-[#EA580C] font-semibold'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-        >
-          {isDir ? (
-            <Folder className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-          ) : (
-            <File className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          )}
-          <span className="truncate">{node.name}</span>
-          {node.size !== undefined && node.size > 0 && !isDir && (
-            <span className="text-[10px] text-slate-400 ml-auto select-none">
-              {(node.size / 1024).toFixed(1)}k
-            </span>
-          )}
-        </button>
-        {isDir && node.children && node.children.map((child) => renderFileNode(child, depth + 1))}
-      </div>
-    );
   };
 
   return (
@@ -899,281 +774,27 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         </div>
       </div>
 
-      {/* Bind Local Folder Modal */}
-      {isBindingLocal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-[#EA580C]" />
-                <h3 className="text-sm font-bold text-slate-900">Select Local Project Folder</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setIsBindingLocal(false);
-                  setPickedFiles([]);
-                  setPickedFolderName('');
-                }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleBindLocalFolder} className="p-5 space-y-4">
-              {/* Option 1: Native Folder Picker / Upload */}
-              <div className="p-4 rounded-xl border border-dashed border-[#FED7AA] bg-[#FFFBF7] flex flex-col items-center justify-center text-center space-y-2.5">
-                <div className="w-10 h-10 rounded-full bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C]">
-                  {isReadingFolder ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <FolderUp className="w-5 h-5" />
-                  )}
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900">
-                    Choose Folder from your Computer
-                  </div>
-                  <div className="text-[11px] text-slate-500 max-w-xs mt-0.5">
-                    Select a local project folder directly (e.g. your portfolio or React app) to authorize and sync into the workspace.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handlePickFolderFromDisk}
-                  disabled={isReadingFolder}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 shadow-2xs transition-all cursor-pointer hover:border-[#EA580C]"
-                >
-                  <FolderOpen className="w-4 h-4 text-[#EA580C]" />
-                  <span>{isReadingFolder ? 'Reading Folder...' : 'Browse Local Folder'}</span>
-                </button>
-
-                <input
-                  type="file"
-                  ref={folderInputRef}
-                  onChange={handleFolderInputChange}
-                  className="hidden"
-                  // @ts-ignore
-                  webkitdirectory=""
-                  directory=""
-                  multiple
-                />
-
-                {pickedFiles.length > 0 && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium animate-in fade-in">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>
-                      Selected <strong>{pickedFolderName}</strong> ({pickedFiles.length} file{pickedFiles.length > 1 ? 's' : ''} ready)
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Divider */}
-              <div className="relative flex items-center justify-center">
-                <div className="border-t border-slate-200 w-full" />
-                <span className="bg-white px-2 text-[10px] uppercase font-bold text-slate-400 tracking-wider absolute">
-                  Or Enter Folder Path
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Local Folder Path {pickedFiles.length === 0 && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type="text"
-                  required={pickedFiles.length === 0}
-                  placeholder="e.g. D:\Portfoloi or /home/user/project"
-                  value={localFolderPath}
-                  onChange={(e) => {
-                    setLocalFolderPath(e.target.value);
-                    if (pickedFiles.length > 0) setPickedFiles([]);
-                  }}
-                  className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:border-[#EA580C] bg-slate-50/50"
-                />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Enter local path. On cloud environments, this initializes a managed workspace for your project.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Workspace Name (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Portfoloi"
-                  value={localWorkspaceName}
-                  onChange={(e) => setLocalWorkspaceName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#EA580C]"
-                />
-              </div>
-
-              {availableWorkspaces.length > 0 && (
-                <div className="border-t border-slate-100 pt-3">
-                  <div className="text-[11px] font-semibold text-slate-600 mb-2">Recent Authorized Projects:</div>
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                    {availableWorkspaces.map((ws) => (
-                      <div
-                        key={ws.id}
-                        onClick={() => {
-                          if (ws.projectRoot) setLocalFolderPath(ws.projectRoot);
-                          setLocalWorkspaceName(ws.name);
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-amber-50 border border-slate-200/80 text-xs flex items-center justify-between cursor-pointer transition-colors"
-                      >
-                        <span className="font-semibold text-slate-800">{ws.name}</span>
-                        <span className="font-mono text-[10px] text-slate-500 truncate max-w-[200px]">{ws.projectRoot || ws.id}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsBindingLocal(false);
-                    setPickedFiles([]);
-                    setPickedFolderName('');
-                  }}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isBindingSubmitting || (!localFolderPath.trim() && pickedFiles.length === 0)}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  {isBindingSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  <span>{pickedFiles.length > 0 ? 'Upload & Open Workspace' : 'Authorize & Open Workspace'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Main 3-Panel Claude Cowork Body matching Image 3 */}
+      {/* Main 3-Panel Claude Cowork Body */}
       <div className="flex-1 flex overflow-hidden bg-[#FAF8F5] relative">
-        {/* Panel 1 (Left): Task List & New Task Button (Image 3 Left Panel) */}
-        {isTasksOpen && (
-          <div
-            className="fixed inset-0 bg-black/25 backdrop-blur-2xs z-30 xl:hidden"
-            onClick={() => setIsTasksOpen(false)}
-          />
-        )}
-        <div
-          className={`${
-            isTasksOpen
-              ? 'fixed inset-y-0 left-0 z-40 xl:static flex'
-              : 'hidden xl:flex'
-          } w-72 md:w-80 border-r border-[#EBE7DF] bg-[#FAF8F5] flex-col shrink-0 overflow-hidden shadow-xl xl:shadow-none animate-in slide-in-from-left duration-200`}
-        >
-              {/* + New task Button */}
-              <div className="p-3 border-b border-[#EBE7DF] bg-[#FCFAF7] shrink-0 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedTaskId(null);
-                    setIsCreatingTask(false);
-                    if (typeof window !== 'undefined' && window.innerWidth < 1280) setIsTasksOpen(false);
-                  }}
-                  className="flex-1 flex items-center gap-2 px-3 py-2 bg-white hover:bg-[#FFF7ED] text-slate-800 hover:text-[#EA580C] border border-[#E5E0D8] hover:border-[#FED7AA] rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer group"
-                >
-                  <div className="w-5 h-5 rounded-lg bg-slate-100 group-hover:bg-[#FFF7ED] flex items-center justify-center text-slate-600 group-hover:text-[#EA580C] transition-colors">
-                    <Plus className="w-3.5 h-3.5" />
-                  </div>
-                  <span>New task</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsTasksOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer xl:hidden"
-                  title="Close tasks"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+        {/* Panel 1: Task List */}
+        <CoworkTaskList
+          tasks={tasks}
+          selectedTaskId={selectedTaskId}
+          onSelectTask={(id) => {
+            setSelectedTaskId(id);
+            if (typeof window !== 'undefined' && window.innerWidth < 1280) setIsTasksOpen(false);
+          }}
+          onNewTaskClick={() => {
+            setSelectedTaskId(null);
+            setIsCreatingTask(false);
+            if (typeof window !== 'undefined' && window.innerWidth < 1280) setIsTasksOpen(false);
+          }}
+          workspace={workspace}
+          isTasksOpen={isTasksOpen}
+          onCloseTasks={() => setIsTasksOpen(false)}
+        />
 
-              {/* Task List Items */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
-                {tasks.map((task) => {
-                  const isSelected = selectedTaskId === task.id;
-                  const completedCount = task.steps?.filter((s) => s.status === 'completed').length || 0;
-                  const totalCount = task.steps?.length || 0;
-
-                  return (
-                    <button
-                      key={task.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTaskId(task.id);
-                        if (typeof window !== 'undefined' && window.innerWidth < 1280) setIsTasksOpen(false);
-                      }}
-                      className={`w-full p-2.5 rounded-xl text-left transition-all cursor-pointer flex items-start justify-between gap-2 border ${
-                        isSelected
-                          ? 'bg-white border-[#E5E0D8] shadow-xs'
-                          : 'hover:bg-white/70 border-transparent hover:border-[#E5E0D8]/60 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">
-                          {task.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 truncate mt-0.5 font-mono">
-                          {task.status === 'completed' ? (
-                            <span className="text-emerald-700 font-sans font-medium">Finished · Verified</span>
-                          ) : task.status === 'awaiting_approval' ? (
-                            <span className="text-amber-700 font-sans font-semibold">Needs human approval</span>
-                          ) : totalCount > 0 ? (
-                            <span>Step {completedCount + 1} of {totalCount}</span>
-                          ) : (
-                            <span>Autonomous Task</span>
-                          )}
-                        </p>
-                      </div>
-
-                      {/* Status Indicator Dot matching Image 3 */}
-                      <div className="shrink-0 mt-1">
-                        {task.status === 'completed' ? (
-                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Completed" />
-                        ) : task.status === 'awaiting_approval' ? (
-                          <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" title="Needs Approval" />
-                        ) : task.status === 'running' ? (
-                          <div className="w-2.5 h-2.5 rounded-full bg-[#EA580C] animate-ping" title="Running" />
-                        ) : (
-                          <div className="w-2.5 h-2.5 rounded-full border border-slate-300 bg-white" title="Ready" />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {tasks.length === 0 && (
-                  <div className="py-12 text-center text-xs text-slate-400 italic">
-                    No tasks yet. Click "+ New task" above.
-                  </div>
-                )}
-              </div>
-
-              {/* User profile footer matching Image 3 bottom */}
-              <div className="p-3 border-t border-[#EBE7DF] bg-[#FCFAF7] flex items-center gap-2.5 shrink-0">
-                <div className="w-8 h-8 rounded-full bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-xs font-bold text-[#EA580C]">
-                  C
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-bold text-slate-800 truncate">Developer Workspace</div>
-                  <div className="text-[10px] text-slate-400 font-mono truncate">{workspace?.name || 'Cortex AI'}</div>
-                </div>
-              </div>
-            </div>
-
-        {/* Panel 2 (Center): Workspace / Canvas (Image 3 Center Notebook) */}
+        {/* Panel 2: Center Canvas / Workspace Notebook */}
         <div
           className="flex-1 min-w-0 flex flex-col overflow-y-auto relative bg-[#FAF8F5]"
           style={{
@@ -1181,746 +802,165 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
             backgroundSize: '24px 24px',
           }}
         >
-          {/* When No Task is Selected: Hero "Let's knock something off your list" matching Image 3 */}
           {!selectedTask ? (
-            <div className="flex-1 min-w-0 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 max-w-2xl mx-auto w-full my-auto animate-in fade-in duration-200">
-              {/* Anthropic Terracotta Icon & Headline */}
-              <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
-                <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C] mb-4 shadow-xs">
-                  <Sparkles className="w-6 h-6 fill-current" />
-                </div>
-                <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-slate-800 tracking-tight text-center leading-snug">
-                  Let's knock something off your list
-                </h2>
-              </div>
-
-              {/* 6 Action Cards Grid (2 rows x 3 columns) matching Image 3 */}
-              <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-6 sm:mb-8">
-                <button
-                  type="button"
-                  onClick={() => setInlinePrompt('Create a new file in workspace: ')}
-                  className="p-3 rounded-xl bg-white hover:bg-[#FFF7ED] border border-[#E5E0D8] hover:border-[#FED7AA] text-left transition-all shadow-2xs hover:shadow-xs cursor-pointer group"
-                >
-                  <FileText className="w-4 h-4 text-slate-500 group-hover:text-[#EA580C] mb-2 transition-colors" />
-                  <span className="text-xs font-semibold text-slate-800 block">Create a file</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInlinePrompt('Analyze codebase metrics, dependencies, and performance: ')}
-                  className="p-3 rounded-xl bg-white hover:bg-[#FFF7ED] border border-[#E5E0D8] hover:border-[#FED7AA] text-left transition-all shadow-2xs hover:shadow-xs cursor-pointer group"
-                >
-                  <BarChart3 className="w-4 h-4 text-slate-500 group-hover:text-[#EA580C] mb-2 transition-colors" />
-                  <span className="text-xs font-semibold text-slate-800 block">Crunch data</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInlinePrompt('Implement a working prototype for: ')}
-                  className="p-3 rounded-xl bg-white hover:bg-[#FFF7ED] border border-[#E5E0D8] hover:border-[#FED7AA] text-left transition-all shadow-2xs hover:shadow-xs cursor-pointer group"
-                >
-                  <Monitor className="w-4 h-4 text-slate-500 group-hover:text-[#EA580C] mb-2 transition-colors" />
-                  <span className="text-xs font-semibold text-slate-800 block">Make a prototype</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInlinePrompt('Summarize project health, open git changes, and run tests: ')}
-                  className="p-3 rounded-xl bg-white hover:bg-[#FFF7ED] border border-[#E5E0D8] hover:border-[#FED7AA] text-left transition-all shadow-2xs hover:shadow-xs cursor-pointer group"
-                >
-                  <Sunrise className="w-4 h-4 text-slate-500 group-hover:text-[#EA580C] mb-2 transition-colors" />
-                  <span className="text-xs font-semibold text-slate-800 block">Prep for the day</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInlinePrompt('Refactor and clean up repository directory structure: ')}
-                  className="p-3 rounded-xl bg-white hover:bg-[#FFF7ED] border border-[#E5E0D8] hover:border-[#FED7AA] text-left transition-all shadow-2xs hover:shadow-xs cursor-pointer group"
-                >
-                  <Folder className="w-4 h-4 text-slate-500 group-hover:text-[#EA580C] mb-2 transition-colors" />
-                  <span className="text-xs font-semibold text-slate-800 block">Organize files</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInlinePrompt('Run test suite and verify changes: ')}
-                  className="p-3 rounded-xl bg-white hover:bg-[#FFF7ED] border border-[#E5E0D8] hover:border-[#FED7AA] text-left transition-all shadow-2xs hover:shadow-xs cursor-pointer group"
-                >
-                  <MessageSquare className="w-4 h-4 text-slate-500 group-hover:text-[#EA580C] mb-2 transition-colors" />
-                  <span className="text-xs font-semibold text-slate-800 block">Send a message</span>
-                </button>
-              </div>
-
-              {/* Floating Bottom Prompt Composer matching Image 3 */}
-              <div className="w-full">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleInlinePromptSubmit();
-                  }}
-                  className="bg-white rounded-2xl border border-[#E5E0D8] focus-within:border-[#EA580C] p-3 shadow-md transition-all flex flex-col gap-2.5"
-                >
-                  <textarea
-                    value={inlinePrompt}
-                    onChange={(e) => setInlinePrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleInlinePromptSubmit();
-                      }
-                    }}
-                    rows={2}
-                    placeholder="Type a task here or use / for more tools"
-                    className="w-full bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none resize-none px-1 leading-relaxed"
-                  />
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
-                    <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
-                      <button
-                        type="button"
-                        onClick={() => setIsExplorerOpen(!isExplorerOpen)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer shrink-0"
-                        title="Attach file / browse workspace"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-
-                      {/* Mode Selector Pill in Prompt Composer */}
-                      <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-[#E5E0D8] px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs shrink-0">
-                        <ShieldAlert className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <select
-                          value={workspace?.permissionMode || 'approve_plan'}
-                          onChange={(e) => handleUpdatePermissionMode(e.target.value)}
-                          className="bg-transparent font-semibold text-slate-700 text-xs focus:outline-none cursor-pointer"
-                        >
-                          <option value="approve_plan">Mode B: Approve Plan</option>
-                          <option value="ask_every_change">Mode A: Ask Each Change</option>
-                          <option value="session_edit">Mode C: Session Edit</option>
-                        </select>
-                      </div>
-
-                      {/* Context Window Selector Pill in Prompt Composer */}
-                      <div
-                        className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-[#E5E0D8] px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs shrink-0"
-                        title={contextBudget ? `Effective limit: ${(contextBudget.effectiveLimit / 1024).toFixed(0)}K · Remaining: ${(contextBudget.remainingTokens / 1024).toFixed(1)}K` : undefined}
-                      >
-                        <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <select
-                          value={contextPreference}
-                          onChange={(e) => handleChangeContextPreference(e.target.value)}
-                          className="bg-transparent font-semibold text-slate-700 text-xs focus:outline-none cursor-pointer"
-                        >
-                          <option value="auto">Auto (1M)</option>
-                          <option value="32k">32K Tokens</option>
-                          <option value="64k">64K Tokens</option>
-                          <option value="128k">128K Tokens</option>
-                          <option value="200k">200K Tokens</option>
-                          <option value="500k">500K Tokens</option>
-                          <option value="1m">1M Tokens</option>
-                        </select>
-                        {contextBudget && (
-                          <span className="text-[10px] font-mono text-slate-500 border-l border-[#E5E0D8] pl-1.5 shrink-0">
-                            {contextBudget.utilizationPercent}%
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isInlineSubmitting || !inlinePrompt.trim()}
-                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] disabled:opacity-40 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
-                    >
-                      {isInlineSubmitting ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <span>Start</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
+            <CoworkHeroView
+              workspace={workspace}
+              inlinePrompt={inlinePrompt}
+              setInlinePrompt={setInlinePrompt}
+              isInlineSubmitting={isInlineSubmitting}
+              onInlinePromptSubmit={handleInlinePromptSubmit}
+              isExplorerOpen={isExplorerOpen}
+              setIsExplorerOpen={setIsExplorerOpen}
+              contextPreference={contextPreference}
+              contextBudget={contextBudget}
+              onChangeContextPreference={handleChangeContextPreference}
+              onUpdatePermissionMode={handleUpdatePermissionMode}
+            />
           ) : (
-            /* When a Task is Active: The Interactive Code & Diff Canvas */
-            <div className="flex-1 flex flex-col overflow-hidden bg-white">
-              {/* Canvas Header */}
-              <div className="h-11 border-b border-[#EBE7DF] bg-[#FAF8F5] px-3 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsExplorerOpen(!isExplorerOpen)}
-                    className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
-                      isExplorerOpen
-                        ? 'bg-[#FFF7ED] border-[#FED7AA] text-[#EA580C]'
-                        : 'bg-white border-[#E5E0D8] text-slate-600 hover:bg-slate-50'
-                    }`}
-                    title={isExplorerOpen ? 'Hide file tree' : 'Show file tree'}
-                  >
-                    {isExplorerOpen ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeft className="w-3.5 h-3.5" />}
-                    <span className="text-[11px]">Files</span>
-                  </button>
-
-                  {selectedFilePath && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#E5E0D8] text-xs font-mono text-slate-800 shadow-2xs">
-                      <FileCode className="w-3.5 h-3.5 text-[#EA580C]" />
-                      <span className="font-bold truncate max-w-[200px]">{pathBasename(selectedFilePath)}</span>
-                      {editedFileContent !== selectedFileContent && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="Unsaved changes" />
-                      )}
-                    </div>
-                  )}
-
-                  {/* Mode Pills */}
-                  <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg text-[11px] font-semibold text-slate-600">
-                    <button
-                      type="button"
-                      onClick={() => setRightViewMode('editor')}
-                      className={`px-2.5 py-0.5 rounded-md transition-colors cursor-pointer ${
-                        rightViewMode === 'editor' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'hover:text-slate-900'
-                      }`}
-                    >
-                      Editor
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRightViewMode('diff')}
-                      className={`px-2.5 py-0.5 rounded-md transition-colors cursor-pointer ${
-                        rightViewMode === 'diff' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'hover:text-slate-900'
-                      }`}
-                    >
-                      Unified Diff
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRightViewMode('artifacts')}
-                      className={`px-2.5 py-0.5 rounded-md transition-colors cursor-pointer ${
-                        rightViewMode === 'artifacts' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'hover:text-slate-900'
-                      }`}
-                    >
-                      Artifacts ({artifacts.length})
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {rightViewMode === 'editor' && selectedFilePath && (
-                    <button
-                      onClick={handleSaveFile}
-                      disabled={isSavingFile || editedFileContent === selectedFileContent}
-                      className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-lg shadow-2xs transition-colors cursor-pointer"
-                    >
-                      <Save className="w-3 h-3" />
-                      <span>{isSavingFile ? 'Saving...' : 'Save File'}</span>
-                    </button>
-                  )}
-
-                  {/* Terminal Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setIsTerminalOpen(!isTerminalOpen)}
-                    className={`flex items-center gap-1 px-2.5 py-1 text-xs font-mono rounded-lg border transition-colors cursor-pointer ${
-                      isTerminalOpen
-                        ? 'bg-slate-900 text-emerald-400 border-slate-950 shadow-2xs'
-                        : 'bg-white border-[#E5E0D8] text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Terminal className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-[11px] font-sans font-semibold">Terminal</span>
-                    {terminalOutput && (
-                      <span
-                        className={`ml-1 px-1 rounded text-[9px] font-bold ${
-                          terminalOutput.exitCode === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {terminalOutput.exitCode}
-                      </span>
-                    )}
-                    {isTerminalOpen ? <ChevronDown className="w-3 h-3 ml-0.5" /> : <ChevronUp className="w-3 h-3 ml-0.5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Canvas Body */}
-              <div className="flex-1 flex overflow-hidden relative">
-                {isExplorerOpen && (
-                  <div className="w-60 border-r border-[#EBE7DF] bg-[#FAF8F5] flex flex-col shrink-0 overflow-hidden">
-                    <div className="p-2.5 border-b border-[#EBE7DF] flex items-center justify-between bg-[#FCFAF7]">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        Project Explorer
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => syncFolderInputRef.current?.click()}
-                          disabled={isSyncingFiles}
-                          className="text-slate-400 hover:text-[#EA580C] cursor-pointer p-0.5 rounded transition-colors"
-                          title="Upload or sync folder files from disk"
-                        >
-                          {isSyncingFiles ? <RefreshCw className="w-3 h-3 animate-spin text-[#EA580C]" /> : <FolderUp className="w-3 h-3" />}
-                        </button>
-                        <input
-                          type="file"
-                          ref={syncFolderInputRef}
-                          onChange={handleSyncFolderInputChange}
-                          className="hidden"
-                          // @ts-ignore
-                          webkitdirectory=""
-                          directory=""
-                          multiple
-                        />
-                        <button
-                          onClick={loadProjectTree}
-                          className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 rounded transition-colors"
-                          title="Refresh project files"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="p-2 border-b border-[#EBE7DF]">
-                      <div className="relative">
-                        <Search className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
-                        <input
-                          type="text"
-                          placeholder="Search files..."
-                          value={fileSearchQuery}
-                          onChange={(e) => setFileSearchQuery(e.target.value)}
-                          className="w-full text-[11px] pl-6 pr-2 py-1 rounded-md bg-white border border-[#E5E0D8] focus:outline-none focus:border-[#EA580C]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-2 space-y-0.5 no-scrollbar">
-                      {fileTree.length > 0 ? (
-                        fileTree.map((node) => renderFileNode(node))
-                      ) : (
-                        <div className="text-center py-8 text-xs text-slate-400">
-                          No files found in workspace.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Main Canvas Editor Area */}
-                <div className="flex-1 flex flex-col overflow-hidden bg-white">
-                  {rightViewMode === 'editor' ? (
-                    selectedFilePath ? (
-                      <div className="h-full flex flex-col">
-                        <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono bg-slate-50/50 shrink-0">
-                          <span className="font-semibold text-slate-700">{selectedFilePath}</span>
-                          <div className="flex items-center gap-3 text-[11px]">
-                            <span>{editedFileContent.split('\n').length} lines</span>
-                            <span>{editedFileContent.length} chars</span>
-                            <button
-                              type="button"
-                              onClick={() => navigator.clipboard.writeText(editedFileContent)}
-                              className="flex items-center gap-1 hover:text-slate-800 cursor-pointer"
-                              title="Copy file content"
-                            >
-                              <Copy className="w-3 h-3" />
-                              <span>Copy</span>
-                            </button>
-                          </div>
-                        </div>
-                        <textarea
-                          value={editedFileContent}
-                          onChange={(e) => setEditedFileContent(e.target.value)}
-                          className="flex-1 w-full p-4 font-mono text-[12.5px] leading-relaxed text-slate-800 bg-white focus:outline-none resize-none no-scrollbar select-text"
-                          spellCheck={false}
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-3">
-                        <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C]">
-                          <FileCode className="w-6 h-6" />
-                        </div>
-                        <div className="max-w-sm space-y-1">
-                          <h4 className="text-xs font-bold text-slate-800">The Canvas is Ready</h4>
-                          <p className="text-[11px] text-slate-500 leading-relaxed">
-                            Click any planned file from the Progress panel on the right or explore project files to start editing.
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  ) : rightViewMode === 'diff' ? (
-                    <div className="h-full overflow-y-auto p-4 space-y-4">
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                        <h3 className="text-xs font-bold text-slate-900">Repository Changes & Diff</h3>
-                        {gitStatus?.isGit && (
-                          <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            branch: {gitStatus.branch || 'main'}
-                          </span>
-                        )}
-                      </div>
-
-                      {gitStatus?.modified && gitStatus.modified.length > 0 ? (
-                        <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 font-mono text-xs space-y-2">
-                          <div className="font-bold text-amber-900">Modified Files ({gitStatus.modified.length}):</div>
-                          <div className="space-y-1">
-                            {gitStatus.modified.map((m: string) => (
-                              <div
-                                key={m}
-                                onClick={() => handleSelectFile(m)}
-                                className="text-amber-800 hover:text-[#EA580C] hover:underline cursor-pointer flex items-center gap-1.5"
-                              >
-                                <span>•</span>
-                                <span>{m}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 italic">
-                          Working tree clean. No uncommitted modifications.
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-full overflow-y-auto p-4 space-y-3">
-                      <h3 className="text-xs font-bold text-slate-900 mb-2">Workspace Artifacts ({artifacts.length})</h3>
-                      <div className="space-y-3">
-                        {artifacts.map((art) => (
-                          <div key={art.id} className="p-3 bg-[#FAF8F5] rounded-xl border border-[#E5E0D8] text-xs">
-                            <div className="flex items-center justify-between font-bold text-slate-900 mb-1.5">
-                              <span>{art.title}</span>
-                              <span className="font-mono text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                v{art.version}
-                              </span>
-                            </div>
-                            <pre className="font-mono text-[11px] text-slate-700 max-h-48 overflow-y-auto bg-white p-3 rounded-lg border border-slate-200">
-                              <code>{art.content}</code>
-                            </pre>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Collapsible Terminal */}
-              {isTerminalOpen && (
-                <div className="h-52 border-t border-slate-800 bg-[#16161E] text-slate-200 flex flex-col shrink-0 animate-in slide-in-from-bottom duration-150">
-                  <div className="px-3 py-1.5 bg-[#1F1F2E] border-b border-slate-800 flex items-center justify-between text-xs font-mono">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="font-bold text-slate-200">Terminal</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleExecuteTerminal('npm test')}
-                        disabled={isExecutingCommand}
-                        className="px-2 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 rounded text-slate-300 cursor-pointer"
-                      >
-                        npm test
-                      </button>
-                      <button
-                        onClick={() => handleExecuteTerminal('git status')}
-                        disabled={isExecutingCommand}
-                        className="px-2 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 rounded text-slate-300 cursor-pointer"
-                      >
-                        git status
-                      </button>
-                      <button
-                        onClick={() => setIsTerminalOpen(false)}
-                        className="p-1 text-slate-400 hover:text-slate-200 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex-1 p-3 font-mono text-xs overflow-y-auto no-scrollbar space-y-1">
-                    {terminalOutput ? (
-                      <pre className="text-slate-200 whitespace-pre-wrap break-all leading-relaxed">
-                        {terminalOutput.stdout || terminalOutput.stderr}
-                      </pre>
-                    ) : (
-                      <div className="text-slate-500 italic">Run authorized development commands.</div>
-                    )}
-                  </div>
-                  <div className="p-2 border-t border-slate-800 bg-[#1A1A26] flex items-center gap-2">
-                    <span className="text-emerald-400 font-mono text-xs select-none">❯</span>
-                    <input
-                      type="text"
-                      placeholder="Enter command..."
-                      value={terminalCommand}
-                      onChange={(e) => setTerminalCommand(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleExecuteTerminal();
-                      }}
-                      className="flex-1 bg-transparent text-xs font-mono text-white focus:outline-none"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
+            <CoworkCanvas
+              workspace={workspace}
+              selectedTask={selectedTask}
+              selectedFilePath={selectedFilePath}
+              selectedFileContent={selectedFileContent}
+              editedFileContent={editedFileContent}
+              setEditedFileContent={setEditedFileContent}
+              isSavingFile={isSavingFile}
+              onSaveFile={handleSaveFile}
+              rightViewMode={rightViewMode}
+              setRightViewMode={setRightViewMode}
+              artifacts={artifacts}
+              isExplorerOpen={isExplorerOpen}
+              setIsExplorerOpen={setIsExplorerOpen}
+              fileTree={fileTree}
+              onSelectFile={handleSelectFile}
+              fileSearchQuery={fileSearchQuery}
+              setFileSearchQuery={setFileSearchQuery}
+              gitStatus={gitStatus}
+              onLoadProjectTree={loadProjectTree}
+              isSyncingFiles={isSyncingFiles}
+              onSyncFolderInputChange={handleSyncFolderInputChange}
+              syncFolderInputRef={syncFolderInputRef}
+              isTerminalOpen={isTerminalOpen}
+              setIsTerminalOpen={setIsTerminalOpen}
+              terminalCommand={terminalCommand}
+              setTerminalCommand={setTerminalCommand}
+              isExecutingCommand={isExecutingCommand}
+              terminalOutput={terminalOutput}
+              onExecuteTerminal={handleExecuteTerminal}
+            />
           )}
         </div>
 
-        {/* Panel 3 (Right): Sidecar Widgets (Progress, Artifacts, Context) matching Image 3 */}
-        {isSidecarOpen && (
-          <div
-            className="fixed inset-0 bg-black/25 backdrop-blur-2xs z-30 2xl:hidden"
-            onClick={() => setIsSidecarOpen(false)}
-          />
-        )}
-        <div
-          className={`${
-            isSidecarOpen
-              ? 'fixed inset-y-0 right-0 z-40 2xl:static flex'
-              : 'hidden 2xl:flex'
-          } w-72 xl:w-80 border-l border-[#EBE7DF] bg-[#FAF8F5] flex-col shrink-0 overflow-y-auto p-3 space-y-3 no-scrollbar shadow-xl 2xl:shadow-none animate-in slide-in-from-right duration-200`}
-        >
-              <div className="flex items-center justify-between pb-1 2xl:hidden border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-700">Sidecar & Progress</span>
+        {/* Panel 3: Right Sidecar Widgets */}
+        <CoworkSidecar
+          workspace={workspace}
+          selectedTask={selectedTask}
+          artifacts={artifacts}
+          projectStack={projectStack}
+          gitStatus={gitStatus}
+          contextPreference={contextPreference}
+          contextBudget={contextBudget}
+          isSidecarOpen={isSidecarOpen}
+          onCloseSidecar={() => setIsSidecarOpen(false)}
+          onAdvanceTask={handleAdvanceTask}
+          onApprovePlan={handleApprovePlan}
+          onRejectPlan={handleRejectPlan}
+          onSelectFile={handleSelectFile}
+          onChangeContextPreference={handleChangeContextPreference}
+          onUpdatePermissionMode={handleUpdatePermissionMode}
+        />
+      </div>
+
+      {/* Bind Local Folder Modal */}
+      <FolderBindingModal
+        isOpen={isBindingLocal}
+        onClose={() => {
+          setIsBindingLocal(false);
+          setPickedFiles([]);
+          setPickedFolderName('');
+        }}
+        localFolderPath={localFolderPath}
+        setLocalFolderPath={setLocalFolderPath}
+        localWorkspaceName={localWorkspaceName}
+        setLocalWorkspaceName={setLocalWorkspaceName}
+        availableWorkspaces={availableWorkspaces}
+        isBindingSubmitting={isBindingSubmitting}
+        isReadingFolder={isReadingFolder}
+        pickedFiles={pickedFiles}
+        pickedFolderName={pickedFolderName}
+        onPickFolderFromDisk={handlePickFolderFromDisk}
+        onFolderInputChange={handleFolderInputChange}
+        onSubmit={handleBindLocalFolder}
+        folderInputRef={folderInputRef}
+      />
+
+      {/* New Task Goal Modal */}
+      {isCreatingTask && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Define Autonomous Goal</h3>
+              <button
+                onClick={() => setIsCreatingTask(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateTask} className="p-5 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Build dark mode toggle with Tailwind"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#EA580C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Goal Description</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Describe what needs to be implemented..."
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#EA580C] resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Constraints (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Do not touch database schema"
+                  value={constraints}
+                  onChange={(e) => setConstraints(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#EA580C]"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsSidecarOpen(false)}
-                  className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-md transition-colors cursor-pointer"
-                  title="Close sidecar"
+                  onClick={() => setIsCreatingTask(false)}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#EA580C] hover:bg-[#C2410C] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  <span>Launch Task</span>
                 </button>
               </div>
-
-              {/* Card 1: Progress (matching Image 3 top card) */}
-              <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsProgressOpen(!isProgressOpen)}
-              className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              <div>
-                <h4 className="text-xs font-bold text-slate-800">Progress</h4>
-                <p className="text-[10px] text-slate-500">Steps will show as the task unfolds.</p>
-              </div>
-              {isProgressOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-            </button>
-
-            {isProgressOpen && (
-              <div className="px-3.5 pb-3.5 pt-1 space-y-2.5 border-t border-slate-100">
-                {selectedTask ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase font-mono">
-                        {selectedTask.title}
-                      </span>
-                      {selectedTask.status !== 'completed' && (
-                        <button
-                          type="button"
-                          onClick={() => handleAdvanceTask(selectedTask.id)}
-                          className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-2xs cursor-pointer"
-                        >
-                          <Play className="w-2.5 h-2.5 fill-current" />
-                          <span>Advance</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Mode B: Plan Approval Callout */}
-                    {(workspace?.permissionMode || 'approve_plan') === 'approve_plan' &&
-                      !selectedTask.isPlanApproved &&
-                      selectedTask.status !== 'completed' &&
-                      selectedTask.status !== 'cancelled' && (
-                        <div className="p-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs space-y-2">
-                          <div className="flex items-center gap-1 font-bold text-amber-950 text-[11px]">
-                            <ShieldAlert className="w-3.5 h-3.5 text-[#D97706]" />
-                            <span>Plan Review Required</span>
-                          </div>
-                          {selectedTask.plannedFiles && selectedTask.plannedFiles.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {selectedTask.plannedFiles.map((f) => (
-                                <button
-                                  key={f}
-                                  type="button"
-                                  onClick={() => handleSelectFile(f)}
-                                  className="px-1.5 py-0.5 bg-white text-amber-900 border border-amber-300 rounded text-[9px] font-mono font-semibold"
-                                >
-                                  {f}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1.5 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => handleApprovePlan(selectedTask.id)}
-                              className="px-2.5 py-1 bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold rounded text-[10px]"
-                            >
-                              Approve Plan
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRejectPlan(selectedTask.id)}
-                              className="px-2 py-1 text-amber-900 hover:bg-amber-100 rounded text-[10px]"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Steps list */}
-                    <div className="space-y-2">
-                      {selectedTask.steps.map((step, idx) => (
-                        <div key={step.id} className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] space-y-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-semibold text-slate-800 truncate">
-                              {idx + 1}. {step.title}
-                            </span>
-                            {step.status === 'completed' ? (
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                            ) : step.status === 'running' ? (
-                              <RefreshCw className="w-3 h-3 text-[#EA580C] animate-spin shrink-0" />
-                            ) : (
-                              <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                            )}
-                          </div>
-                          {step.targetPath && (
-                            <button
-                              type="button"
-                              onClick={() => handleSelectFile(step.targetPath!)}
-                              className="text-[9px] font-mono text-[#EA580C] bg-orange-50/60 px-1 py-0.2 rounded hover:underline block truncate"
-                            >
-                              {step.targetPath}
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-[11px] text-slate-400 italic py-2">
-                    No active steps. Start a task to unfold progress.
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card 2: Artifacts (matching Image 3 middle card) */}
-          <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsArtifactsOpen(!isArtifactsOpen)}
-              className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              <div>
-                <h4 className="text-xs font-bold text-slate-800">Artifacts</h4>
-                <p className="text-[10px] text-slate-500">Outputs created during the task land here.</p>
-              </div>
-              {isArtifactsOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-            </button>
-
-            {isArtifactsOpen && (
-              <div className="px-3.5 pb-3.5 pt-1 space-y-1.5 border-t border-slate-100">
-                {artifacts.map((art) => (
-                  <div key={art.id} className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 truncate">{art.title}</span>
-                    <span className="font-mono text-[9px] text-slate-400">v{art.version}</span>
-                  </div>
-                ))}
-                {artifacts.length === 0 && (
-                  <div className="text-[11px] text-slate-400 italic py-2">
-                    No outputs created yet.
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card 3: Context (matching Image 3 bottom card) */}
-          <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsContextOpen(!isContextOpen)}
-              className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              <div>
-                <h4 className="text-xs font-bold text-slate-800">Context</h4>
-                <p className="text-[10px] text-slate-500">Track the tools and files in use as Cortex works.</p>
-              </div>
-              {isContextOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-            </button>
-
-            {isContextOpen && (
-              <div className="px-3.5 pb-3.5 pt-1 space-y-2.5 border-t border-slate-100 text-xs">
-                {/* Context Window Selector inside Context Card */}
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                    Context Window
-                  </label>
-                  <select
-                    value={contextPreference}
-                    onChange={(e) => handleChangeContextPreference(e.target.value)}
-                    className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800 cursor-pointer focus:outline-none"
-                  >
-                    <option value="auto">Auto (1M Tokens)</option>
-                    <option value="32k">32K Tokens</option>
-                    <option value="64k">64K Tokens</option>
-                    <option value="128k">128K Tokens</option>
-                    <option value="200k">200K Tokens</option>
-                    <option value="500k">500K Tokens</option>
-                    <option value="1m">1M Tokens</option>
-                  </select>
-                  {contextBudget && (
-                    <div className="text-[10px] text-slate-500 font-mono mt-1 flex justify-between">
-                      <span>Utilization: {contextBudget.utilizationPercent}%</span>
-                      <span>Rem: {(contextBudget.remainingTokens / 1024).toFixed(0)}K</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Permission Mode Selector inside Context Card */}
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                    Permission Policy
-                  </label>
-                  <select
-                    value={workspace?.permissionMode || 'approve_plan'}
-                    onChange={(e) => handleUpdatePermissionMode(e.target.value)}
-                    className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800 cursor-pointer focus:outline-none"
-                  >
-                    <option value="approve_plan">Mode B: Approve Plan (Default)</option>
-                    <option value="ask_every_change">Mode A: Ask Every Change</option>
-                    <option value="session_edit">Mode C: Session Edit</option>
-                  </select>
-                </div>
-
-                {/* Tech Stack & Git info */}
-                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[10px] font-mono space-y-1">
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>Root:</span>
-                    <span className="truncate max-w-[140px] font-bold">{workspace?.name}</span>
-                  </div>
-                  {projectStack && (
-                    <div className="flex items-center justify-between text-slate-600">
-                      <span>Stack:</span>
-                      <span className="text-[#EA580C] font-semibold">{projectStack.framework}</span>
-                    </div>
-                  )}
-                  {gitStatus?.isGit && (
-                    <div className="flex items-center justify-between text-emerald-700">
-                      <span>Git:</span>
-                      <span className="font-semibold">{gitStatus.branch || 'main'}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
-
-function pathBasename(p: string): string {
-  const parts = p.split(/[\/\\]/);
-  return parts[parts.length - 1] || p;
-}
