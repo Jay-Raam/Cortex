@@ -19,7 +19,7 @@ import {
   Folder,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact, WorkspaceFileNode, ExecutionCommandResult } from '../server/types';
-import { fetchGraphQL, advanceTaskApi, approveStepApi, importGitHubRepoApi, createGitHubPrApi } from '../lib/api';
+import { fetchGraphQL, advanceTaskApi, approveStepApi, importGitHubRepoApi, createGitHubPrApi, executeSwarmTaskApi } from '../lib/api';
 import { CoworkWorkspaceProps, RightViewMode } from './cowork/types';
 import { CoworkTaskList } from './cowork/CoworkTaskList';
 import { CoworkHeroView } from './cowork/CoworkHeroView';
@@ -362,6 +362,18 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
       alert(`Error binding folder: ${err.message}`);
     } finally {
       setIsBindingSubmitting(false);
+    }
+  };
+
+  // Multi-Agent Swarm Execution
+  const handleRunSwarm = async (taskId: string) => {
+    try {
+      const updated = await executeSwarmTaskApi(taskId);
+      setSelectedTaskId(updated.id);
+      await loadWorkspaceData();
+      onRefreshWorkspace();
+    } catch (err: any) {
+      alert('Swarm execution failed: ' + err.message);
     }
   };
 
@@ -1036,6 +1048,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
           terminalOutput={terminalOutput}
           isExecutingCommand={isExecutingCommand}
           onExecuteTerminal={handleExecuteTerminal}
+          onRunSwarm={handleRunSwarm}
         />
       )}
 

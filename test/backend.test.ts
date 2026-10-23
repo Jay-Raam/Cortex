@@ -1619,6 +1619,168 @@ print(fibonacci(10))
     });
   });
 
+
+  describe('17. Multi-Agent Collaborative Swarm Workflow (Architect, Developer, Reviewer)', () => {
+    it('executes 3-agent swarm pipeline (Architect -> Developer -> QA Reviewer) via runSwarmTaskLoop', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_swarm_test_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Swarm Landing Page Project',
+        description: 'Swarm team test workspace',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_swarm_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Build Barber Shop Landing Page via Swarm',
+        goal: 'create a landing page for barber shop in html, css, js',
+        modelId: 'gemini-3.8-flash',
+        status: 'running',
+        isPlanApproved: true,
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      // Generate initial steps
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+      db.updateTask(task.id, testUser1.id, { steps, isPlanApproved: true, status: 'running' });
+
+      // Run Swarm Loop
+      const completedTask = await coworkEngine.runSwarmTaskLoop(task.id, testUser1.id);
+
+      assert.strictEqual(completedTask.status, 'completed', 'Swarm task must complete successfully');
+      assert.strictEqual(completedTask.isSwarmMode, true, 'isSwarmMode flag must be true');
+      assert.ok(completedTask.swarmEvents && completedTask.swarmEvents.length === 3, 'Must contain 3 swarm collaboration events');
+
+      const [archEvent, devEvent, qaEvent] = completedTask.swarmEvents;
+      assert.strictEqual(archEvent.role, 'architect', 'Event 1 must be from Architect');
+      assert.strictEqual(archEvent.status, 'completed');
+      assert.ok(archEvent.deliverables?.includes('index.html'), 'Architect must plan index.html');
+
+      assert.strictEqual(devEvent.role, 'developer', 'Event 2 must be from Developer');
+      assert.strictEqual(devEvent.status, 'completed');
+
+      assert.strictEqual(qaEvent.role, 'reviewer', 'Event 3 must be from QA Auditor');
+      assert.strictEqual(qaEvent.status, 'completed');
+      assert.ok(qaEvent.message.includes('0 high-severity vulnerabilities'), 'QA report must include security audit');
+
+      assert.ok(completedTask.summary?.includes('Swarm Team (Architect Dr. Aris + Developer Devon + QA Serena)'), 'Summary must highlight swarm team');
+    });
+
+    it('triggers autonomous swarm execution via POST /api/cowork/tasks/:id/swarm-execute', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_swarm_api_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Swarm API Workspace',
+        description: 'Swarm HTTP API test',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_swarm_http_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Build Portfolio via Swarm API',
+        goal: 'create a personal developer portfolio website in html and css',
+        modelId: 'gemini-3.8-flash',
+        status: 'running',
+        isPlanApproved: true,
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+      const steps = await coworkEngine.planTask(task, testUser1.id);
+      db.updateTask(task.id, testUser1.id, { steps, isPlanApproved: true, status: 'running' });
+
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/tasks/${task.id}/swarm-execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        assert.strictEqual(res.status, 200, 'swarm-execute must return 200 OK');
+        const data = await res.json();
+        assert.strictEqual(data.success, true);
+        assert.strictEqual(data.task.isSwarmMode, true);
+        assert.strictEqual(data.swarmEvents.length, 3);
+        assert.strictEqual(data.task.status, 'completed');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects unauthorized swarm execution from another tenant', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_swarm_unauth_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Private Swarm Workspace',
+        description: 'Tenant isolation test',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const task: AgentTask = {
+        id: `task_swarm_tenant_${Date.now()}`,
+        workspaceId: ws.id,
+        userId: testUser1.id,
+        title: 'Private Swarm Task',
+        goal: 'private task',
+        modelId: 'gemini-3.8-flash',
+        status: 'running',
+        steps: [],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createTask(task);
+
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken: u2Token } = generateTokens(testUser2);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/tasks/${task.id}/swarm-execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${u2Token}`,
+          },
+        });
+        assert.strictEqual(res.status, 404, 'Must return 404 for foreign tenant');
+      } finally {
+        server.close();
+      }
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

@@ -102,6 +102,7 @@ export interface CoworkSidecarProps {
   terminalOutput?: ExecutionCommandResult | null;
   isExecutingCommand?: boolean;
   onExecuteTerminal?: (cmd?: string) => void;
+  onRunSwarm?: (taskId: string) => void;
 }
 
 export interface FolderBindingModalProps {
