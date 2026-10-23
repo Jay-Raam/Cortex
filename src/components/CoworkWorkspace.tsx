@@ -992,6 +992,31 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         )}
       </div>
 
+      {/* Real-time Sidecar & Execution Stream */}
+      {selectedTask && (
+        <CoworkSidecar
+          workspace={workspace}
+          selectedTask={selectedTask}
+          artifacts={artifacts}
+          projectStack={projectStack}
+          gitStatus={gitStatus}
+          contextPreference={contextPreference}
+          contextBudget={contextBudget}
+          isSidecarOpen={isSidecarOpen}
+          onCloseSidecar={() => setIsSidecarOpen(false)}
+          onAdvanceTask={handleAdvanceTask}
+          onApproveStep={handleApproveStep}
+          onApprovePlan={handleApprovePlan}
+          onRejectPlan={handleRejectPlan}
+          onSelectFile={handleSelectFile}
+          onChangeContextPreference={handleChangeContextPreference}
+          onUpdatePermissionMode={handleUpdatePermissionMode}
+          terminalOutput={terminalOutput}
+          isExecutingCommand={isExecutingCommand}
+          onExecuteTerminal={handleExecuteTerminal}
+        />
+      )}
+
       {/* Bind Local Folder Modal */}
       <FolderBindingModal
         isOpen={isBindingLocal}

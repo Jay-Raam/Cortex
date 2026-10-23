@@ -99,6 +99,9 @@ export interface CoworkSidecarProps {
   onSelectFile: (filePath: string) => void;
   onChangeContextPreference: (pref: string) => void;
   onUpdatePermissionMode: (mode: string) => void;
+  terminalOutput?: ExecutionCommandResult | null;
+  isExecutingCommand?: boolean;
+  onExecuteTerminal?: (cmd?: string) => void;
 }
 
 export interface FolderBindingModalProps {

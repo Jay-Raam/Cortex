@@ -38,6 +38,7 @@ import { CoworkCanvasProps } from './types';
 import { UnifiedDiffViewer } from './UnifiedDiffViewer';
 import { WorkspaceFileNode } from '../../server/types';
 import { downloadWorkspaceZip } from '../../lib/api';
+import { parseAnsiToHtml } from './ansi';
 
 function pathBasename(p: string): string {
   const parts = p.split(/[\/\\]/);
@@ -1103,9 +1104,12 @@ export const CoworkCanvas: React.FC<CoworkCanvasProps> = ({
               </div>
               <div className="flex-1 p-3 font-mono text-xs overflow-y-auto no-scrollbar space-y-1">
                 {terminalOutput ? (
-                  <pre className="text-slate-200 whitespace-pre-wrap break-all leading-relaxed">
-                    {terminalOutput.stdout || terminalOutput.stderr}
-                  </pre>
+                  <pre
+                    className="text-slate-200 whitespace-pre-wrap break-all leading-relaxed font-mono"
+                    dangerouslySetInnerHTML={{
+                      __html: parseAnsiToHtml(terminalOutput.stdout || terminalOutput.stderr),
+                    }}
+                  />
                 ) : (
                   <div className="text-slate-500 italic">Run authorized development commands.</div>
                 )}

@@ -9,9 +9,13 @@ import {
   RefreshCw,
   Clock,
   Download,
+  Terminal,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { CoworkSidecarProps } from './types';
 import { downloadWorkspaceZip } from '../../lib/api';
+import { parseAnsiToHtml } from './ansi';
 
 export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
   workspace,
@@ -29,11 +33,16 @@ export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
   onSelectFile,
   onChangeContextPreference,
   onUpdatePermissionMode,
+  terminalOutput,
+  isExecutingCommand,
+  onExecuteTerminal,
 }) => {
   const [isProgressOpen, setIsProgressOpen] = useState(true);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(true);
   const [isContextOpen, setIsContextOpen] = useState(true);
+  const [isTerminalCardOpen, setIsTerminalCardOpen] = useState(true);
   const [isExportingZip, setIsExportingZip] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleExportZip = async () => {
     if (!workspace?.id || isExportingZip) return;
@@ -309,6 +318,86 @@ export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
                     <span className="font-semibold">{gitStatus.branch || 'main'}</span>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Card 4: Terminal & Execution Stream */}
+        <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsTerminalCardOpen(!isTerminalCardOpen)}
+            className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Terminal className="w-3.5 h-3.5 text-emerald-600" />
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">Terminal Stream</h4>
+                <p className="text-[10px] text-slate-500">Live stdout/stderr & execution</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {isExecutingCommand && (
+                <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-mono font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  Running
+                </span>
+              )}
+              {isTerminalCardOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+            </div>
+          </button>
+
+          {isTerminalCardOpen && (
+            <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-100">
+              <div className="rounded-lg bg-[#16161E] border border-slate-800 p-2.5 text-[10px] font-mono text-slate-200 max-h-56 overflow-y-auto">
+                {terminalOutput ? (
+                  <div
+                    className="whitespace-pre-wrap break-all leading-relaxed font-mono"
+                    dangerouslySetInnerHTML={{
+                      __html: parseAnsiToHtml(terminalOutput.stdout || terminalOutput.stderr || 'Command completed with 0 exit code.'),
+                    }}
+                  />
+                ) : (
+                  <div className="text-slate-500 italic py-2">
+                    No active command logs. Execute tests or build tasks to inspect live output stream.
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                {terminalOutput && (
+                  <div className="text-[10px] font-mono flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${terminalOutput.exitCode === 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                    <span className="text-slate-500">Exit: {terminalOutput.exitCode}</span>
+                    <span className="text-slate-400">({terminalOutput.durationMs}ms)</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1 ml-auto">
+                  {onExecuteTerminal && (
+                    <button
+                      type="button"
+                      onClick={() => onExecuteTerminal('npm test')}
+                      disabled={isExecutingCommand}
+                      className="px-2 py-0.5 text-[9px] font-mono text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded cursor-pointer transition-colors"
+                    >
+                      test
+                    </button>
+                  )}
+                  {terminalOutput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(terminalOutput.stdout || terminalOutput.stderr || '');
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                      }}
+                      className="px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      {isCopied ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
+                      <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
