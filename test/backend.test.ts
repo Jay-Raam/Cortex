@@ -153,6 +153,22 @@ describe('Cortex AI Automated Test Suite', () => {
         });
       }, /paid inference model/);
     });
+
+    it('includes local Ollama models in catalog with zero-cost flag and streaming capability', () => {
+      const ollamaModel = modelCatalog.getModelById('ollama/qwen2.5-coder');
+      assert.ok(ollamaModel, 'Qwen 2.5 Coder Ollama model must exist in catalog');
+      assert.strictEqual(ollamaModel?.providerId, 'ollama');
+      assert.strictEqual(ollamaModel?.isFree, true, 'Ollama model must be 100% free');
+      assert.strictEqual(ollamaModel?.capabilities.streaming, true);
+
+      const resolved = modelRouter.resolveModel({
+        requestedModelId: 'ollama/qwen2.5-coder',
+        forceFree: true,
+        messages: [{ role: 'user', content: 'test code' }],
+      });
+      assert.strictEqual(resolved.model.id, 'ollama/qwen2.5-coder');
+      assert.strictEqual(resolved.model.providerId, 'ollama');
+    });
   });
 
   describe('3. Co-Work Engine & Bounded Tools', () => {

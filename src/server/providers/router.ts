@@ -231,6 +231,23 @@ export class ModelRouter {
           },
           signal
         );
+      } else if (model.providerId === 'ollama') {
+        const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
+        const realOllamaModel = model.id.replace(/^ollama\//, '');
+        completedText = await streamOpenAICompatibleResponse(
+          {
+            baseUrl,
+            apiKey: 'ollama', // Ollama does not require an API key
+          },
+          realOllamaModel,
+          req.messages,
+          req.systemInstruction,
+          {
+            onDelta: handleDelta,
+            onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
+          },
+          signal
+        );
       } else {
         // OpenAI compatible fallback
         const baseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL || 'https://api.openai.com/v1';

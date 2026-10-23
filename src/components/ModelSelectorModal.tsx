@@ -22,7 +22,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
   onSelectMode,
 }) => {
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'free' | 'gemini' | 'openrouter' | 'groq'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'free' | 'gemini' | 'openrouter' | 'groq' | 'ollama'>('all');
 
   const filteredModels = useMemo(() => {
     return models.filter((m) => {
@@ -37,6 +37,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
       if (activeTab === 'gemini') return m.providerId === 'gemini';
       if (activeTab === 'openrouter') return m.providerId === 'openrouter';
       if (activeTab === 'groq') return m.providerId === 'groq';
+      if (activeTab === 'ollama') return m.providerId === 'ollama';
       return true;
     });
   }, [models, search, activeTab]);
@@ -133,17 +134,18 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
         {/* Filter Bar & Search */}
         <div className="px-6 py-3 flex items-center justify-between gap-4 border-b border-slate-100">
           <div className="flex items-center gap-1 text-xs">
-            {(['all', 'free', 'gemini', 'openrouter', 'groq'] as const).map((tab) => (
+            {(['all', 'free', 'gemini', 'openrouter', 'groq', 'ollama'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1 rounded-lg capitalize font-medium transition-colors cursor-pointer ${
+                className={`px-3 py-1 rounded-lg capitalize font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
                   activeTab === tab
                     ? 'bg-[#FF6B00] text-white shadow-2xs'
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                {tab === 'all' ? 'All Models' : tab}
+                {tab === 'ollama' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
+                <span>{tab === 'all' ? 'All Models' : tab === 'ollama' ? 'Local Ollama' : tab}</span>
               </button>
             ))}
           </div>

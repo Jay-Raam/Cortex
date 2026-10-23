@@ -214,8 +214,46 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
       openrouter: Boolean(process.env.OPENROUTER_API_KEY),
       groq: Boolean(process.env.GROQ_API_KEY),
       nvidia: Boolean(process.env.NVIDIA_NIM_API_KEY),
+      ollama: true,
     },
   });
+});
+
+/**
+ * Local Ollama status & model discovery endpoint
+ */
+apiRouter.get('/providers/ollama/status', async (_req: Request, res: Response) => {
+  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  const tagsUrl = `${baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, '')}/api/tags`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+    const resp = await fetch(tagsUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (resp.ok) {
+      const data = (await resp.json()) as any;
+      const localModels = (data.models || []).map((m: any) => ({
+        name: m.name,
+        size: m.size,
+        modifiedAt: m.modified_at,
+      }));
+      return res.json({
+        available: true,
+        endpoint: baseUrl,
+        models: localModels,
+      });
+    }
+    return res.json({ available: false, endpoint: baseUrl, models: [], message: 'Ollama returned non-200' });
+  } catch (err: any) {
+    return res.json({
+      available: false,
+      endpoint: baseUrl,
+      models: [],
+      message: 'Local Ollama instance not reachable at ' + baseUrl,
+    });
+  }
 });
 
 /**

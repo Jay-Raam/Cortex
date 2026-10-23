@@ -1,4 +1,4 @@
-export type ProviderId = 'gemini' | 'openrouter' | 'groq' | 'nvidia' | 'openai';
+export type ProviderId = 'gemini' | 'openrouter' | 'groq' | 'nvidia' | 'openai' | 'ollama';
 export type ModelMode = 'efficient' | 'balanced' | 'powerful';
 export type ModelAvailability = 'available' | 'degraded' | 'rate_limited' | 'unconfigured';
 
