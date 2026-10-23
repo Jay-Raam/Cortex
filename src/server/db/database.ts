@@ -16,6 +16,19 @@ import {
   WorkspaceCheckpoint,
 } from '../types';
 
+
+export interface ArenaVote {
+  id: string;
+  userId: string;
+  prompt: string;
+  modelA: string;
+  modelB: string;
+  winner: 'model_a' | 'model_b' | 'tie' | 'both_bad';
+  latencyMsA?: number;
+  latencyMsB?: number;
+  createdAt: string;
+}
+
 interface DatabaseSchema {
   users: User[];
   sessions: Session[];
@@ -29,6 +42,7 @@ interface DatabaseSchema {
   checkpoints: WorkspaceCheckpoint[];
   notifications: NotificationItem[];
   preferences: NotificationPreferences[];
+  arenaVotes?: ArenaVote[];
 }
 
 const DATA_DIR = process.env.CORTEX_DATA_DIR || path.resolve(process.cwd(), 'data');
@@ -620,6 +634,19 @@ class Database {
 
   getCheckpointById(id: string): WorkspaceCheckpoint | undefined {
     return this.data.checkpoints.find((c) => c.id === id);
+  }
+
+
+  addArenaVote(vote: ArenaVote): ArenaVote {
+    if (!this.data.arenaVotes) this.data.arenaVotes = [];
+    this.data.arenaVotes.push(vote);
+    this.persist();
+    return vote;
+  }
+
+  getArenaVotes(userId: string): ArenaVote[] {
+    if (!this.data.arenaVotes) return [];
+    return this.data.arenaVotes.filter((v) => v.userId === userId);
   }
 
   createCheckpoint(ckpt: WorkspaceCheckpoint): WorkspaceCheckpoint {

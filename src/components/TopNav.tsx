@@ -11,12 +11,13 @@ import {
   Menu,
   Check,
   Radio,
+  Swords,
 } from 'lucide-react';
 import { ModelMode } from '../server/types';
 
 interface TopNavProps {
-  currentView: 'chat' | 'cowork' | 'skills' | 'docs';
-  onNavigate: (view: 'chat' | 'cowork' | 'skills' | 'docs') => void;
+  currentView: 'chat' | 'cowork' | 'skills' | 'docs' | 'arena';
+  onNavigate: (view: 'chat' | 'cowork' | 'skills' | 'docs' | 'arena') => void;
   selectedModelName: string;
   selectedMode: ModelMode;
   onOpenModelModal: () => void;
@@ -90,6 +91,18 @@ export const TopNav: React.FC<TopNavProps> = ({
           >
             Chat
           </button>
+          <button
+            onClick={() => onNavigate('arena')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              currentView === 'arena'
+                ? 'bg-white text-[#EA580C] shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Swords className="w-3.5 h-3.5 text-[#EA580C]" />
+            <span>Arena</span>
+          </button>
+
           {isDesktopApp() && (
             <button
               onClick={() => onNavigate('cowork')}
