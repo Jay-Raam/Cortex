@@ -1781,6 +1781,120 @@ print(fibonacci(10))
     });
   });
 
+
+  describe('18. AI Token Usage & Zero-Cost Savings Analytics Dashboard', () => {
+    it('aggregates prompt and completion tokens accurately across user conversations', async () => {
+      const conv = db.createConversation({
+        id: `conv_analytics_${Date.now()}`,
+        userId: testUser1.id,
+        title: 'Analytics Test Conversation',
+        modelId: 'gemini-3.8-flash',
+        providerId: 'gemini',
+        mode: 'balanced',
+        isPinned: false,
+        isArchived: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      db.addMessage({
+        id: `msg_ana_1_${Date.now()}`,
+        conversationId: conv.id,
+        role: 'user',
+        content: 'Hello Cortex! How does zero-cost AI model routing work in practice?',
+        createdAt: new Date().toISOString(),
+      }, testUser1.id);
+
+      db.addMessage({
+        id: `msg_ana_2_${Date.now()}`,
+        conversationId: conv.id,
+        role: 'assistant',
+        content: 'Zero-cost AI routing works by evaluating incoming prompt complexity and dynamically directing requests to free-tier cloud models like Gemini 3.8 Flash, OpenRouter free community models, or local Ollama instances, completely bypassing metered token charges.',
+        createdAt: new Date().toISOString(),
+      }, testUser1.id);
+
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/analytics/usage-summary`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        assert.strictEqual(res.status, 200, 'Must return 200 OK');
+        const data = await res.json();
+        assert.strictEqual(data.success, true);
+        assert.strictEqual(data.userId, testUser1.id);
+        assert.ok(data.summary.totalTokens > 0, 'Total tokens must be > 0');
+        assert.ok(data.summary.totalPromptTokens > 0, 'Prompt tokens must be > 0');
+        assert.ok(data.summary.totalCompletionTokens > 0, 'Completion tokens must be > 0');
+        assert.strictEqual(data.summary.actualCostCharged, 0.00, 'Actual cost charged must be 0.00');
+        assert.ok(data.summary.totalCostSaved >= 0, 'Cost saved must be non-negative');
+        assert.ok(data.summary.tokensByModel['gemini-3.8-flash'] > 0, 'Model breakdown must record gemini tokens');
+        assert.ok(data.summary.tokensByProvider['gemini'] > 0, 'Provider breakdown must record gemini tokens');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('enforces multi-tenant data isolation on usage analytics summary', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken: u2Token } = generateTokens(testUser2);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/analytics/usage-summary`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${u2Token}`,
+          },
+        });
+
+        assert.strictEqual(res.status, 200);
+        const data = await res.json();
+        assert.strictEqual(data.userId, testUser2.id);
+        assert.strictEqual(data.summary.totalConversations, 0);
+        assert.strictEqual(data.summary.totalTokens, 0);
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects unauthenticated requests to usage summary with 401', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/analytics/usage-summary`);
+        assert.strictEqual(res.status, 401, 'Unauthenticated request must return 401');
+      } finally {
+        server.close();
+      }
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');
