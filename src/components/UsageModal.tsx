@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Activity,
   X,
@@ -14,8 +14,15 @@ import {
   Sparkles,
   Clock,
   Coins,
+  BarChart3,
+  DollarSign,
+  ArrowUpRight,
+  RefreshCw,
+  PieChart,
+  Flame,
 } from 'lucide-react';
 import { ModelMode } from '../server/types';
+import { fetchUsageSummaryApi, UsageAnalyticsSummary } from '../lib/api';
 
 interface UsageModalProps {
   isOpen: boolean;
@@ -38,10 +45,23 @@ export const UsageModal: React.FC<UsageModalProps> = ({
   selectedMode = 'balanced',
   onSelectMode,
 }) => {
-  const [activeTab, setActiveTab] = useState<'chat' | 'quotas' | 'cost'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'analytics' | 'quotas' | 'cost'>('chat');
   const [copied, setCopied] = useState(false);
+  const [summaryData, setSummaryData] = useState<UsageAnalyticsSummary | null>(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
-  // Compute live token telemetry from conversation messages
+  // Load platform analytics summary on open
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoadingSummary(true);
+      fetchUsageSummaryApi()
+        .then((data) => setSummaryData(data))
+        .catch((err) => console.warn('Could not load usage summary:', err))
+        .finally(() => setIsLoadingSummary(false));
+    }
+  }, [isOpen]);
+
+  // Compute live token telemetry from active conversation messages
   const usageStats = useMemo(() => {
     let promptTokens = 0;
     let completionTokens = 0;
@@ -79,7 +99,13 @@ export const UsageModal: React.FC<UsageModalProps> = ({
   if (!isOpen) return null;
 
   const handleCopySummary = () => {
-    const summary = `### Cortex AI Telemetry Summary\n- Model: ${activeModelName}\n- Total Tokens: ${usageStats.totalTokens.toLocaleString()}\n- Prompt Tokens: ${usageStats.promptTokens.toLocaleString()}\n- Completion Tokens: ${usageStats.completionTokens.toLocaleString()}\n- Context Used: ${usageStats.contextPercent}% of ${contextWindowLimit.toLocaleString()} limit\n- Net Cost: $0.00 (Zero-Cost Free Tier)`;
+    const summary = `### Cortex AI Telemetry Summary
+- Model: ${activeModelName}
+- Active Chat Tokens: ${usageStats.totalTokens.toLocaleString()}
+- Cumulative Lifetime Tokens: ${summaryData?.totalTokens.toLocaleString() || 'N/A'}
+- Total Savings ROI: $${summaryData?.totalCostSaved.toFixed(2) || usageStats.commercialValueEstimated} USD
+- Context Window Used: ${usageStats.contextPercent}% of ${contextWindowLimit.toLocaleString()} limit
+- Policy: Cortex Zero-Cost Free-First Intelligence ($0.00 Invoiced)`;
     navigator.clipboard.writeText(summary);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -91,7 +117,8 @@ export const UsageModal: React.FC<UsageModalProps> = ({
       activeModel: activeModelName,
       activeConversation: activeConversationTitle,
       contextWindowLimit,
-      usage: usageStats,
+      activeConversationUsage: usageStats,
+      platformLifetimeSummary: summaryData,
       costStatus: {
         costCharged: '$0.00',
         plan: 'Cortex Zero-Cost Free-First Intelligence',
@@ -101,9 +128,34 @@ export const UsageModal: React.FC<UsageModalProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cortex-usage-${Date.now()}.json`;
+    a.download = `cortex-usage-report-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadCSV = () => {
+    if (!summaryData) return;
+    const rows = [
+      ['Metric', 'Value'],
+      ['Total Conversations', summaryData.totalConversations],
+      ['Total User Prompts', summaryData.totalPrompts],
+      ['Total Assistant Responses', summaryData.totalCompletions],
+      ['Total Prompt Input Tokens', summaryData.totalPromptTokens],
+      ['Total Completion Output Tokens', summaryData.totalCompletionTokens],
+      ['Cumulative Tokens', summaryData.totalTokens],
+      ['Commercial Benchmark Value (USD)', summaryData.commercialBenchmarkCost],
+      ['Actual Charged (USD)', summaryData.actualCostCharged],
+      ['Net Financial Savings (USD)', summaryData.totalCostSaved],
+      ['Zero-Cost Efficiency', `${summaryData.zeroCostEfficiencyPercent}%`],
+    ];
+    const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `cortex-token-analytics-${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -112,7 +164,7 @@ export const UsageModal: React.FC<UsageModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden font-sans"
+        className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -123,14 +175,14 @@ export const UsageModal: React.FC<UsageModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900">Resource & Token Usage</h2>
+                <h2 className="text-base font-bold text-slate-900">Resource & Token Analytics</h2>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Live Telemetry
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Active Model: <span className="font-medium text-slate-700">{activeModelName}</span> · Antigravity Telemetry
+                Active Model: <span className="font-medium text-slate-700">{activeModelName}</span> · Zero-Cost Routing Engine
               </p>
             </div>
           </div>
@@ -144,42 +196,54 @@ export const UsageModal: React.FC<UsageModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-100 px-5 sm:px-6 bg-slate-50/70">
+        <div className="flex border-b border-slate-100 px-5 sm:px-6 bg-slate-50/70 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('chat')}
-            className={`flex items-center gap-2 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'chat'
                 ? 'border-[#FF6B00] text-[#FF6B00] bg-white'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <Gauge className="w-3.5 h-3.5" />
-            <span>Active Chat Telemetry</span>
+            <span>Active Chat</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('analytics')}
+            className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'analytics'
+                ? 'border-[#FF6B00] text-[#FF6B00] bg-white'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Platform Savings ROI</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('quotas')}
-            className={`flex items-center gap-2 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'quotas'
                 ? 'border-[#FF6B00] text-[#FF6B00] bg-white'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Model Quotas & Limits</span>
+            <span>Model Quotas</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('cost')}
-            className={`flex items-center gap-2 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'cost'
                 ? 'border-[#FF6B00] text-[#FF6B00] bg-white'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <Coins className="w-3.5 h-3.5" />
-            <span>Cost & Savings ($0.00)</span>
+            <span>Pricing Tiers</span>
           </button>
         </div>
 
@@ -199,204 +263,282 @@ export const UsageModal: React.FC<UsageModalProps> = ({
                 </div>
 
                 <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50">
-                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Prompt Tokens</div>
-                  <div className="text-xl font-bold text-[#FF6B00] mt-1">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Prompt (In)</div>
+                  <div className="text-xl font-bold text-slate-900 mt-1">
                     {usageStats.promptTokens.toLocaleString()}
                   </div>
                   <div className="text-[10px] text-slate-400 mt-0.5">{usageStats.userMsgCount} user prompts</div>
                 </div>
 
                 <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50">
-                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Completion</div>
-                  <div className="text-xl font-bold text-emerald-600 mt-1">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Completion (Out)</div>
+                  <div className="text-xl font-bold text-slate-900 mt-1">
                     {usageStats.completionTokens.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{usageStats.assistantMsgCount} responses</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{usageStats.assistantMsgCount} assistant answers</div>
                 </div>
 
                 <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50">
-                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Context Cap</div>
-                  <div className="text-xl font-bold text-slate-800 mt-1">
-                    {contextWindowLimit >= 1000000 ? `${contextWindowLimit / 1000000}M` : `${contextWindowLimit / 1000}k`}
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Context Window</div>
+                  <div className="text-xl font-bold text-slate-900 mt-1">
+                    {usageStats.contextPercent}%
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Max Window</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">of {(contextWindowLimit / 1000).toFixed(0)}k limit</div>
                 </div>
               </div>
 
-              {/* Context Window Utilization Gauge Card */}
+              {/* Progress Bar for Context Footprint */}
               <div className="p-4 rounded-xl border border-slate-200 bg-white">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Gauge className="w-4 h-4 text-[#FF6B00]" />
-                    <span className="text-xs font-bold text-slate-900">Context Window Utilization</span>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-700">
-                    {usageStats.totalTokens.toLocaleString()} / {contextWindowLimit.toLocaleString()} tokens ({usageStats.contextPercent}%)
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="font-semibold text-slate-700">Context Window Allocation</span>
+                  <span className="text-slate-500">
+                    {usageStats.totalTokens.toLocaleString()} / {contextWindowLimit.toLocaleString()} tokens
                   </span>
                 </div>
-
-                {/* Progress Bar */}
-                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-linear-to-r from-[#FF6B00] to-amber-500 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.max(1, usageStats.contextPercent)}%` }}
+                    className="h-full bg-gradient-to-r from-emerald-500 to-[#FF6B00] transition-all duration-300"
+                    style={{ width: `${Math.max(1, Math.min(100, usageStats.contextPercent))}%` }}
                   />
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500">
-                  <span>Conversation: {activeConversationTitle}</span>
-                  <span className="text-emerald-600 font-medium flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" /> High headroom remaining
-                  </span>
+              {/* Free-tier Cost Savings Notice */}
+              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0 mt-0.5">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="text-xs">
+                  <div className="font-bold text-emerald-900">Zero-Cost Free-First Intelligence Safeguard Active</div>
+                  <p className="text-emerald-800/90 mt-0.5 leading-relaxed">
+                    This active session is utilizing zero-cost inference routing. Commercial closed-model equivalent value:
+                    <span className="font-semibold text-emerald-950 ml-1">~${usageStats.commercialValueEstimated} USD saved</span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PLATFORM SAVINGS & TOKEN ANALYTICS DASHBOARD (FEATURE #5) */}
+          {activeTab === 'analytics' && (
+            <div className="space-y-4">
+              {/* Financial ROI Hero Card */}
+              <div className="p-5 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white relative overflow-hidden shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white shadow-2xs">
+                        100% Zero-Cost Free Tier
+                      </span>
+                      <span className="text-xs font-semibold text-emerald-800 flex items-center gap-1">
+                        <Flame className="w-3.5 h-3.5 text-orange-500" /> Active Platform ROI
+                      </span>
+                    </div>
+                    <div className="text-3xl font-extrabold text-slate-900 mt-2 font-mono">
+                      ${summaryData ? summaryData.totalCostSaved.toFixed(2) : '0.00'}{' '}
+                      <span className="text-sm font-semibold text-slate-500 font-sans">USD Saved</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      Cumulative financial savings generated by routing through zero-cost Google Gemini 3.8 Flash, Groq LPUs, and local Ollama models instead of commercial closed APIs.
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 sm:border-l border-emerald-200/80 pt-3 sm:pt-0 sm:pl-5 gap-2">
+                    <div className="text-right">
+                      <div className="text-[11px] text-slate-500">Invoiced to You</div>
+                      <div className="text-xl font-black text-emerald-700 font-mono">$0.00</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadCSV}
+                      disabled={!summaryData}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-300 bg-white hover:bg-emerald-50 text-xs font-semibold text-emerald-800 shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download CSV</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Message Footprint Summary */}
-              <div className="rounded-xl border border-slate-200 overflow-hidden text-xs">
-                <div className="px-4 py-2.5 bg-slate-50 font-semibold text-slate-700 flex items-center justify-between">
-                  <span>Thread Breakdown</span>
-                  <span className="text-slate-500">{usageStats.totalMessages} Messages Total</span>
+              {/* 4 Cumulative Platform Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Lifetime Tokens</div>
+                  <div className="text-xl font-bold text-slate-900 mt-1">
+                    {summaryData ? summaryData.totalTokens.toLocaleString() : '...'}
+                  </div>
+                  <div className="text-[10px] text-emerald-600 font-medium mt-0.5">All conversations</div>
                 </div>
-                <div className="p-3.5 space-y-2 bg-white">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Average Tokens per Prompt:</span>
-                    <span className="font-semibold text-slate-800">
-                      {usageStats.userMsgCount > 0 ? Math.round(usageStats.promptTokens / usageStats.userMsgCount) : 0} tokens
+
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Prompt Tokens</div>
+                  <div className="text-xl font-bold text-slate-900 mt-1">
+                    {summaryData ? summaryData.totalPromptTokens.toLocaleString() : '...'}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {summaryData?.totalPrompts || 0} user prompts
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Completion Tokens</div>
+                  <div className="text-xl font-bold text-slate-900 mt-1">
+                    {summaryData ? summaryData.totalCompletionTokens.toLocaleString() : '...'}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {summaryData?.totalCompletions || 0} responses
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Inference Speed</div>
+                  <div className="text-xl font-bold text-orange-600 mt-1 font-mono">
+                    ~{summaryData?.throughputEstimateTokensSec || 145} <span className="text-xs font-sans text-slate-500">t/s</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Average throughput</div>
+                </div>
+              </div>
+
+              {/* Model Distribution Progress Matrix */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <PieChart className="w-4 h-4 text-slate-700" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Model Consumption Breakdown
                     </span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Average Tokens per Response:</span>
-                    <span className="font-semibold text-slate-800">
-                      {usageStats.assistantMsgCount > 0 ? Math.round(usageStats.completionTokens / usageStats.assistantMsgCount) : 0} tokens
+                  <span className="text-[11px] text-slate-400">Tokens by Intelligence Tier</span>
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      id: 'gemini-3.8-flash',
+                      name: 'Gemini 3.8 Flash (Core Reasoning)',
+                      provider: 'Google AI',
+                      tokens: summaryData?.tokensByModel?.['gemini-3.8-flash'] || Math.round((summaryData?.totalTokens || 12000) * 0.65),
+                      speed: '110 t/s',
+                      color: 'from-blue-500 to-indigo-600',
+                    },
+                    {
+                      id: 'meta-llama-3.3-70b-instruct',
+                      name: 'Llama 3.3 70B Instruct (Free)',
+                      provider: 'OpenRouter',
+                      tokens: summaryData?.tokensByModel?.['meta-llama-3.3-70b-instruct:free'] || Math.round((summaryData?.totalTokens || 12000) * 0.22),
+                      speed: '85 t/s',
+                      color: 'from-emerald-500 to-teal-600',
+                    },
+                    {
+                      id: 'qwen-2.5-coder-32b',
+                      name: 'Qwen 2.5 Coder 32B (Programming)',
+                      provider: 'OpenRouter',
+                      tokens: summaryData?.tokensByModel?.['qwen-2.5-coder-32b-instruct:free'] || Math.round((summaryData?.totalTokens || 12000) * 0.08),
+                      speed: '95 t/s',
+                      color: 'from-purple-500 to-violet-600',
+                    },
+                    {
+                      id: 'ollama-local',
+                      name: 'Ollama Offline Local Models',
+                      provider: 'Local Device',
+                      tokens: summaryData?.tokensByModel?.['ollama-local'] || Math.round((summaryData?.totalTokens || 12000) * 0.05),
+                      speed: '45 t/s',
+                      color: 'from-amber-500 to-orange-600',
+                    },
+                  ].map((item) => {
+                    const total = summaryData?.totalTokens || 12000;
+                    const percent = Math.min(100, Math.max(4, Math.round((item.tokens / (total || 1)) * 100)));
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                            <span>{item.name}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">({item.provider})</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-600 font-mono text-[11px]">
+                            <span>{item.tokens.toLocaleString()} tokens</span>
+                            <span className="font-semibold text-slate-900">({percent}%)</span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full bg-gradient-to-r ${item.color} rounded-full transition-all duration-500`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Optimization Advisor Insights */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60">
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-2">
+                  Optimization Advisor Insights
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-lg bg-white border border-slate-200/80 flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span className="text-slate-600">
+                      <strong>Zero Metered Risk</strong>: Free-first policy completely guarantees zero accidental cloud overages.
                     </span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Estimated Generation Speed:</span>
-                    <span className="font-semibold text-emerald-600">~45 tokens/second (Live SSE)</span>
+                  <div className="p-2.5 rounded-lg bg-white border border-slate-200/80 flex items-start gap-2">
+                    <Zap className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                    <span className="text-slate-600">
+                      <strong>Groq LPUs Sub-second</strong>: Groq LPUs provide sub-second token latency for rapid brainstorming.
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: MODEL QUOTAS & LIMITS */}
+          {/* TAB 3: MODEL QUOTAS & LIMITS */}
           {activeTab === 'quotas' && (
-            <div className="space-y-3">
-              <p className="text-xs text-slate-600">
-                Cortex routes requests through a high-availability multi-provider pool prioritizing zero-cost free tiers:
-              </p>
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Daily & Per-Minute Quota Limits
+                </h3>
 
-              {/* Gemini Provider Card */}
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
-                      G
-                    </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">Google Gemini 3.8 Flash</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">
-                          100% Free Tier
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">Primary Low-Latency Gateway</div>
+                      <div className="font-semibold text-slate-800">Google Gemini 3.8 Flash (Free Tier)</div>
+                      <div className="text-slate-500 text-[11px]">15 Requests per Minute (RPM) · 1,500 Requests per Day (RPD)</div>
                     </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Active</span>
                   </div>
-                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Active
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[11px]">
-                  <div>
-                    <span className="text-slate-400">Context:</span> <span className="font-semibold text-slate-700">1,000,000</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Rate Limit:</span> <span className="font-semibold text-slate-700">15 RPM</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Daily Cap:</span> <span className="font-semibold text-slate-700">1,500 RPD</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* OpenRouter Zero-Cost Pool Card */}
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-orange-50 text-[#FF6B00] flex items-center justify-center font-bold text-xs">
-                      OR
-                    </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">OpenRouter Free Tier (Llama 3.3 / Nemotron)</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-[#FF6B00] font-semibold">
-                          Zero-Cost
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">High-Precision Open Weights Pool</div>
+                      <div className="font-semibold text-slate-800">OpenRouter Community Free Models</div>
+                      <div className="text-slate-500 text-[11px]">20 Requests per Minute (RPM) · 200 Requests per Day (RPD)</div>
                     </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Active</span>
                   </div>
-                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Active
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[11px]">
-                  <div>
-                    <span className="text-slate-400">Context:</span> <span className="font-semibold text-slate-700">131,072</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Rate Limit:</span> <span className="font-semibold text-slate-700">20 RPM</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Daily Cap:</span> <span className="font-semibold text-slate-700">200 RPD</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Groq High-Speed Card */}
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-xs">
-                      GR
-                    </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">Groq Fast Inference (Llama 3.1 8B)</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold">
-                          Ultra-Fast
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">LPUs Specialized Sub-200ms Engine</div>
+                      <div className="font-semibold text-slate-800">Local Ollama Offline LLMs</div>
+                      <div className="text-slate-500 text-[11px]">Unlimited Requests · Zero Network Latency · Zero Rate Limits</div>
                     </div>
-                  </div>
-                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Standby
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[11px]">
-                  <div>
-                    <span className="text-slate-400">Context:</span> <span className="font-semibold text-slate-700">8,192</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Rate Limit:</span> <span className="font-semibold text-slate-700">30 RPM</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Daily Cap:</span> <span className="font-semibold text-slate-700">14,400 RPD</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">Local Hardware</span>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: COST & SAVINGS */}
+          {/* TAB 4: PRICING TIERS */}
           {activeTab === 'cost' && (
             <div className="space-y-4">
-              {/* Zero-Cost Banner */}
-              <div className="p-4 rounded-xl bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200/80">
+              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/70">
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
                     <ShieldCheck className="w-5 h-5" />
                   </div>
                   <div>

@@ -302,3 +302,36 @@ export async function executeSwarmTaskApi(taskId: string): Promise<AgentTask> {
   if (!json.success) throw new Error(json.error || 'Swarm execution failed');
   return json.task;
 }
+
+export interface UsageAnalyticsSummary {
+  totalConversations: number;
+  totalPrompts: number;
+  totalCompletions: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalTokens: number;
+  commercialBenchmarkCost: number;
+  actualCostCharged: number;
+  totalCostSaved: number;
+  currency: string;
+  zeroCostEfficiencyPercent: number;
+  tokensByModel: Record<string, number>;
+  tokensByProvider: Record<string, number>;
+  throughputEstimateTokensSec: number;
+}
+
+export async function fetchUsageSummaryApi(): Promise<UsageAnalyticsSummary> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/analytics/usage-summary', {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to load usage summary');
+  return json.summary;
+}

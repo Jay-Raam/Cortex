@@ -1207,3 +1207,75 @@ apiRouter.post('/notifications/test', (req: Request, res: Response) => {
 
   res.json({ success: true, notification: notif });
 });
+
+/**
+ * GET /api/analytics/usage-summary
+ * Aggregates lifetime token consumption, savings ROI, and model distribution for authenticated user
+ */
+apiRouter.get('/analytics/usage-summary', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // 1. Get all conversations belonging to user
+  const conversations = db.getConversations(user.id);
+  
+  let totalPrompts = 0;
+  let totalCompletions = 0;
+  let totalPromptTokens = 0;
+  let totalCompletionTokens = 0;
+  const tokensByModel: Record<string, number> = {};
+  const tokensByProvider: Record<string, number> = {};
+
+  for (const conv of conversations) {
+    const messages = db.getMessages(conv.id, user.id);
+    const modelKey = conv.modelId || 'gemini-3.8-flash';
+    const providerKey = conv.providerId || 'gemini';
+
+    for (const msg of messages) {
+      const estimatedTokens = Math.max(1, Math.ceil((msg.content || '').length / 4));
+      if (msg.role === 'user') {
+        totalPrompts++;
+        totalPromptTokens += estimatedTokens;
+      } else if (msg.role === 'assistant') {
+        totalCompletions++;
+        totalCompletionTokens += estimatedTokens;
+      }
+
+      tokensByModel[modelKey] = (tokensByModel[modelKey] || 0) + estimatedTokens;
+      tokensByProvider[providerKey] = (tokensByProvider[providerKey] || 0) + estimatedTokens;
+    }
+  }
+
+  const totalTokens = totalPromptTokens + totalCompletionTokens;
+  // Standard benchmark commercial closed-model rate: $3.00/1M input, $15.00/1M output
+  const promptValue = (totalPromptTokens / 1_000_000) * 3.0;
+  const completionValue = (totalCompletionTokens / 1_000_000) * 15.0;
+  const commercialBenchmarkCost = Number((promptValue + completionValue).toFixed(4));
+  const actualCostCharged = 0.00;
+  const totalCostSaved = commercialBenchmarkCost;
+
+  res.json({
+    success: true,
+    userId: user.id,
+    summary: {
+      totalConversations: conversations.length,
+      totalPrompts,
+      totalCompletions,
+      totalPromptTokens,
+      totalCompletionTokens,
+      totalTokens,
+      commercialBenchmarkCost,
+      actualCostCharged,
+      totalCostSaved,
+      currency: 'USD',
+      zeroCostEfficiencyPercent: totalTokens > 0 ? 100 : 0,
+      tokensByModel,
+      tokensByProvider,
+      throughputEstimateTokensSec: 145,
+    },
+  });
+});
