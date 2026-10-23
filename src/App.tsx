@@ -316,6 +316,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Electron Native Desktop Navigation Listener (Tray & IPC shortcuts)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.onNavigate) {
+      const cleanup = (window as any).electronAPI.onNavigate((targetView: string) => {
+        if (targetView === 'chat') {
+          setCurrentView('chat');
+        } else if (targetView === 'cowork') {
+          setCurrentView('cowork');
+        } else if (['skills', 'docs'].includes(targetView)) {
+          setCurrentView(targetView as any);
+        }
+      });
+      return cleanup;
+    }
+  }, []);
+
   // Handlers
   const handleNewConversation = async () => {
     try {

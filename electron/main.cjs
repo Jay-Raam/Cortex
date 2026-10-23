@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, Tray, Menu, globalShortcut, nativeImage } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -21,6 +21,9 @@ if (!gotTheLock) {
 
 let mainWindow = null;
 let embeddedServerInstance = null;
+let tray = null;
+let isQuitting = false;
+let minimizeToTray = true;
 const isDev = process.env.NODE_ENV === 'development' || (!app.isPackaged && Boolean(process.env.VITE_DEV_SERVER_URL));
 
 /**
@@ -145,6 +148,14 @@ function createWindow(initialUrl) {
     return { action: 'deny' };
   });
 
+  mainWindow.on('close', (event) => {
+    if (!isQuitting && minimizeToTray) {
+      event.preventDefault();
+      mainWindow.hide();
+      return false;
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -223,11 +234,139 @@ ipcMain.handle('system:metrics', async () => {
   };
 });
 
+// Tray & Window Management IPC Handlers
+ipcMain.handle('app:toggleMinimizeToTray', async (_event, enabled) => {
+  minimizeToTray = Boolean(enabled);
+  return minimizeToTray;
+});
+
+ipcMain.handle('app:getMinimizeToTray', async () => {
+  return minimizeToTray;
+});
+
+ipcMain.handle('app:toggleWindow', async () => {
+  toggleMainWindow();
+  return mainWindow ? mainWindow.isVisible() : false;
+});
+
+function toggleMainWindow() {
+  if (!mainWindow) {
+    const storage = setupUserDataStorage();
+    const url = embeddedServerInstance?.url || 'http://localhost:3000';
+    createWindow(url);
+    return;
+  }
+  if (mainWindow.isVisible()) {
+    if (mainWindow.isFocused()) {
+      mainWindow.hide();
+    } else {
+      mainWindow.focus();
+    }
+  } else {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+}
+
+function showAndNavigate(view) {
+  if (!mainWindow) {
+    toggleMainWindow();
+  } else {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('cortex:navigate', view);
+  }
+}
+
+function createTray() {
+  if (tray) return;
+
+  const trayIconPath = path.join(__dirname, 'tray-icon.png');
+  let icon;
+  if (fs.existsSync(trayIconPath)) {
+    icon = nativeImage.createFromPath(trayIconPath);
+  } else {
+    icon = nativeImage.createEmpty();
+  }
+
+  try {
+    tray = new Tray(icon);
+    tray.setToolTip('Cortex | Next-Gen AI Agent & Co-Work Platform');
+
+    const updateTrayMenu = () => {
+      const contextMenu = Menu.buildFromTemplate([
+        {
+          label: 'Cortex Desktop',
+          icon: icon.isEmpty() ? undefined : icon.resize({ width: 16, height: 16 }),
+          enabled: false,
+        },
+        { type: 'separator' },
+        {
+          label: 'Toggle Cortex (Alt+Space)',
+          click: () => toggleMainWindow(),
+        },
+        {
+          label: 'New Chat',
+          click: () => showAndNavigate('chat'),
+        },
+        {
+          label: 'Co-Work Workspace',
+          click: () => showAndNavigate('cowork'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Minimize to Tray on Close',
+          type: 'checkbox',
+          checked: minimizeToTray,
+          click: (menuItem) => {
+            minimizeToTray = menuItem.checked;
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Quit Cortex',
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          },
+        },
+      ]);
+      tray.setContextMenu(contextMenu);
+    };
+
+    updateTrayMenu();
+
+    tray.on('click', () => {
+      toggleMainWindow();
+    });
+
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+  } catch (err) {
+    console.warn('[Cortex Electron] Tray initialization warning:', err.message);
+  }
+}
+
 app.on('second-instance', () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
     mainWindow.focus();
   }
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 app.whenReady().then(async () => {
@@ -250,6 +389,27 @@ app.whenReady().then(async () => {
   }
 
   createWindow(targetUrl);
+  createTray();
+
+  // Register Global Hotkey Alt+Space (with fallback to CommandOrControl+Shift+Space)
+  try {
+    const registered = globalShortcut.register('Alt+Space', () => {
+      toggleMainWindow();
+    });
+    if (!registered) {
+      console.warn('[Cortex Electron] Alt+Space occupied, trying CommandOrControl+Shift+Space fallback');
+      const fallbackRegistered = globalShortcut.register('CommandOrControl+Shift+Space', () => {
+        toggleMainWindow();
+      });
+      if (fallbackRegistered) {
+        console.log('[Cortex Electron] Fallback global hotkey registered: CommandOrControl+Shift+Space');
+      }
+    } else {
+      console.log('[Cortex Electron] Global hotkey registered: Alt+Space');
+    }
+  } catch (err) {
+    console.warn('[Cortex Electron] Failed to register global hotkey:', err.message);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -259,12 +419,14 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (embeddedServerInstance && embeddedServerInstance.server) {
-    try {
-      embeddedServerInstance.server.close();
-    } catch {}
-  }
-  if (process.platform !== 'darwin') {
-    app.quit();
+  if (isQuitting || !minimizeToTray) {
+    if (embeddedServerInstance && embeddedServerInstance.server) {
+      try {
+        embeddedServerInstance.server.close();
+      } catch {}
+    }
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
   }
 });
