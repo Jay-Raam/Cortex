@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Copy, Check, RefreshCw, FileText, User, Maximize2, X, Download, Cpu, ChevronDown } from 'lucide-react';
+import { Copy, Check, RefreshCw, FileText, User, Maximize2, X, Download, Cpu, ChevronDown, Layers } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { Message, ModelInfo } from '../server/types';
 import { CognivoLogo } from './CognivoLogo';
+import { DiagramVisualizerModal } from './diagrams/DiagramVisualizerModal';
 
 interface ChatMessageProps {
   message: Message;
@@ -382,6 +383,7 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
 
 const CodeSnippet: React.FC<{ code: string; language: string }> = ({ code, language }) => {
   const [copied, setCopied] = useState(false);
+  const [isDiagramOpen, setIsDiagramOpen] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -389,7 +391,14 @@ const CodeSnippet: React.FC<{ code: string; language: string }> = ({ code, langu
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const displayLang = language && language !== 'code' ? language.toUpperCase() : 'TEXT';
+  const isDiagram =
+    language.toLowerCase() === 'mermaid' ||
+    code.trim().startsWith('graph ') ||
+    code.trim().startsWith('flowchart ') ||
+    code.trim().startsWith('sequenceDiagram') ||
+    code.trim().startsWith('stateDiagram');
+
+  const displayLang = isDiagram ? 'MERMAID DIAGRAM' : language && language !== 'code' ? language.toUpperCase() : 'TEXT';
 
   return (
     <div className="my-3.5 rounded-xl border border-slate-700/60 bg-[#0F172A] overflow-hidden shadow-md">
@@ -400,23 +409,44 @@ const CodeSnippet: React.FC<{ code: string; language: string }> = ({ code, langu
             {displayLang}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-            copied
-              ? 'text-emerald-400 bg-emerald-950/40 border border-emerald-500/30'
-              : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-          }`}
-          title="Copy code to clipboard"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-          <span>{copied ? 'Copied!' : 'Copy Code'}</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          {isDiagram && (
+            <button
+              type="button"
+              onClick={() => setIsDiagramOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold text-orange-300 hover:text-white bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 transition-colors cursor-pointer mr-1"
+              title="Inspect interactive pan/zoom diagram"
+            >
+              <Layers className="w-3.5 h-3.5 text-orange-400" />
+              <span>Inspect Diagram</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCopy}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+              copied
+                ? 'text-emerald-400 bg-emerald-950/40 border border-emerald-500/30'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+            }`}
+            title="Copy code to clipboard"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? 'Copied!' : 'Copy Code'}</span>
+          </button>
+        </div>
       </div>
       <pre className="p-4 text-xs font-mono text-slate-100 overflow-x-auto leading-relaxed selection:bg-orange-500/30">
         <code>{code}</code>
       </pre>
+
+      {isDiagramOpen && (
+        <DiagramVisualizerModal
+          isOpen={isDiagramOpen}
+          onClose={() => setIsDiagramOpen(false)}
+          mermaidSource={code}
+        />
+      )}
     </div>
   );
 };

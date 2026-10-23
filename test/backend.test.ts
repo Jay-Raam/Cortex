@@ -15,6 +15,7 @@ import path from 'node:path';
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../src/server/db/database';
+import { parseMermaid, renderDiagramToSvg } from '../src/components/diagrams/diagramParser';
 import { modelCatalog } from '../src/server/providers/catalog';
 import { modelRouter } from '../src/server/providers/router';
 import { coworkEngine } from '../src/server/cowork/engine';
@@ -2020,6 +2021,67 @@ print(fibonacci(10))
       } finally {
         server.close();
       }
+    });
+  });
+
+
+  describe('20. Interactive Architecture Diagram & Workflow Visualizer', () => {
+    it('parses standard flowchart syntax into structured nodes and relational links', () => {
+      const source = `flowchart TD
+        Client["Browser Client"] -->|HTTPS /api/chat| Router["Model Router"]
+        Router --> Gemini["Google Gemini 3.8 Flash"]
+        Router --> Ollama["Local Ollama Offline"]`;
+
+      const diagram = parseMermaid(source);
+      assert.strictEqual(diagram.type, 'flowchart');
+      assert.strictEqual(diagram.direction, 'TB');
+      assert.ok(diagram.nodes.length >= 4, 'Must parse at least 4 nodes');
+      assert.ok(diagram.links.length >= 3, 'Must parse at least 3 links');
+
+      const clientNode = diagram.nodes.find((n) => n.id === 'Client');
+      assert.ok(clientNode, 'Client node must exist');
+      assert.strictEqual(clientNode?.label, 'Browser Client');
+    });
+
+    it('parses sequence diagrams into participants and sequential interactions', () => {
+      const source = `sequenceDiagram
+        User ->> Frontend: Clicks Voice Button
+        Frontend ->> SpeechAPI: Requests Mic Audio
+        SpeechAPI -->> Frontend: Stream Transcript
+        Frontend ->> Server: Dispatches Prompt`;
+
+      const diagram = parseMermaid(source);
+      assert.strictEqual(diagram.type, 'sequence');
+      assert.ok(diagram.nodes.length >= 3, 'Must parse participants');
+      assert.ok(diagram.links.length >= 4, 'Must parse sequence messages');
+      assert.ok(diagram.links.some((l) => l.label && l.label.includes('Stream Transcript')));
+    });
+
+    it('generates high-resolution standards-compliant SVG with styling and markers', () => {
+      const source = `graph LR
+        A["Input Artifact"] --> B["Analysis Engine"]
+        B --> C["Export Report"]`;
+
+      const diagram = parseMermaid(source);
+      const svg = renderDiagramToSvg(diagram);
+
+      assert.ok(svg.startsWith('<?xml'), 'Must start with XML declaration');
+      assert.ok(svg.includes('<svg xmlns="http://www.w3.org/2000/svg"'), 'Must contain SVG root');
+      assert.ok(svg.includes('id="arrowhead"'), 'Must contain arrowhead marker definition');
+      assert.ok(svg.includes('class="diagram-node"'), 'Must contain diagram nodes');
+      assert.ok(svg.includes('class="diagram-link"'), 'Must contain diagram links');
+    });
+
+    it('sanitizes XML special characters in node labels against injection', () => {
+      const source = `graph TD
+        X["Security <Audit> & 'Sanitization' \"Check\""] --> Y["Clean Node"]`;
+
+      const diagram = parseMermaid(source);
+      const svg = renderDiagramToSvg(diagram);
+
+      assert.ok(!svg.includes('<Audit>'), 'Must not contain raw unescaped HTML tags');
+      assert.ok(svg.includes('&lt;Audit&gt;'), 'Must contain XML-escaped brackets');
+      assert.ok(svg.includes('&amp;'), 'Must contain XML-escaped ampersand');
     });
   });
 
