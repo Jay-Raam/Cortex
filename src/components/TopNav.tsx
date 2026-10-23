@@ -10,6 +10,7 @@ import {
   FileText,
   Menu,
   Check,
+  Radio,
 } from 'lucide-react';
 import { ModelMode } from '../server/types';
 
@@ -22,6 +23,7 @@ interface TopNavProps {
   onOpenNotifications: () => void;
   onOpenShortcuts: () => void;
   onOpenShareModal: () => void;
+  onOpenVoiceMode?: () => void;
   onToggleSidebar?: () => void;
   unreadNotificationsCount: number;
 }
@@ -35,6 +37,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   onOpenNotifications,
   onOpenShortcuts,
   onOpenShareModal,
+  onOpenVoiceMode,
   onToggleSidebar,
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
@@ -148,6 +151,18 @@ export const TopNav: React.FC<TopNavProps> = ({
         >
           {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Link2 className="w-4 h-4" />}
         </button>
+
+        {/* Live Voice Mode Button */}
+        {onOpenVoiceMode && (
+          <button
+            onClick={onOpenVoiceMode}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-orange-200 bg-orange-50/70 hover:bg-orange-100/70 text-xs font-semibold text-[#FF6B00] shadow-2xs transition-all cursor-pointer"
+            title="Live Voice Conversation Mode (Ctrl+Shift+V)"
+          >
+            <Radio className="w-3.5 h-3.5 text-[#FF6B00] animate-pulse" />
+            <span className="hidden sm:inline">Voice</span>
+          </button>
+        )}
 
         {/* Share Button Pill */}
         <button

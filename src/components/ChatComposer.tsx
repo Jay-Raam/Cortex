@@ -12,6 +12,7 @@ import {
   Square,
   X,
   ChevronRight,
+  Radio,
 } from 'lucide-react';
 import { ModelMode } from '../server/types';
 
@@ -23,6 +24,7 @@ interface ChatComposerProps {
   selectedMode?: ModelMode;
   onOpenModelModal?: () => void;
   onOpenUsageModal?: () => void;
+  onOpenVoiceMode?: () => void;
   showUpgradeBanner?: boolean;
 }
 
@@ -33,6 +35,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   selectedModelName,
   onOpenModelModal,
   onOpenUsageModal,
+  onOpenVoiceMode,
   showUpgradeBanner = false,
 }) => {
   const [text, setText] = useState('');
@@ -319,6 +322,18 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             >
               <Paperclip className="w-4 h-4" />
             </button>
+
+            {/* Live Voice HUD Button */}
+            {onOpenVoiceMode && (
+              <button
+                type="button"
+                onClick={onOpenVoiceMode}
+                className="p-1 sm:p-1.5 text-slate-400 hover:text-[#FF6B00] hover:bg-orange-50 rounded-md transition-colors cursor-pointer"
+                title="Live Voice Conversation Mode (Ctrl+Shift+V)"
+              >
+                <Radio className="w-4 h-4 text-[#FF6B00] animate-pulse" />
+              </button>
+            )}
 
             {/* Voice Audio Mic */}
             <button

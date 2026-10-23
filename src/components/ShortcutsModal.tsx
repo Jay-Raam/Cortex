@@ -1,10 +1,10 @@
 import React from 'react';
-import { Command, MessageSquare, Briefcase, Sparkles, BookOpen, Plus, Zap, PanelLeft, XCircle, X } from 'lucide-react';
+import { Command, MessageSquare, Briefcase, Sparkles, BookOpen, Plus, Zap, PanelLeft, XCircle, X, Radio } from 'lucide-react';
 
 interface ShortcutsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAction: (action: 'chat' | 'cowork' | 'skills' | 'docs' | 'new_chat' | 'models' | 'toggle_sidebar') => void;
+  onAction: (action: 'chat' | 'cowork' | 'skills' | 'docs' | 'new_chat' | 'models' | 'toggle_sidebar' | 'voice') => void;
 }
 
 export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose, onAction }) => {
@@ -24,6 +24,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose,
     { key: `${modKey}+N`, label: 'New Chat', desc: 'Start a fresh conversation thread', icon: <Plus className="w-4 h-4 text-[#FF6B00]" />, action: () => onAction('new_chat') },
     { key: `${modKey}+M`, label: 'Model Router & Catalog', desc: 'Open multi-provider model picker', icon: <Zap className="w-4 h-4 text-[#FF6B00]" />, action: () => onAction('models') },
     { key: `${modKey}+B`, label: 'Toggle Sidebar', desc: 'Collapse or expand navigation drawer', icon: <PanelLeft className="w-4 h-4 text-[#FF6B00]" />, action: () => onAction('toggle_sidebar') },
+        { key: `${modKey}+Shift+V`, label: 'Live Voice Mode', desc: 'Hands-free conversational voice overlay HUD', icon: <Radio className="w-4 h-4 text-[#FF6B00]" />, action: () => onAction('voice') },
     { key: 'Esc', label: 'Close Modals', desc: 'Dismiss active dialog or overlay', icon: <XCircle className="w-4 h-4 text-slate-400" />, action: onClose },
   ];
 

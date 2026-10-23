@@ -22,6 +22,7 @@ const ShareModal = React.lazy(() => import('./components/ShareModal').then((m) =
 const ProfileModal = React.lazy(() => import('./components/ProfileModal').then((m) => ({ default: m.ProfileModal })));
 const UsageModal = React.lazy(() => import('./components/UsageModal').then((m) => ({ default: m.UsageModal })));
 const CreateProjectModal = React.lazy(() => import('./components/CreateProjectModal').then((m) => ({ default: m.CreateProjectModal })));
+const VoiceOverlayModal = React.lazy(() => import('./components/voice/VoiceOverlayModal').then((m) => ({ default: m.VoiceOverlayModal })));
 
 function ViewLoadingFallback() {
   return (
@@ -103,6 +104,7 @@ export default function App() {
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [isVoiceOverlayOpen, setIsVoiceOverlayOpen] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const stopStreamRef = useRef<(() => void) | null>(null);
@@ -297,7 +299,10 @@ export default function App() {
   // Keyboard Shortcuts (Ctrl+K, Ctrl+N, Ctrl+B, etc.)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        setIsVoiceOverlayOpen((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsShortcutsOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
@@ -770,6 +775,7 @@ export default function App() {
             onOpenNotifications={() => setIsNotificationsOpen(true)}
             onOpenShortcuts={() => setIsShortcutsOpen(true)}
             onOpenShareModal={() => setIsShareModalOpen(true)}
+            onOpenVoiceMode={() => setIsVoiceOverlayOpen(true)}
             onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             unreadNotificationsCount={unreadNotifications}
           />
@@ -854,6 +860,7 @@ export default function App() {
                         selectedMode={selectedMode}
                         onOpenModelModal={() => setIsModelModalOpen(true)}
                         onOpenUsageModal={() => setIsUsageModalOpen(true)}
+                        onOpenVoiceMode={() => setIsVoiceOverlayOpen(true)}
                         showUpgradeBanner={true}
                       />
                     </div>
@@ -977,6 +984,7 @@ export default function App() {
                     selectedMode={selectedMode}
                     onOpenModelModal={() => setIsModelModalOpen(true)}
                     onOpenUsageModal={() => setIsUsageModalOpen(true)}
+                    onOpenVoiceMode={() => setIsVoiceOverlayOpen(true)}
                   />
                   <div className="text-center text-[11px] text-slate-400 mt-1">
                     Cortex can make mistakes. Check important info.
@@ -1066,6 +1074,8 @@ export default function App() {
             setIsModelModalOpen(true);
           } else if (act === 'toggle_sidebar') {
             setIsSidebarCollapsed(!isSidebarCollapsed);
+          } else if (act === 'voice') {
+            setIsVoiceOverlayOpen(true);
           }
         }}
       />
@@ -1082,6 +1092,19 @@ export default function App() {
         isOpen={isKnowledgeOpen}
         onClose={() => setIsKnowledgeOpen(false)}
       />
+
+      <React.Suspense fallback={null}>
+        <VoiceOverlayModal
+          isOpen={isVoiceOverlayOpen}
+          onClose={() => setIsVoiceOverlayOpen(false)}
+          onSendMessage={(content) => handleSendMessage(content, [])}
+          isStreaming={isStreaming}
+          lastAssistantMessage={
+            messages.filter((m) => m.role === 'assistant').slice(-1)[0]?.content
+          }
+          selectedModelName={activeModel?.displayName || 'Cortex Core v1'}
+        />
+      </React.Suspense>
 
       <TemplatesModal
         isOpen={isTemplatesOpen}
