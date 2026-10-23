@@ -40,6 +40,7 @@ import { UnifiedDiffViewer } from './UnifiedDiffViewer';
 import { WorkspaceFileNode } from '../../server/types';
 import { downloadWorkspaceZip, createGitHubPrApi } from '../../lib/api';
 import { parseAnsiToHtml } from './ansi';
+import { CodeEditor } from './CodeEditor';
 
 function pathBasename(p: string): string {
   const parts = p.split(/[\/\\]/);
@@ -152,6 +153,29 @@ export const CoworkCanvas: React.FC<CoworkCanvasProps> = ({
     }
     return list;
   }, [selectedTask.plannedFiles, artifacts]);
+
+const [openTabs, setOpenTabs] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (selectedFilePath && !openTabs.includes(selectedFilePath)) {
+      setOpenTabs((prev) => [...prev, selectedFilePath]);
+    }
+  }, [selectedFilePath]);
+
+  useEffect(() => {
+    if (openTabs.length === 0 && availableFiles.length > 0) {
+      setOpenTabs(availableFiles.slice(0, 4));
+    }
+  }, [availableFiles]);
+
+  const handleCloseTab = (tabToClose: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextTabs = openTabs.filter((t) => t !== tabToClose);
+    setOpenTabs(nextTabs);
+    if (selectedFilePath === tabToClose && nextTabs.length > 0) {
+      onSelectFile(nextTabs[nextTabs.length - 1]);
+    }
+  };
 
   const hasHtml = useMemo(
     () => availableFiles.some((f) => f.toLowerCase().endsWith('.html')),
@@ -1050,44 +1074,72 @@ export const CoworkCanvas: React.FC<CoworkCanvasProps> = ({
                   </div>
                 )
               ) : rightViewMode === 'editor' ? (
-                selectedFilePath ? (
-                  <div className="h-full flex flex-col">
-                    <div className="px-4 py-1.5 border-b border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono bg-slate-50/50 shrink-0">
-                      <span className="font-semibold text-slate-700">{selectedFilePath}</span>
-                      <div className="flex items-center gap-3 text-[11px]">
-                        <span>{editedFileContent.split('\n').length} lines</span>
-                        <span>{editedFileContent.length} chars</span>
-                        <button
-                          type="button"
-                          onClick={() => navigator.clipboard.writeText(editedFileContent)}
-                          className="flex items-center gap-1 hover:text-slate-800 cursor-pointer"
-                          title="Copy file content"
-                        >
-                          <Copy className="w-3 h-3" />
-                          <span>Copy</span>
-                        </button>
+                <div className="h-full flex flex-col min-h-0 bg-white">
+                  {/* Multi-Tab File Strip */}
+                  {openTabs.length > 0 && (
+                    <div className="flex items-center bg-[#FAF8F5] border-b border-[#EBE7DF] overflow-x-auto no-scrollbar shrink-0 px-2 pt-1.5 gap-1 select-none">
+                      {openTabs.map((tab) => {
+                        const isActive = selectedFilePath === tab;
+                        const isModified = isActive && editedFileContent !== selectedFileContent;
+                        return (
+                          <div
+                            key={tab}
+                            onClick={() => {
+                              onSelectFile(tab);
+                              setRightViewMode('editor');
+                            }}
+                            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg text-xs font-mono transition-all cursor-pointer border-t border-x ${
+                              isActive
+                                ? 'bg-white border-[#EBE7DF] text-[#EA580C] font-bold shadow-2xs -mb-px pb-2'
+                                : 'bg-[#F5F2EB]/60 hover:bg-white/80 border-transparent text-slate-600'
+                            }`}
+                          >
+                            {getFileIcon(tab)}
+                            <span className="truncate max-w-[140px]">{pathBasename(tab)}</span>
+                            {isModified ? (
+                              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Unsaved changes" />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => handleCloseTab(tab, e)}
+                                className="opacity-0 group-hover:opacity-100 hover:bg-slate-200/60 rounded p-0.5 text-slate-400 hover:text-slate-700 transition-opacity"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Code Editor */}
+                  {selectedFilePath ? (
+                    <div className="flex-1 min-h-0">
+                      <CodeEditor
+                        filePath={selectedFilePath}
+                        content={editedFileContent}
+                        originalContent={selectedFileContent}
+                        onChange={setEditedFileContent}
+                        onSave={onSaveFile}
+                        isSaving={isSavingFile}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C]">
+                        <FileCode className="w-6 h-6" />
+                      </div>
+                      <div className="max-w-sm space-y-1">
+                        <h4 className="text-xs font-bold text-slate-800">The Canvas is Ready</h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Select a file from the tabs above or click any step with an edited file to view and edit code.
+                        </p>
                       </div>
                     </div>
-                    <textarea
-                      value={editedFileContent}
-                      onChange={(e) => setEditedFileContent(e.target.value)}
-                      className="flex-1 w-full p-4 font-mono text-[12.5px] leading-relaxed text-slate-800 bg-white focus:outline-none resize-none no-scrollbar select-text"
-                      spellCheck={false}
-                    />
-                  </div>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center text-[#EA580C]">
-                      <FileCode className="w-6 h-6" />
-                    </div>
-                    <div className="max-w-sm space-y-1">
-                      <h4 className="text-xs font-bold text-slate-800">The Canvas is Ready</h4>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        Select a file from the tabs above or click any step with an edited file to view and edit code.
-                      </p>
-                    </div>
-                  </div>
-                )
+                  )}
+                </div>
+
               ) : rightViewMode === 'diff' ? (
                 <UnifiedDiffViewer gitStatus={gitStatus} onSelectFile={onSelectFile} />
               ) : (
