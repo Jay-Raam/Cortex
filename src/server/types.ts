@@ -129,6 +129,8 @@ export interface Workspace {
   projectRoot?: string;
   isLocalBinding?: boolean;
   gitBranch?: string;
+  githubRepo?: string;
+  githubUrl?: string;
   permissionMode?: PermissionMode;
   contextWindowPreference?: string; // 'auto' | '32k' | '64k' | '128k' | '200k' | '500k' | '1m'
   detectedStack?: ProjectStackInfo;
