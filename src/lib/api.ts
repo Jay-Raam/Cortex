@@ -243,3 +243,45 @@ export async function downloadWorkspaceZip(workspaceId: string, workspaceName = 
     a.remove();
   }, 1000);
 }
+
+export async function importGitHubRepoApi(params: {
+  repoUrl: string;
+  branch?: string;
+  name?: string;
+  permissionMode?: string;
+}): Promise<{ workspace: Workspace; cloneResult: any; stack: any }> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/cowork/workspaces/import-github', {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(params),
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to import GitHub repository');
+  return json;
+}
+
+export async function createGitHubPrApi(
+  workspaceId: string,
+  params: { title: string; body?: string; branchName?: string }
+): Promise<{ success: boolean; branchName: string; prUrl?: string; compareUrl?: string; message: string }> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/cowork/workspaces/${workspaceId}/create-github-pr`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(params),
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to create GitHub Pull Request');
+  return json;
+}

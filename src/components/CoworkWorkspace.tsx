@@ -19,7 +19,7 @@ import {
   Folder,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact, WorkspaceFileNode, ExecutionCommandResult } from '../server/types';
-import { fetchGraphQL, advanceTaskApi, approveStepApi } from '../lib/api';
+import { fetchGraphQL, advanceTaskApi, approveStepApi, importGitHubRepoApi, createGitHubPrApi } from '../lib/api';
 import { CoworkWorkspaceProps, RightViewMode } from './cowork/types';
 import { CoworkTaskList } from './cowork/CoworkTaskList';
 import { CoworkHeroView } from './cowork/CoworkHeroView';
@@ -360,6 +360,27 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
       }
     } catch (err: any) {
       alert(`Error binding folder: ${err.message}`);
+    } finally {
+      setIsBindingSubmitting(false);
+    }
+  };
+
+  // Direct GitHub Repository Import
+  const handleImportGitHub = async (params: { repoUrl: string; branch?: string; name?: string }) => {
+    setIsBindingSubmitting(true);
+    try {
+      const data = await importGitHubRepoApi(params);
+      if (data.workspace) {
+        setIsBindingLocal(false);
+        onRefreshWorkspace();
+        if (onSelectWorkspace) {
+          onSelectWorkspace(data.workspace);
+        }
+        await loadWorkspaces();
+      }
+    } catch (err: any) {
+      alert(`Error cloning GitHub repository: ${err.message}`);
+      throw err;
     } finally {
       setIsBindingSubmitting(false);
     }
@@ -806,6 +827,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
           onSubmit={handleBindLocalFolder}
           folderInputRef={folderInputRef}
           onFolderInputChange={handleFolderInputChange}
+          onImportGitHub={handleImportGitHub}
         />
       </div>
     );
@@ -1038,6 +1060,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         onFolderInputChange={handleFolderInputChange}
         onSubmit={handleBindLocalFolder}
         folderInputRef={folderInputRef}
+        onImportGitHub={handleImportGitHub}
       />
 
       {/* New Task Goal Modal */}

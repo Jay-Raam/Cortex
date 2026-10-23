@@ -907,6 +907,122 @@ apiRouter.post('/cowork/workspaces/import-folder', async (req: Request, res: Res
 });
 
 /**
+ * Direct GitHub Repository Clone & Workspace Initialization
+ */
+apiRouter.post('/cowork/workspaces/import-github', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { repoUrl, branch, name, permissionMode = 'approve_plan' } = req.body;
+  if (!repoUrl || typeof repoUrl !== 'string') {
+    return res
+      .status(400)
+      .json({ error: 'repoUrl is required (e.g. "owner/repo" or "https://github.com/owner/repo")' });
+  }
+
+  let parsed: { owner: string; repo: string; fullName: string; httpsUrl: string };
+  try {
+    parsed = workspaceManager.parseGitHubRepoUrl(repoUrl);
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  const wsId = `ws_github_${Date.now()}`;
+  const baseDir = process.env.CORTEX_WORKSPACES_DIR || path.resolve(process.cwd(), 'workspaces');
+  const wsRoot = path.resolve(baseDir, wsId);
+
+  // Clone repository
+  const cloneResult = await workspaceManager.cloneGitHubRepo(wsRoot, parsed, branch);
+
+  // Analyze stack and git status
+  const stack = await workspaceManager.getProjectStructure(wsRoot);
+  const git = await workspaceManager.getGitStatus(wsRoot);
+
+  const displayWorkspaceName = name?.trim() || parsed.repo;
+  const newWorkspace: Workspace = {
+    id: wsId,
+    userId: user.id,
+    name: displayWorkspaceName,
+    description: `GitHub Repository: ${parsed.fullName}`,
+    projectRoot: wsRoot,
+    isLocalBinding: true,
+    gitBranch: git.branch || branch || 'main',
+    githubRepo: parsed.fullName,
+    githubUrl: parsed.httpsUrl,
+    permissionMode: (permissionMode as any) || 'approve_plan',
+    detectedStack: stack,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.createWorkspace(newWorkspace);
+
+  // Seed initial artifact from README.md or package.json if present
+  try {
+    const readmePath = path.join(wsRoot, 'README.md');
+    if (fs.existsSync(readmePath)) {
+      const readmeContent = fs.readFileSync(readmePath, 'utf8');
+      db.createArtifact(
+        {
+          id: `art_gh_${Date.now()}`,
+          workspaceId: wsId,
+          title: 'README.md',
+          fileName: 'README.md',
+          language: 'markdown',
+          content: readmeContent,
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        user.id
+      );
+    }
+  } catch {}
+
+  res.json({
+    success: true,
+    workspace: newWorkspace,
+    cloneResult,
+    stack,
+  });
+});
+
+/**
+ * Create a Git branch and open a Pull Request back to GitHub
+ */
+apiRouter.post('/cowork/workspaces/:id/create-github-pr', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { title = 'feat: autonomous agent updates via Cortex', body = '', branchName } = req.body;
+  const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+
+  try {
+    const prResult = await workspaceManager.createGitHubPullRequest(wsRoot, {
+      title,
+      body,
+      branchName,
+      repoFullName: workspace.githubRepo,
+    });
+    res.json(prResult);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create Pull Request' });
+  }
+});
+
+/**
  * Sync or upload files into an existing workspace
  */
 apiRouter.post('/cowork/workspaces/:id/sync-files', async (req: Request, res: Response) => {

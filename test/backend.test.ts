@@ -1462,6 +1462,163 @@ print(fibonacci(10))
     });
   });
 
+  describe('16. Direct GitHub Repository Import & Pull Request Generator', () => {
+    it('accurately parses and validates GitHub repository URLs, SSH slugs, and HTTPS links', () => {
+      const validCases = [
+        { input: 'Jay-Raam/Smart-ERP', expectedOwner: 'Jay-Raam', expectedRepo: 'Smart-ERP' },
+        { input: 'https://github.com/Jay-Raam/Smart-ERP', expectedOwner: 'Jay-Raam', expectedRepo: 'Smart-ERP' },
+        { input: 'https://github.com/Jay-Raam/Smart-ERP.git', expectedOwner: 'Jay-Raam', expectedRepo: 'Smart-ERP' },
+        { input: 'git@github.com:Jay-Raam/Smart-ERP.git', expectedOwner: 'Jay-Raam', expectedRepo: 'Smart-ERP' },
+        { input: 'facebook/react', expectedOwner: 'facebook', expectedRepo: 'react' },
+      ];
+
+      for (const tc of validCases) {
+        const parsed = workspaceManager.parseGitHubRepoUrl(tc.input);
+        assert.strictEqual(parsed.owner, tc.expectedOwner);
+        assert.strictEqual(parsed.repo, tc.expectedRepo);
+        assert.strictEqual(parsed.fullName, `${tc.expectedOwner}/${tc.expectedRepo}`);
+      }
+
+      assert.throws(() => workspaceManager.parseGitHubRepoUrl(''), /required/);
+      assert.throws(() => workspaceManager.parseGitHubRepoUrl('invalid url format with spaces'), /Invalid GitHub repository format/);
+    });
+
+    it('creates workspace and clones repository or initializes workspace structure via import-github', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/import-github`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            repoUrl: 'Jay-Raam/Smart-ERP',
+            name: 'Smart ERP Project',
+            branch: 'main',
+          }),
+        });
+
+        assert.strictEqual(res.status, 200, 'import-github must return HTTP 200 OK');
+        const data = await res.json();
+        assert.strictEqual(data.success, true);
+        assert.ok(data.workspace);
+        assert.strictEqual(data.workspace.githubRepo, 'Jay-Raam/Smart-ERP');
+        assert.strictEqual(data.workspace.name, 'Smart ERP Project');
+        assert.strictEqual(data.workspace.isLocalBinding, true);
+        assert.ok(data.workspace.projectRoot);
+      } finally {
+        server.close();
+      }
+    });
+
+    it('creates a git branch and returns compare URL or PR link via create-github-pr', async () => {
+      // Create a test workspace with git repo
+      const wsId = `ws_git_pr_${Date.now()}`;
+      const wsDir = path.resolve(process.cwd(), 'workspaces', wsId);
+      fs.mkdirSync(wsDir, { recursive: true });
+      fs.writeFileSync(path.join(wsDir, 'README.md'), '# Test Project for PR', 'utf8');
+
+      // Initialize git
+      const { exec } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const execAsync = promisify(exec);
+      await execAsync('git init && git config user.email "test@cortex.ai" && git config user.name "Cortex Test" && git add . && git commit -m "initial commit"', { cwd: wsDir });
+
+      const ws = db.createWorkspace({
+        id: wsId,
+        userId: testUser1.id,
+        name: 'Git PR Workspace',
+        description: 'Test PR creation',
+        projectRoot: wsDir,
+        isLocalBinding: true,
+        githubRepo: 'Jay-Raam/Smart-ERP',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        // Add a modification
+        fs.writeFileSync(path.join(wsDir, 'feature.ts'), 'export const feature = "payment_v2";', 'utf8');
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/create-github-pr`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title: 'feat: add payment gateway v2',
+            body: 'Autonomous PR implementation created via Cortex AI',
+            branchName: `cortex/feature-payment-${Date.now().toString(36)}`,
+          }),
+        });
+
+        assert.strictEqual(res.status, 200, 'create-github-pr must return HTTP 200');
+        const data = await res.json();
+        assert.strictEqual(data.success, true);
+        assert.ok(data.branchName.startsWith('cortex/feature-payment-'));
+        assert.ok(data.compareUrl?.includes('Jay-Raam/Smart-ERP/compare/main...cortex/feature-payment-'));
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects unauthorized PR creation on another user workspace', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_unauth_pr_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Private PR Workspace',
+        description: 'Tenant isolation test',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken: u2Token } = generateTokens(testUser2);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/create-github-pr`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${u2Token}`,
+          },
+          body: JSON.stringify({ title: 'unauthorized patch' }),
+        });
+        assert.strictEqual(res.status, 404, 'Must reject tenant access with 404');
+      } finally {
+        server.close();
+      }
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

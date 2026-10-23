@@ -120,4 +120,5 @@ export interface FolderBindingModalProps {
   onFolderInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (e: React.FormEvent) => void;
   folderInputRef: React.RefObject<HTMLInputElement | null>;
+  onImportGitHub?: (params: { repoUrl: string; branch?: string; name?: string }) => Promise<void>;
 }
