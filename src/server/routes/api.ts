@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import { ZipArchive } from 'archiver';
-import { db } from '../db/database';
+import { db, ArenaVote } from '../db/database';
 import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
@@ -1278,4 +1278,58 @@ apiRouter.get('/analytics/usage-summary', (req: Request, res: Response) => {
       throughputEstimateTokensSec: 145,
     },
   });
+});
+
+/**
+ * POST /api/arena/vote
+ * Records developer evaluation preference for head-to-head model battles
+ */
+apiRouter.post('/arena/vote', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { prompt, modelA, modelB, winner, latencyMsA, latencyMsB } = req.body;
+  if (!prompt || !modelA || !modelB || !winner) {
+    return res.status(400).json({ error: 'prompt, modelA, modelB, and winner are required' });
+  }
+
+  const validWinners = ['model_a', 'model_b', 'tie', 'both_bad'];
+  if (!validWinners.includes(winner)) {
+    return res.status(400).json({ error: `Invalid winner. Must be one of: ${validWinners.join(', ')}` });
+  }
+
+  const vote: ArenaVote = {
+    id: `vote_${Date.now()}`,
+    userId: user.id,
+    prompt,
+    modelA,
+    modelB,
+    winner,
+    latencyMsA: latencyMsA || 0,
+    latencyMsB: latencyMsB || 0,
+    createdAt: new Date().toISOString(),
+  };
+
+  db.addArenaVote(vote);
+  res.json({ success: true, vote });
+});
+
+/**
+ * GET /api/arena/votes
+ * Returns evaluation voting history for user
+ */
+apiRouter.get('/arena/votes', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const votes = db.getArenaVotes(user.id);
+  res.json({ success: true, votes });
 });

@@ -1,10 +1,10 @@
 import React from 'react';
-import { Command, MessageSquare, Briefcase, Sparkles, BookOpen, Plus, Zap, PanelLeft, XCircle, X, Radio } from 'lucide-react';
+import { Command, MessageSquare, Briefcase, Sparkles, BookOpen, Plus, Zap, PanelLeft, XCircle, X, Radio, Swords } from 'lucide-react';
 
 interface ShortcutsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAction: (action: 'chat' | 'cowork' | 'skills' | 'docs' | 'new_chat' | 'models' | 'toggle_sidebar' | 'voice') => void;
+  onAction: (action: 'chat' | 'cowork' | 'skills' | 'docs' | 'new_chat' | 'models' | 'toggle_sidebar' | 'voice' | 'arena') => void;
 }
 
 export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose, onAction }) => {
@@ -18,6 +18,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose,
     { key: `${modKey}+2`, label: 'Co-Work Workspace', desc: 'Switch to agentic task planner', icon: <Briefcase className="w-4 h-4 text-[#FF6B00]" />, action: () => onAction('cowork') },
     { key: `${modKey}+3`, label: 'Skills & Personas', desc: 'Browse domain workflows', icon: <Sparkles className="w-4 h-4 text-[#FF6B00]" />, action: () => onAction('skills') },
     { key: `${modKey}+4`, label: 'Architecture & Docs', desc: 'System topology & guides', icon: <BookOpen className="w-4 h-4 text-[#FF6B00]" />, action: () => onAction('docs') },
+    { key: `${modKey}+5`, label: 'Model Arena', desc: 'Dual-model concurrent streaming battle & comparison', icon: <Swords className="w-4 h-4 text-[#FF6B00]" />, action: () => onAction('arena') },
   ];
 
   const actionShortcuts = [

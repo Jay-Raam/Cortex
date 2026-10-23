@@ -1895,6 +1895,134 @@ print(fibonacci(10))
     });
   });
 
+
+  describe('19. Side-by-Side Dual Model Arena & Blind Comparison (POST /api/arena/vote, GET /api/arena/votes)', () => {
+    it('records developer evaluation preference and latency telemetry via POST /api/arena/vote', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/arena/vote`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            prompt: 'Explain CAP theorem in simple distributed systems terms',
+            modelA: 'gemini-3.8-flash',
+            modelB: 'meta-llama-3.3-70b-instruct:free',
+            winner: 'model_a',
+            latencyMsA: 340,
+            latencyMsB: 580,
+          }),
+        });
+
+        assert.strictEqual(res.status, 200, 'Must return 200 OK');
+        const data = await res.json();
+        assert.strictEqual(data.success, true);
+        assert.strictEqual(data.vote.winner, 'model_a');
+        assert.strictEqual(data.vote.modelA, 'gemini-3.8-flash');
+        assert.strictEqual(data.vote.modelB, 'meta-llama-3.3-70b-instruct:free');
+        assert.strictEqual(data.vote.latencyMsA, 340);
+        assert.strictEqual(data.vote.latencyMsB, 580);
+        assert.strictEqual(data.vote.userId, testUser1.id);
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects invalid winner categories with 400 Bad Request', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/arena/vote`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            prompt: 'Sample prompt',
+            modelA: 'gemini-3.8-flash',
+            modelB: 'meta-llama-3.3-70b-instruct:free',
+            winner: 'invalid_category_test',
+          }),
+        });
+
+        assert.strictEqual(res.status, 400);
+        const data = await res.json();
+        assert.ok(data.error.includes('Invalid winner'));
+      } finally {
+        server.close();
+      }
+    });
+
+    it('retrieves user voting history and enforces multi-tenant data isolation', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken: u1Token } = generateTokens(testUser1);
+      const { accessToken: u2Token } = generateTokens(testUser2);
+
+      try {
+        const res1 = await fetch(`http://127.0.0.1:${port}/api/arena/votes`, {
+          headers: { Authorization: `Bearer ${u1Token}` },
+        });
+        const data1 = await res1.json();
+        assert.strictEqual(res1.status, 200);
+        assert.ok(data1.votes.length >= 1, 'User 1 should see their vote');
+
+        const res2 = await fetch(`http://127.0.0.1:${port}/api/arena/votes`, {
+          headers: { Authorization: `Bearer ${u2Token}` },
+        });
+        const data2 = await res2.json();
+        assert.strictEqual(res2.status, 200);
+        assert.strictEqual(data2.votes.length, 0, 'User 2 should see 0 votes (isolated)');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects unauthenticated requests to arena voting endpoints with 401', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/arena/votes`);
+        assert.strictEqual(res.status, 401);
+      } finally {
+        server.close();
+      }
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

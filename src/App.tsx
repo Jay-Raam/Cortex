@@ -23,6 +23,7 @@ const ProfileModal = React.lazy(() => import('./components/ProfileModal').then((
 const UsageModal = React.lazy(() => import('./components/UsageModal').then((m) => ({ default: m.UsageModal })));
 const CreateProjectModal = React.lazy(() => import('./components/CreateProjectModal').then((m) => ({ default: m.CreateProjectModal })));
 const VoiceOverlayModal = React.lazy(() => import('./components/voice/VoiceOverlayModal').then((m) => ({ default: m.VoiceOverlayModal })));
+const ModelArenaView = React.lazy(() => import('./components/arena/ModelArenaView').then((m) => ({ default: m.ModelArenaView })));
 
 function ViewLoadingFallback() {
   return (
@@ -69,7 +70,7 @@ import {
 import { exportConversationToMarkdown, exportConversationToJson } from './lib/export';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'chat' | 'cowork' | 'skills' | 'docs'>('chat');
+  const [currentView, setCurrentView] = useState<'chat' | 'cowork' | 'skills' | 'docs' | 'arena'>('chat');
 
   // Domain data
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -299,7 +300,10 @@ export default function App() {
   // Keyboard Shortcuts (Ctrl+K, Ctrl+N, Ctrl+B, etc.)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
+      if ((e.ctrlKey || e.metaKey) && e.key === '5') {
+        e.preventDefault();
+        setCurrentView('arena');
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
         e.preventDefault();
         setIsVoiceOverlayOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -1066,7 +1070,7 @@ export default function App() {
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
         onAction={(act) => {
-          if (act === 'chat' || act === 'cowork' || act === 'skills' || act === 'docs') {
+          if (act === 'chat' || act === 'cowork' || act === 'skills' || act === 'docs' || act === 'arena') {
             setCurrentView(act);
           } else if (act === 'new_chat') {
             handleNewConversation();

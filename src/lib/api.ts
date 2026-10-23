@@ -335,3 +335,45 @@ export async function fetchUsageSummaryApi(): Promise<UsageAnalyticsSummary> {
   if (!json.success) throw new Error(json.error || 'Failed to load usage summary');
   return json.summary;
 }
+
+export interface ArenaVotePayload {
+  prompt: string;
+  modelA: string;
+  modelB: string;
+  winner: 'model_a' | 'model_b' | 'tie' | 'both_bad';
+  latencyMsA?: number;
+  latencyMsB?: number;
+}
+
+export async function submitArenaVoteApi(voteData: ArenaVotePayload): Promise<any> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/arena/vote', {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(voteData),
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to submit arena vote');
+  return json.vote;
+}
+
+export async function fetchArenaVotesApi(): Promise<any[]> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/arena/votes', {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to fetch arena votes');
+  return json.votes;
+}
