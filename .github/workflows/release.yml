@@ -1,0 +1,72 @@
+name: Cortex Windows Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build Windows NSIS Installer & Publish Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: TypeScript Lint & Typecheck
+        run: npm run lint
+
+      - name: Run Backend Automated Tests
+        run: npm test
+
+      - name: Build Web Application Bundle
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Build Embedded Express Server
+        run: npm run build:server
+
+      - name: Build Windows NSIS Installer (.exe)
+        run: npx electron-builder --win nsis -c.directories.output=release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Inspect Generated Release Artifacts
+        shell: powershell
+        run: |
+          Write-Host "Generated release artifacts in release directory:"
+          Get-ChildItem -Path release | Select-Object Name, Length, LastWriteTime
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/*.blockmap
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

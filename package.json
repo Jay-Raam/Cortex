@@ -64,7 +64,7 @@
     "appId": "ai.nexa.cortex",
     "productName": "Cortex",
     "directories": {
-      "output": "D:/Cortex-Release"
+      "output": "release"
     },
     "files": [
       "dist/**/*",
