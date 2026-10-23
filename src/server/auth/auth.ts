@@ -68,6 +68,11 @@ export function extractToken(req: Request): string | null {
     }
   }
 
+  // 4. Query parameter token (useful for direct file download links like ZIP export)
+  if (req.query && typeof req.query.token === 'string' && req.query.token) {
+    return req.query.token.trim();
+  }
+
   return null;
 }
 

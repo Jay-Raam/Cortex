@@ -32,10 +32,12 @@ import {
   Globe,
   Palette,
   FileText,
+  Download,
 } from 'lucide-react';
 import { CoworkCanvasProps } from './types';
 import { UnifiedDiffViewer } from './UnifiedDiffViewer';
 import { WorkspaceFileNode } from '../../server/types';
+import { downloadWorkspaceZip } from '../../lib/api';
 
 function pathBasename(p: string): string {
   const parts = p.split(/[\/\\]/);
@@ -96,6 +98,20 @@ export const CoworkCanvas: React.FC<CoworkCanvasProps> = ({
   const [mobileTab, setMobileTab] = useState<'timeline' | 'canvas'>('timeline');
   const [previewViewport, setPreviewViewport] = useState<'desktop' | 'mobile'>('desktop');
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+
+  const handleDownloadZip = async () => {
+    if (!workspace?.id || isDownloadingZip) return;
+    setIsDownloadingZip(true);
+    try {
+      await downloadWorkspaceZip(workspace.id, workspace.name);
+    } catch (err: any) {
+      console.error('Failed to export workspace zip:', err);
+      alert('Failed to export workspace ZIP: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsDownloadingZip(false);
+    }
+  };
 
   // Collect available files from artifacts and plannedFiles
   const availableFiles = useMemo(() => {
@@ -775,6 +791,19 @@ export const CoworkCanvas: React.FC<CoworkCanvasProps> = ({
                 >
                   <Save className="w-3 h-3" />
                   <span className="hidden sm:inline">{isSavingFile ? 'Saving...' : 'Save File'}</span>
+                </button>
+              )}
+
+              {workspace?.id && (
+                <button
+                  type="button"
+                  onClick={handleDownloadZip}
+                  disabled={isDownloadingZip}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-50/80 hover:bg-orange-100 border border-orange-200 text-[#EA580C] shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                  title="Download full workspace as ZIP"
+                >
+                  <Download className={`w-3 h-3 ${isDownloadingZip ? 'animate-bounce' : ''}`} />
+                  <span className="hidden sm:inline">{isDownloadingZip ? 'Exporting...' : 'Export ZIP'}</span>
                 </button>
               )}
 

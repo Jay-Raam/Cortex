@@ -210,3 +210,36 @@ export async function approveStepApi(taskId: string, stepId?: string, approvalId
   if (!json.success) throw new Error(json.error || 'Failed to approve step');
   return json.task;
 }
+
+export async function downloadWorkspaceZip(workspaceId: string, workspaceName = 'workspace'): Promise<void> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/cowork/workspaces/${workspaceId}/export-zip`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({ error: 'Export failed' }));
+    throw new Error(json.error || `HTTP ${res.status}: Failed to export workspace ZIP`);
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = (workspaceName || 'cortex-workspace')
+    .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '_') || 'workspace';
+  a.download = `${safeName}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+    a.remove();
+  }, 1000);
+}

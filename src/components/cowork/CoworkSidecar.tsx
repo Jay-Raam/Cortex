@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   RefreshCw,
   Clock,
+  Download,
 } from 'lucide-react';
 import { CoworkSidecarProps } from './types';
+import { downloadWorkspaceZip } from '../../lib/api';
 
 export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
   workspace,
@@ -31,6 +33,20 @@ export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
   const [isProgressOpen, setIsProgressOpen] = useState(true);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(true);
   const [isContextOpen, setIsContextOpen] = useState(true);
+  const [isExportingZip, setIsExportingZip] = useState(false);
+
+  const handleExportZip = async () => {
+    if (!workspace?.id || isExportingZip) return;
+    setIsExportingZip(true);
+    try {
+      await downloadWorkspaceZip(workspace.id, workspace.name);
+    } catch (err: any) {
+      console.error('Failed to export workspace zip:', err);
+      alert('Failed to export workspace ZIP: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsExportingZip(false);
+    }
+  };
 
   return (
     <>
@@ -200,6 +216,18 @@ export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
                 <div className="text-[11px] text-slate-400 italic py-2">
                   No outputs created yet.
                 </div>
+              )}
+              {workspace?.id && (
+                <button
+                  type="button"
+                  onClick={handleExportZip}
+                  disabled={isExportingZip}
+                  className="w-full mt-2 py-1.5 px-2.5 rounded-lg bg-orange-50/70 hover:bg-orange-100/80 border border-orange-200 text-[#EA580C] text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                  title="Download all workspace files and deliverables as a ZIP archive"
+                >
+                  <Download className={`w-3.5 h-3.5 ${isExportingZip ? 'animate-bounce' : ''}`} />
+                  <span>{isExportingZip ? 'Exporting ZIP...' : 'Download Project (.zip)'}</span>
+                </button>
               )}
             </div>
           )}

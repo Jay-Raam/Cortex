@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
+import { ZipArchive } from 'archiver';
 import { db } from '../db/database';
 import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
@@ -639,6 +640,77 @@ apiRouter.delete('/cowork/workspaces/:id', async (req: Request, res: Response) =
   const deleted = db.deleteWorkspace(id, user.id);
   if (!deleted) return res.status(404).json({ error: 'Workspace not found or access denied' });
   res.json({ success: true, message: 'Workspace deleted' });
+});
+
+/**
+ * Export full workspace directory and artifacts as a ZIP archive
+ */
+apiRouter.get('/cowork/workspaces/:id/export-zip', async (req: Request, res: Response) => {
+  let user: User;
+  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) return res.status(404).json({ error: 'Workspace not found or access denied' });
+
+  try {
+    const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+    const artifacts = db.getArtifacts(workspace.id, user.id);
+
+    const safeWsName = (workspace.name || 'cortex-workspace')
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .trim()
+      .replace(/\s+/g, '_') || 'workspace';
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeWsName}.zip"`);
+
+    const archive = new ZipArchive({
+      zlib: { level: 9 },
+    });
+
+    archive.on('error', (err: any) => {
+      console.error('[ZipExport] Archiver error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to generate ZIP archive: ' + err.message });
+      }
+    });
+
+    archive.pipe(res);
+
+    // 1. If physical workspace directory exists on disk, append all files
+    if (fs.existsSync(wsRoot)) {
+      archive.glob('**/*', {
+        cwd: wsRoot,
+        nodir: true,
+        ignore: [
+          'node_modules/**',
+          '.git/**',
+          '.next/**',
+          'dist/**',
+          'build/**',
+          '.cache/**',
+          '**/*.pem',
+          '**/*.key',
+          '**/id_rsa*',
+          '**/id_ed25519*',
+        ],
+      });
+    }
+
+    // 2. Also ensure any artifacts stored in database are included if not present on disk
+    for (const art of artifacts) {
+      const artPath = path.resolve(wsRoot, art.fileName);
+      if (!fs.existsSync(artPath)) {
+        archive.append(art.content, { name: art.fileName });
+      }
+    }
+
+    await archive.finalize();
+  } catch (err: any) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
+  }
 });
 
 /**
