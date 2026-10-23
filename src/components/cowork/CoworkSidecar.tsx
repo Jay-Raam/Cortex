@@ -12,6 +12,8 @@ import {
   Terminal,
   Copy,
   Check,
+  Users,
+  Sparkles,
 } from 'lucide-react';
 import { CoworkSidecarProps } from './types';
 import { downloadWorkspaceZip } from '../../lib/api';
@@ -36,7 +38,10 @@ export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
   terminalOutput,
   isExecutingCommand,
   onExecuteTerminal,
+  onRunSwarm,
 }) => {
+  const [isSwarmOpen, setIsSwarmOpen] = useState(true);
+  const [isSwarmRunning, setIsSwarmRunning] = useState(false);
   const [isProgressOpen, setIsProgressOpen] = useState(true);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(true);
   const [isContextOpen, setIsContextOpen] = useState(true);
@@ -82,6 +87,103 @@ export const CoworkSidecar: React.FC<CoworkSidecarProps> = ({
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Card: Agent Swarm Team */}
+        <div className="bg-white rounded-xl border border-[#EBE7DF] shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsSwarmOpen(!isSwarmOpen)}
+            className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center text-[#EA580C]">
+                <Users className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-slate-800">Swarm Team</h4>
+                  <span className="text-[9px] bg-orange-100 text-[#EA580C] font-extrabold px-1.5 py-0.2 rounded-full">
+                    3 AI Agents
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500">Architect · Developer · QA Reviewer</p>
+              </div>
+            </div>
+            {isSwarmOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+          </button>
+
+          {isSwarmOpen && (
+            <div className="px-3.5 pb-3.5 pt-1 space-y-2.5 border-t border-slate-100">
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                <div className="p-1.5 rounded-lg bg-slate-50 border border-slate-200/80 text-center">
+                  <span className="text-sm block">🏛️</span>
+                  <div className="text-[10px] font-bold text-slate-800 truncate">Dr. Aris</div>
+                  <div className="text-[8px] text-slate-400 font-mono">Architect</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-slate-50 border border-slate-200/80 text-center">
+                  <span className="text-sm block">💻</span>
+                  <div className="text-[10px] font-bold text-slate-800 truncate">Devon</div>
+                  <div className="text-[8px] text-slate-400 font-mono">Senior Dev</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-slate-50 border border-slate-200/80 text-center">
+                  <span className="text-sm block">🛡️</span>
+                  <div className="text-[10px] font-bold text-slate-800 truncate">Serena</div>
+                  <div className="text-[8px] text-slate-400 font-mono">QA Auditor</div>
+                </div>
+              </div>
+
+              {selectedTask?.swarmEvents && selectedTask.swarmEvents.length > 0 ? (
+                <div className="space-y-2 pt-1 border-t border-slate-100">
+                  {selectedTask.swarmEvents.map((ev) => (
+                    <div key={ev.id} className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs">{ev.avatarIcon || '🤖'}</span>
+                          <span className="text-[10px] font-bold text-slate-800 truncate">{ev.agentName}</span>
+                        </div>
+                        <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-semibold">
+                          Done
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 leading-relaxed font-sans">{ev.message}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-1">
+                  {selectedTask && selectedTask.status !== 'completed' && onRunSwarm && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!selectedTask || isSwarmRunning) return;
+                        setIsSwarmRunning(true);
+                        try {
+                          await onRunSwarm(selectedTask.id);
+                        } finally {
+                          setIsSwarmRunning(false);
+                        }
+                      }}
+                      disabled={isSwarmRunning}
+                      className="w-full py-1.5 px-2.5 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                    >
+                      {isSwarmRunning ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Swarm Executing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Users className="w-3.5 h-3.5 text-orange-400" />
+                          <span>Deploy Swarm Team (3 Agents)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Card 1: Progress */}

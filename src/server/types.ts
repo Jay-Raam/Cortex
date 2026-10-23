@@ -213,6 +213,21 @@ export interface AgentTaskStep {
   completedAt?: string;
 }
 
+export type SwarmAgentRole = 'architect' | 'developer' | 'reviewer';
+
+export interface SwarmCollaborationEvent {
+  id: string;
+  role: SwarmAgentRole;
+  agentName: string;
+  modelId: string;
+  avatarIcon: string;
+  title: string;
+  message: string;
+  status: 'active' | 'completed' | 'flagged';
+  timestamp: string;
+  deliverables?: string[];
+}
+
 export interface AgentTask {
   id: string;
   workspaceId: string;
@@ -231,6 +246,8 @@ export interface AgentTask {
   artifactIds: string[];
   summary?: string;
   error?: string;
+  isSwarmMode?: boolean;
+  swarmEvents?: SwarmCollaborationEvent[];
   createdAt: string;
   updatedAt: string;
 }

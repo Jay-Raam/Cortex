@@ -551,6 +551,32 @@ apiRouter.post('/cowork/tasks/:id/plan/reject', async (req: Request, res: Respon
 });
 
 /**
+ * Execute multi-agent collaborative swarm pipeline (Architect -> Developer -> QA Reviewer)
+ */
+apiRouter.post('/cowork/tasks/:id/swarm-execute', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { id } = req.params;
+  const task = db.getTaskById(id, user.id);
+  if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
+
+  try {
+    const updatedTask = await coworkEngine.runSwarmTaskLoop(id, user.id);
+    res.json({
+      success: true,
+      task: updatedTask,
+      swarmEvents: updatedTask.swarmEvents || [],
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Swarm execution failed' });
+  }
+});
+
+/**
  * Update workspace permission mode (ask_every_change, approve_plan, session_edit)
  */
 apiRouter.post('/cowork/workspaces/:id/permission-mode', async (req: Request, res: Response) => {

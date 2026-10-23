@@ -285,3 +285,20 @@ export async function createGitHubPrApi(
   if (!json.success) throw new Error(json.error || 'Failed to create GitHub Pull Request');
   return json;
 }
+
+
+export async function executeSwarmTaskApi(taskId: string): Promise<AgentTask> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/cowork/tasks/' + taskId + '/swarm-execute', {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Swarm execution failed');
+  return json.task;
+}
