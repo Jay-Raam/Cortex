@@ -1,23 +1,49 @@
+import { CognivoLogo } from './components/CognivoLogo';
+import { AuthPage } from './components/AuthPage';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TopNav } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatComposer } from './components/ChatComposer';
-import { ModelSelectorModal } from './components/ModelSelectorModal';
-import { CoworkWorkspace } from './components/CoworkWorkspace';
-import { SkillsDrawer } from './components/SkillsDrawer';
-import { NotificationModal } from './components/NotificationModal';
-import { ShortcutsModal } from './components/ShortcutsModal';
-import { DocsView } from './components/DocsView';
-import { CognivoLogo } from './components/CognivoLogo';
-import { ExploreModal } from './components/ExploreModal';
-import { KnowledgeModal } from './components/KnowledgeModal';
-import { TemplatesModal } from './components/TemplatesModal';
-import { ShareModal } from './components/ShareModal';
-import { AuthPage } from './components/AuthPage';
-import { ProfileModal } from './components/ProfileModal';
-import { UsageModal } from './components/UsageModal';
-import { CreateProjectModal } from './components/CreateProjectModal';
+
+
+
+// Lazy-loaded heavy views and modals for optimal bundle splitting and instant launch
+const CoworkWorkspace = React.lazy(() => import('./components/CoworkWorkspace').then((m) => ({ default: m.CoworkWorkspace })));
+const DocsView = React.lazy(() => import('./components/DocsView').then((m) => ({ default: m.DocsView })));
+const SkillsDrawer = React.lazy(() => import('./components/SkillsDrawer').then((m) => ({ default: m.SkillsDrawer })));
+const ModelSelectorModal = React.lazy(() => import('./components/ModelSelectorModal').then((m) => ({ default: m.ModelSelectorModal })));
+const NotificationModal = React.lazy(() => import('./components/NotificationModal').then((m) => ({ default: m.NotificationModal })));
+const ShortcutsModal = React.lazy(() => import('./components/ShortcutsModal').then((m) => ({ default: m.ShortcutsModal })));
+const ExploreModal = React.lazy(() => import('./components/ExploreModal').then((m) => ({ default: m.ExploreModal })));
+const KnowledgeModal = React.lazy(() => import('./components/KnowledgeModal').then((m) => ({ default: m.KnowledgeModal })));
+const TemplatesModal = React.lazy(() => import('./components/TemplatesModal').then((m) => ({ default: m.TemplatesModal })));
+const ShareModal = React.lazy(() => import('./components/ShareModal').then((m) => ({ default: m.ShareModal })));
+const ProfileModal = React.lazy(() => import('./components/ProfileModal').then((m) => ({ default: m.ProfileModal })));
+const UsageModal = React.lazy(() => import('./components/UsageModal').then((m) => ({ default: m.UsageModal })));
+const CreateProjectModal = React.lazy(() => import('./components/CreateProjectModal').then((m) => ({ default: m.CreateProjectModal })));
+
+function ViewLoadingFallback() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center min-h-[400px] bg-[#FAF8F5] text-slate-500">
+      <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mb-3" />
+      <span className="text-xs font-semibold tracking-wide">Loading workspace...</span>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser, renameConversationApi } from './lib/api';
 import {
   Conversation,
@@ -945,31 +971,40 @@ export default function App() {
           )}
 
           {currentView === 'cowork' && (
-            <CoworkWorkspace
-              workspace={activeWorkspace}
-              workspaces={workspaces}
-              onNewWorkspace={() => setIsCreateProjectModalOpen(true)}
-              onRefreshWorkspace={loadInitialData}
-              onSelectWorkspace={(ws) => setActiveWorkspace(ws)}
-              onDeleteWorkspace={handleDeleteWorkspace}
-            />
+            <React.Suspense fallback={<ViewLoadingFallback />}>
+              <CoworkWorkspace
+                workspace={activeWorkspace}
+                workspaces={workspaces}
+                onNewWorkspace={() => setIsCreateProjectModalOpen(true)}
+                onRefreshWorkspace={loadInitialData}
+                onSelectWorkspace={(ws) => setActiveWorkspace(ws)}
+                onDeleteWorkspace={handleDeleteWorkspace}
+              />
+            </React.Suspense>
           )}
 
           {currentView === 'skills' && (
-            <SkillsDrawer
-              isOpen={currentView === 'skills'}
-              skills={skills}
-              activeSkillId={activeSkillId}
-              onSelectSkill={(id) => setActiveSkillId(id)}
-              onClose={() => setCurrentView('chat')}
-            />
+            <React.Suspense fallback={<ViewLoadingFallback />}>
+              <SkillsDrawer
+                isOpen={currentView === 'skills'}
+                skills={skills}
+                activeSkillId={activeSkillId}
+                onSelectSkill={(id) => setActiveSkillId(id)}
+                onClose={() => setCurrentView('chat')}
+              />
+            </React.Suspense>
           )}
 
-          {currentView === 'docs' && <DocsView />}
+          {currentView === 'docs' && (
+            <React.Suspense fallback={<ViewLoadingFallback />}>
+              <DocsView />
+            </React.Suspense>
+          )}
         </div>
       </div>
 
       {/* Modals & Dialogs */}
+      <React.Suspense fallback={null}>
       <ModelSelectorModal
         isOpen={isModelModalOpen}
         onClose={() => setIsModelModalOpen(false)}
@@ -1062,6 +1097,7 @@ export default function App() {
         selectedMode={selectedMode}
         onSelectMode={(mode) => setSelectedMode(mode)}
       />
+      </React.Suspense>
     </div>
   );
 }
