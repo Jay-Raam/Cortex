@@ -384,7 +384,215 @@ export class WorkspaceManager {
   /**
    * Inspects package manifest, build scripts, and dependencies.
    */
-  async getProjectStructure(workspaceRoot: string): Promise<{
+  /**
+   * Multi-file search and replace across workspace files with regex, case-sensitivity,
+   * match preview, unified diffs, and optional atomic batch application.
+   */
+  async searchAndReplace(
+    workspaceRoot: string,
+    options: {
+      query: string;
+      replacement?: string;
+      isRegex?: boolean;
+      matchCase?: boolean;
+      wholeWord?: boolean;
+      filePattern?: string;
+      dryRun?: boolean;
+      maxResults?: number;
+    }
+  ): Promise<{
+    query: string;
+    replacement?: string;
+    isRegex: boolean;
+    matchCase: boolean;
+    wholeWord: boolean;
+    totalMatches: number;
+    filesCount: number;
+    matches: Array<{
+      file: string;
+      line: number;
+      column: number;
+      lineContent: string;
+      matchText: string;
+      preview: string;
+    }>;
+    filePreviews: Array<{
+      file: string;
+      matchesCount: number;
+      diff: string;
+    }>;
+    applied: boolean;
+  }> {
+    const isRegex = Boolean(options.isRegex);
+    const matchCase = Boolean(options.matchCase);
+    const wholeWord = Boolean(options.wholeWord);
+    const dryRun = options.dryRun !== false;
+    const maxResults = options.maxResults || 200;
+
+    if (!options.query || typeof options.query !== 'string') {
+      return {
+        query: '',
+        replacement: options.replacement,
+        isRegex,
+        matchCase,
+        wholeWord,
+        totalMatches: 0,
+        filesCount: 0,
+        matches: [],
+        filePreviews: [],
+        applied: false,
+      };
+    }
+
+    // Build regular expression safely
+    let patternStr = options.query;
+    if (!isRegex) {
+      patternStr = patternStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    if (wholeWord) {
+      patternStr = `\\b${patternStr}\\b`;
+    }
+    const flags = matchCase ? 'g' : 'gi';
+    let regex: RegExp;
+    try {
+      regex = new RegExp(patternStr, flags);
+    } catch (err: any) {
+      throw new Error(`Invalid regular expression pattern: ${err.message}`);
+    }
+
+    // Parse file patterns filter (e.g. "*.ts, *.tsx, src/*")
+    const patterns = options.filePattern
+      ? options.filePattern
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : [];
+
+    const matchesPattern = (relPath: string): boolean => {
+      if (patterns.length === 0) return true;
+      const normalized = relPath.replace(/\\/g, '/');
+      return patterns.some((pat) => {
+        if (pat.startsWith('*.')) {
+          const ext = pat.substring(1);
+          return normalized.endsWith(ext);
+        }
+        if (pat.endsWith('*')) {
+          const prefix = pat.substring(0, pat.length - 1);
+          return normalized.startsWith(prefix);
+        }
+        return normalized.includes(pat);
+      });
+    };
+
+    const tree = await this.listDirectoryTree(workspaceRoot, '', 6);
+    const flatten = (nodes: WorkspaceFileNode[]): string[] => {
+      let paths: string[] = [];
+      for (const node of nodes) {
+        if (node.type === 'file') paths.push(node.path);
+        if (node.children) paths = paths.concat(flatten(node.children));
+      }
+      return paths;
+    };
+
+    const allFiles = flatten(tree);
+    const targetFiles = allFiles.filter((f) => !this.isSensitiveFile(f) && matchesPattern(f));
+
+    const matches: Array<{
+      file: string;
+      line: number;
+      column: number;
+      lineContent: string;
+      matchText: string;
+      preview: string;
+    }> = [];
+
+    const filePreviews: Array<{
+      file: string;
+      matchesCount: number;
+      diff: string;
+    }> = [];
+
+    for (const relPath of targetFiles) {
+      try {
+        const { content: originalContent } = await this.readFile(workspaceRoot, relPath);
+        const lines = originalContent.split('\n');
+        let fileMatchCount = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+          const lineText = lines[i];
+          const lineRegex = new RegExp(patternStr, flags);
+          let match: RegExpExecArray | null;
+
+          while ((match = lineRegex.exec(lineText)) !== null) {
+            fileMatchCount++;
+            if (matches.length < maxResults) {
+              const col = match.index + 1;
+              const matchText = match[0];
+              const preview =
+                options.replacement !== undefined
+                  ? lineText.substring(0, match.index) +
+                    `[${options.replacement}]` +
+                    lineText.substring(match.index + matchText.length)
+                  : lineText.trim().substring(0, 160);
+
+              matches.push({
+                file: relPath,
+                line: i + 1,
+                column: col,
+                lineContent: lineText.trim().substring(0, 160),
+                matchText,
+                preview,
+              });
+            }
+            if (!matchCase && !lineRegex.global) break;
+          }
+        }
+
+        if (fileMatchCount > 0 && options.replacement !== undefined) {
+          const newContent = originalContent.replace(regex, options.replacement);
+          const origLines = originalContent.split('\n');
+          const newLines = newContent.split('\n');
+          const diffLines: string[] = [];
+          const max = Math.max(origLines.length, newLines.length);
+
+          for (let k = 0; k < max; k++) {
+            const o = origLines[k];
+            const n = newLines[k];
+            if (o !== n) {
+              if (o !== undefined) diffLines.push(`- ${o}`);
+              if (n !== undefined) diffLines.push(`+ ${n}`);
+            }
+          }
+
+          filePreviews.push({
+            file: relPath,
+            matchesCount: fileMatchCount,
+            diff: diffLines.slice(0, 50).join('\n'),
+          });
+
+          // If not a dry run, atomically update the file on disk
+          if (!dryRun) {
+            await this.editFile(workspaceRoot, relPath, newContent);
+          }
+        }
+      } catch {}
+    }
+
+    return {
+      query: options.query,
+      replacement: options.replacement,
+      isRegex,
+      matchCase,
+      wholeWord,
+      totalMatches: matches.length,
+      filesCount: filePreviews.length > 0 ? filePreviews.length : new Set(matches.map((m) => m.file)).size,
+      matches,
+      filePreviews,
+      applied: !dryRun && options.replacement !== undefined && filePreviews.length > 0,
+    };
+  }
+
+    async getProjectStructure(workspaceRoot: string): Promise<{
     framework: string;
     packageScripts: Record<string, string>;
     dependencies: Record<string, string>;

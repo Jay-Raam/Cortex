@@ -1635,3 +1635,40 @@ apiRouter.post('/cowork/workspaces/:id/git/release-notes', async (req: Request, 
     res.status(500).json({ error: err.message || 'Failed to generate release notes' });
   }
 });
+
+
+/**
+ * POST /api/cowork/workspaces/:id/search-replace
+ * Multi-file search and replace across workspace files with regex and match previews
+ */
+apiRouter.post('/cowork/workspaces/:id/search-replace', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+  try {
+    const result = await workspaceManager.searchAndReplace(wsRoot, {
+      query: req.body.query,
+      replacement: req.body.replacement,
+      isRegex: req.body.isRegex,
+      matchCase: req.body.matchCase,
+      wholeWord: req.body.wholeWord,
+      filePattern: req.body.filePattern,
+      dryRun: req.body.dryRun,
+      maxResults: req.body.maxResults,
+    });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to execute search and replace' });
+  }
+});
