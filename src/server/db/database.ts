@@ -14,6 +14,7 @@ import {
   NotificationPreferences,
   ApprovalRequest,
   WorkspaceCheckpoint,
+  CustomModelEndpoint,
 } from '../types';
 
 
@@ -43,6 +44,7 @@ interface DatabaseSchema {
   notifications: NotificationItem[];
   preferences: NotificationPreferences[];
   arenaVotes?: ArenaVote[];
+  customEndpoints?: CustomModelEndpoint[];
 }
 
 const DATA_DIR = process.env.CORTEX_DATA_DIR || path.resolve(process.cwd(), 'data');
@@ -647,6 +649,39 @@ class Database {
   getArenaVotes(userId: string): ArenaVote[] {
     if (!this.data.arenaVotes) return [];
     return this.data.arenaVotes.filter((v) => v.userId === userId);
+  }
+
+
+  // --- Custom Model Endpoints ---
+  getCustomEndpoints(userId: string): CustomModelEndpoint[] {
+    if (!this.data.customEndpoints) return [];
+    return this.data.customEndpoints.filter((e) => e.userId === userId);
+  }
+
+  getCustomEndpointById(id: string, userId?: string): CustomModelEndpoint | undefined {
+    if (!this.data.customEndpoints) return undefined;
+    return this.data.customEndpoints.find((e) => e.id === id && (!userId || e.userId === userId));
+  }
+
+  saveCustomEndpoint(endpoint: CustomModelEndpoint): CustomModelEndpoint {
+    if (!this.data.customEndpoints) this.data.customEndpoints = [];
+    const idx = this.data.customEndpoints.findIndex((e) => e.id === endpoint.id && e.userId === endpoint.userId);
+    if (idx >= 0) {
+      this.data.customEndpoints[idx] = endpoint;
+    } else {
+      this.data.customEndpoints.push(endpoint);
+    }
+    this.persist();
+    return endpoint;
+  }
+
+  deleteCustomEndpoint(id: string, userId: string): boolean {
+    if (!this.data.customEndpoints) return false;
+    const initialLen = this.data.customEndpoints.length;
+    this.data.customEndpoints = this.data.customEndpoints.filter((e) => !(e.id === id && e.userId === userId));
+    const deleted = this.data.customEndpoints.length < initialLen;
+    if (deleted) this.persist();
+    return deleted;
   }
 
   createCheckpoint(ckpt: WorkspaceCheckpoint): WorkspaceCheckpoint {

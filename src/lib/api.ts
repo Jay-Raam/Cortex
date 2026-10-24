@@ -1,4 +1,4 @@
-import { ModelInfo, Conversation, Message, Skill, Workspace, WorkspaceArtifact, AgentTask, NotificationItem, User } from '../server/types';
+import { ModelInfo, Conversation, Message, Skill, Workspace, WorkspaceArtifact, AgentTask, NotificationItem, User, CustomModelEndpoint } from '../server/types';
 
 export async function loginUser(email: string, password: string): Promise<User> {
   const res = await fetch('/api/auth/login', {
@@ -376,4 +376,67 @@ export async function fetchArenaVotesApi(): Promise<any[]> {
   const json = await res.json();
   if (!json.success) throw new Error(json.error || 'Failed to fetch arena votes');
   return json.votes;
+}
+
+export async function fetchCustomEndpointsApi(): Promise<CustomModelEndpoint[]> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/providers/custom-endpoints', {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to fetch custom endpoints');
+  return json.endpoints;
+}
+
+export async function saveCustomEndpointApi(endpoint: Partial<CustomModelEndpoint>): Promise<CustomModelEndpoint> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/providers/custom-endpoints', {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(endpoint),
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to save custom endpoint');
+  return json.endpoint;
+}
+
+export async function deleteCustomEndpointApi(id: string): Promise<void> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/providers/custom-endpoints/${id}`, {
+    method: 'DELETE',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to delete custom endpoint');
+}
+
+export async function pingCustomEndpointApi(id: string): Promise<{ success: boolean; healthStatus: string; latencyMs: number; error?: string }> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/providers/custom-endpoints/${id}/ping`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  return json;
 }

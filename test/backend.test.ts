@@ -2085,6 +2085,94 @@ print(fibonacci(10))
     });
   });
 
+  describe('21. Custom OpenAI-Compatible Endpoints & Local Inference Cluster Manager', () => {
+    const customEndpoint1 = {
+      id: `ep_vllm_${Date.now()}`,
+      userId: '',
+      name: 'vLLM Local Cluster',
+      baseUrl: 'http://localhost:8000/v1',
+      apiKey: 'vllm-token-abc',
+      defaultModel: 'meta-llama/Llama-3.1-70B-Instruct',
+      description: 'On-premise GPU cluster serving vLLM OpenAI-compatible engine',
+      contextWindow: 131072,
+      isEnabled: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    it('creates, retrieves, and persists custom endpoints with multi-tenant isolation', () => {
+      customEndpoint1.userId = testUser1.id;
+      const saved = db.saveCustomEndpoint(customEndpoint1);
+
+      assert.strictEqual(saved.id, customEndpoint1.id);
+      assert.strictEqual(saved.name, 'vLLM Local Cluster');
+      assert.strictEqual(saved.baseUrl, 'http://localhost:8000/v1');
+
+      // TestUser1 retrieves their endpoint
+      const u1Endpoints = db.getCustomEndpoints(testUser1.id);
+      assert.ok(u1Endpoints.some((e) => e.id === customEndpoint1.id));
+
+      // TestUser2 does NOT see TestUser1's endpoint (isolation)
+      const u2Endpoints = db.getCustomEndpoints(testUser2.id);
+      assert.ok(!u2Endpoints.some((e) => e.id === customEndpoint1.id));
+
+      // Direct ID lookup respecting tenant boundary
+      const fetchedByU1 = db.getCustomEndpointById(customEndpoint1.id, testUser1.id);
+      assert.ok(fetchedByU1);
+      assert.strictEqual(fetchedByU1?.defaultModel, 'meta-llama/Llama-3.1-70B-Instruct');
+
+      const fetchedByU2 = db.getCustomEndpointById(customEndpoint1.id, testUser2.id);
+      assert.strictEqual(fetchedByU2, undefined, 'User2 must not access User1 endpoint by ID');
+    });
+
+    it('augments dynamic model catalog with active custom endpoints and zero-cost pricing', () => {
+      const activeEndpoint = { ...customEndpoint1, isEnabled: true };
+      const disabledEndpoint = {
+        ...customEndpoint1,
+        id: `ep_disabled_${Date.now()}`,
+        name: 'Disabled LM Studio',
+        isEnabled: false,
+      };
+
+      const catalogWithCustom = modelCatalog.getModels([activeEndpoint, disabledEndpoint]);
+
+      const foundActive = catalogWithCustom.find((m) => m.id === `custom_${activeEndpoint.id}`);
+      assert.ok(foundActive, 'Active custom endpoint must be dynamically registered in catalog');
+      assert.strictEqual(foundActive?.providerId, 'custom');
+      assert.strictEqual(foundActive?.displayName, 'vLLM Local Cluster (meta-llama/Llama-3.1-70B-Instruct)');
+      assert.strictEqual(foundActive?.isFree, true, 'Custom endpoint inference must be marked zero-cost');
+      assert.strictEqual(foundActive?.contextWindow, 131072);
+      assert.ok(foundActive?.description.includes('Self-hosted OpenAI-compatible inference endpoint'));
+
+      const foundDisabled = catalogWithCustom.find((m) => m.id === `custom_${disabledEndpoint.id}`);
+      assert.strictEqual(foundDisabled, undefined, 'Disabled custom endpoints must not appear in model catalog');
+    });
+
+    it('ModelRouter routes to custom endpoint without throwing paid inference restriction', () => {
+      const resolved = modelRouter.resolveModel({
+        requestedModelId: `custom_${customEndpoint1.id}`,
+        forceFree: true,
+        allowPaidInference: false,
+        messages: [{ role: 'user', content: 'Test local inference routing' }],
+      });
+
+      assert.strictEqual(resolved.model.id, `custom_${customEndpoint1.id}`);
+      assert.strictEqual(resolved.model.providerId, 'custom');
+      assert.strictEqual(resolved.model.isFree, true);
+    });
+
+    it('deletes custom endpoint safely and maintains DB hygiene', () => {
+      const unauthorizedDelete = db.deleteCustomEndpoint(customEndpoint1.id, testUser2.id);
+      assert.strictEqual(unauthorizedDelete, false, 'User2 cannot delete User1 endpoint');
+
+      const authorizedDelete = db.deleteCustomEndpoint(customEndpoint1.id, testUser1.id);
+      assert.strictEqual(authorizedDelete, true, 'User1 can delete own custom endpoint');
+
+      const u1EndpointsAfter = db.getCustomEndpoints(testUser1.id);
+      assert.ok(!u1EndpointsAfter.some((e) => e.id === customEndpoint1.id));
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

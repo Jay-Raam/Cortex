@@ -1,4 +1,4 @@
-import { ModelInfo } from '../types';
+import { ModelInfo, CustomModelEndpoint } from '../types';
 
 export const INITIAL_MODELS: ModelInfo[] = [
   // --- Google Gemini Models ---
@@ -262,8 +262,8 @@ export const INITIAL_MODELS: ModelInfo[] = [
 class ModelCatalog {
   private models: ModelInfo[] = [...INITIAL_MODELS];
 
-  getModels(): ModelInfo[] {
-    return this.models.map((m) => {
+  getModels(customEndpoints?: CustomModelEndpoint[]): ModelInfo[] {
+    let list = this.models.map((m) => {
       // dynamically evaluate availability based on configured environment keys
       let availability = m.availability;
       if (m.providerId === 'gemini' && !process.env.GEMINI_API_KEY) {
@@ -278,10 +278,37 @@ class ModelCatalog {
       }
       return { ...m, availability };
     });
+
+    if (customEndpoints && customEndpoints.length > 0) {
+      const customModels: ModelInfo[] = customEndpoints
+        .filter((e) => e.isEnabled)
+        .map((e) => ({
+          id: `custom_${e.id}`,
+          providerId: 'custom' as any,
+          displayName: `${e.name} (${e.defaultModel})`,
+          description: `Self-hosted OpenAI-compatible inference endpoint at ${e.baseUrl}`,
+          mode: 'balanced',
+          isFree: true,
+          pricingDescription: 'Private Self-Hosted Infrastructure ($0.00)',
+          contextWindow: e.contextWindow || 32768,
+          capabilities: {
+            streaming: true,
+            vision: false,
+            toolCalling: true,
+            reasoning: true,
+          },
+          availability: e.healthStatus === 'unreachable' ? 'degraded' : 'available',
+          lastChecked: e.lastHealthCheck || new Date().toISOString(),
+          latencyMs: e.latencyMs || 50,
+        }));
+      list = [...customModels, ...list];
+    }
+
+    return list;
   }
 
-  getModelById(id: string): ModelInfo | undefined {
-    return this.getModels().find((m) => m.id === id);
+  getModelById(id: string, customEndpoints?: CustomModelEndpoint[]): ModelInfo | undefined {
+    return this.getModels(customEndpoints).find((m) => m.id === id);
   }
 
   getModelsByMode(mode: 'efficient' | 'balanced' | 'powerful'): ModelInfo[] {

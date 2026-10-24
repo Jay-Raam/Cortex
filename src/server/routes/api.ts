@@ -10,7 +10,7 @@ import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
 import { executionRunner } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens } from '../auth/auth';
-import { Message, User, Workspace } from '../types';
+import { Message, User, Workspace, CustomModelEndpoint } from '../types';
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
 import { contextManager } from '../cowork/context-manager';
 
@@ -1332,4 +1332,142 @@ apiRouter.get('/arena/votes', (req: Request, res: Response) => {
 
   const votes = db.getArenaVotes(user.id);
   res.json({ success: true, votes });
+});
+
+/**
+ * GET /api/providers/custom-endpoints
+ * List user's custom OpenAI-compatible inference endpoints
+ */
+apiRouter.get('/providers/custom-endpoints', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const endpoints = db.getCustomEndpoints(user.id);
+  res.json({ success: true, endpoints });
+});
+
+/**
+ * POST /api/providers/custom-endpoints
+ * Create or update custom OpenAI-compatible endpoint
+ */
+apiRouter.post('/providers/custom-endpoints', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id, name, baseUrl, apiKey, defaultModel, contextWindow, isEnabled } = req.body;
+  if (!name || !baseUrl || !defaultModel) {
+    return res.status(400).json({ error: 'name, baseUrl, and defaultModel are required' });
+  }
+
+  const cleanBaseUrl = baseUrl.trim().replace(/\/+$/, '');
+
+  const endpoint: CustomModelEndpoint = {
+    id: id || `ep_${Date.now()}`,
+    userId: user.id,
+    name: name.trim(),
+    baseUrl: cleanBaseUrl,
+    apiKey: apiKey ? apiKey.trim() : undefined,
+    defaultModel: defaultModel.trim(),
+    contextWindow: Number(contextWindow) || 32768,
+    isEnabled: isEnabled !== undefined ? Boolean(isEnabled) : true,
+    healthStatus: 'untested',
+    createdAt: new Date().toISOString(),
+  };
+
+  db.saveCustomEndpoint(endpoint);
+  res.json({ success: true, endpoint });
+});
+
+/**
+ * DELETE /api/providers/custom-endpoints/:id
+ * Remove custom endpoint
+ */
+apiRouter.delete('/providers/custom-endpoints/:id', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const deleted = db.deleteCustomEndpoint(id, user.id);
+  if (!deleted) {
+    return res.status(404).json({ error: 'Endpoint not found or unauthorized' });
+  }
+
+  res.json({ success: true });
+});
+
+/**
+ * POST /api/providers/custom-endpoints/:id/ping
+ * Health check ping to verify server connectivity & measure latency
+ */
+apiRouter.post('/providers/custom-endpoints/:id/ping', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const endpoint = db.getCustomEndpointById(id, user.id);
+  if (!endpoint) {
+    return res.status(404).json({ error: 'Endpoint not found' });
+  }
+
+  const start = Date.now();
+  let healthStatus: 'healthy' | 'unreachable' = 'unreachable';
+  let latencyMs = 0;
+  let errorMsg: string | undefined;
+
+  try {
+    const headers: Record<string, string> = {};
+    if (endpoint.apiKey) {
+      headers['Authorization'] = `Bearer ${endpoint.apiKey}`;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    const checkRes = await fetch(`${endpoint.baseUrl}/models`, {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
+
+    latencyMs = Date.now() - start;
+    if (checkRes.ok || checkRes.status === 401 || checkRes.status === 403 || checkRes.status === 404) {
+      healthStatus = 'healthy';
+    } else {
+      healthStatus = 'unreachable';
+      errorMsg = `Server returned HTTP ${checkRes.status}`;
+    }
+  } catch (err: any) {
+    latencyMs = Date.now() - start;
+    healthStatus = 'unreachable';
+    errorMsg = err.message || 'Connection failed';
+  }
+
+  endpoint.healthStatus = healthStatus;
+  endpoint.lastHealthCheck = new Date().toISOString();
+  endpoint.latencyMs = latencyMs;
+  db.saveCustomEndpoint(endpoint);
+
+  res.json({
+    success: healthStatus === 'healthy',
+    healthStatus,
+    latencyMs,
+    error: errorMsg,
+    endpoint,
+  });
 });
