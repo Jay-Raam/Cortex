@@ -2183,6 +2183,7 @@ print(fibonacci(10))
         forceFree: true,
         allowPaidInference: false,
         messages: [{ role: 'user', content: 'Test local inference routing' }],
+        userId: testUser1.id,
       });
 
       assert.strictEqual(resolved.model.id, `custom_${customEndpoint1.id}`);
@@ -4057,6 +4058,98 @@ print(fibonacci(10))
         server.close();
         db.deleteCustomEndpoint(rawEndpointId, testUser1.id);
       }
+    });
+  });
+
+  describe('34. Insecure Direct Object Reference (IDOR) & Quota Hijacking Defense in Custom Model Routing', () => {
+    let ownerEndpointId: string;
+
+    before(() => {
+      ownerEndpointId = `ep_owner_${Date.now()}`;
+      db.saveCustomEndpoint({
+        id: ownerEndpointId,
+        userId: testUser1.id,
+        name: 'Private vLLM Tenant Cluster',
+        baseUrl: 'https://vllm.private-org.internal',
+        apiKey: 'sk-secret-quota-key-999',
+        defaultModel: 'meta-llama/Llama-3-70b-instruct',
+        contextWindow: 65536,
+        isEnabled: true,
+        healthStatus: 'healthy',
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    after(() => {
+      db.deleteCustomEndpoint(ownerEndpointId, testUser1.id);
+    });
+
+    it('successfully resolves custom model for the authorized endpoint owner', () => {
+      const resolved = modelRouter.resolveModel({
+        requestedModelId: `custom_${ownerEndpointId}`,
+        userId: testUser1.id,
+        messages: [{ role: 'user', content: 'hello' }],
+      });
+      assert.strictEqual(resolved.model.id, `custom_${ownerEndpointId}`);
+      assert.strictEqual(resolved.model.displayName, 'Private vLLM Tenant Cluster (meta-llama/Llama-3-70b-instruct)');
+    });
+
+    it('rejects custom model resolution when userId is omitted (fail-closed)', () => {
+      assert.throws(
+        () => {
+          modelRouter.resolveModel({
+            requestedModelId: `custom_${ownerEndpointId}`,
+            // userId omitted
+            messages: [{ role: 'user', content: 'hello' }],
+          });
+        },
+        /Authentication required: Cannot route to custom model endpoint without user context/
+      );
+    });
+
+    it('rejects foreign tenant attempting to resolve another user custom endpoint (IDOR prevention)', () => {
+      assert.throws(
+        () => {
+          modelRouter.resolveModel({
+            requestedModelId: `custom_${ownerEndpointId}`,
+            userId: testUser2.id, // User 2 attempting to access User 1 endpoint
+            messages: [{ role: 'user', content: 'hello' }],
+          });
+        },
+        /Custom model endpoint not found or unauthorized/
+      );
+    });
+
+    it('rejects foreign tenant attempting to stream through another user custom endpoint', async () => {
+      await assert.rejects(
+        async () => {
+          await modelRouter.stream(
+            {
+              requestedModelId: `custom_${ownerEndpointId}`,
+              userId: testUser2.id,
+              messages: [{ role: 'user', content: 'hello' }],
+            },
+            () => {}
+          );
+        },
+        /Custom model endpoint not found or unauthorized/
+      );
+    });
+
+    it('rejects unauthenticated stream requests attempting to route to custom endpoints', async () => {
+      await assert.rejects(
+        async () => {
+          await modelRouter.stream(
+            {
+              requestedModelId: `custom_${ownerEndpointId}`,
+              // userId omitted
+              messages: [{ role: 'user', content: 'hello' }],
+            },
+            () => {}
+          );
+        },
+        /Authentication required: Cannot route to custom model endpoint without user context/
+      );
     });
   });
 
