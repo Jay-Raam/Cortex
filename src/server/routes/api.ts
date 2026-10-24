@@ -15,6 +15,7 @@ import { performWebSearch, formatSearchAugmentation } from '../services/search';
 import { contextManager } from '../cowork/context-manager';
 import { validateWorkspaceBindPath } from '../security/path-validator';
 import { isValidGitBranchName } from '../security/git-security';
+import { validateEndpointUrl } from '../security/ssrf-validator';
 import {
   validateUploadedFile,
   generateSafeUploadFilename,
@@ -1326,7 +1327,7 @@ apiRouter.get('/providers/custom-endpoints', (req: Request, res: Response) => {
  * POST /api/providers/custom-endpoints
  * Create or update custom OpenAI-compatible endpoint
  */
-apiRouter.post('/providers/custom-endpoints', (req: Request, res: Response) => {
+apiRouter.post('/providers/custom-endpoints', async (req: Request, res: Response) => {
   let user: User;
   try {
     user = getReqUser(req);
@@ -1340,6 +1341,12 @@ apiRouter.post('/providers/custom-endpoints', (req: Request, res: Response) => {
   }
 
   const cleanBaseUrl = baseUrl.trim().replace(/\/+$/, '');
+
+  // SSRF Protection: Validate target baseUrl
+  const ssrfCheck = await validateEndpointUrl(cleanBaseUrl);
+  if (!ssrfCheck.isValid) {
+    return res.status(400).json({ error: ssrfCheck.reason || 'Invalid or forbidden endpoint URL' });
+  }
 
   const endpoint: CustomModelEndpoint = {
     id: id || `ep_${Date.now()}`,
@@ -1395,6 +1402,22 @@ apiRouter.post('/providers/custom-endpoints/:id/ping', async (req: Request, res:
   const endpoint = db.getCustomEndpointById(id, user.id);
   if (!endpoint) {
     return res.status(404).json({ error: 'Endpoint not found' });
+  }
+
+  // SSRF Protection: Re-validate endpoint baseUrl prior to initiating outbound request
+  const ssrfCheck = await validateEndpointUrl(endpoint.baseUrl);
+  if (!ssrfCheck.isValid) {
+    endpoint.healthStatus = 'unreachable';
+    endpoint.lastHealthCheck = new Date().toISOString();
+    endpoint.latencyMs = 0;
+    db.saveCustomEndpoint(endpoint);
+    return res.status(400).json({
+      success: false,
+      healthStatus: 'unreachable',
+      latencyMs: 0,
+      error: `SSRF protection blocked ping request: ${ssrfCheck.reason}`,
+      endpoint,
+    });
   }
 
   const start = Date.now();

@@ -1,9 +1,11 @@
 import { StreamCallbacks } from './gemini';
+import { validateEndpointUrl } from '../security/ssrf-validator';
 
 export interface ProviderEndpointConfig {
   baseUrl: string;
   apiKey: string;
   defaultHeaders?: Record<string, string>;
+  allowPrivateNetworks?: boolean;
 }
 
 export async function streamOpenAICompatibleResponse(
@@ -22,6 +24,14 @@ export async function streamOpenAICompatibleResponse(
 
   for (const m of messages) {
     formattedMessages.push({ role: m.role, content: m.content });
+  }
+
+  // SSRF Protection: Validate target baseUrl before connecting
+  const ssrfCheck = await validateEndpointUrl(config.baseUrl, {
+    allowPrivateNetworks: config.allowPrivateNetworks,
+  });
+  if (!ssrfCheck.isValid) {
+    throw new Error(`SSRF protection: Request blocked to forbidden endpoint (${ssrfCheck.reason})`);
   }
 
   const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/chat/completions`;
