@@ -7,6 +7,7 @@ import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import { getCorsOptions } from './src/server/security/cors-policy';
+import { getUploadsStaticOptions } from './src/server/security/upload-policy';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createYoga } from 'graphql-yoga';
@@ -28,7 +29,7 @@ async function startServer() {
 
   // Static uploads directory
   const uploadsDir = path.resolve(process.cwd(), 'uploads');
-  app.use('/uploads', express.static(uploadsDir));
+  app.use('/uploads', express.static(uploadsDir, getUploadsStaticOptions()));
 
   // REST API routes
   app.use('/api', apiRouter);
