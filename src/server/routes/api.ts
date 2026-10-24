@@ -361,6 +361,7 @@ apiRouter.post('/chat/stream', async (req: Request, res: Response) => {
         messages: history,
         systemInstruction,
         attachments,
+        userId: user.id,
       },
       (event) => {
         if (event.type === 'delta' && event.payload?.text) {

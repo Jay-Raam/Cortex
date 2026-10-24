@@ -12,6 +12,7 @@ export interface RouteRequest {
   systemInstruction?: string;
   allowPaidInference?: boolean;
   attachments?: Array<{ id: string; name: string; mimeType: string; url: string }>;
+  userId?: string;
 }
 
 export interface StreamEvent {
@@ -27,9 +28,14 @@ export class ModelRouter {
     let catalog = modelCatalog.getModels();
     if (req.requestedModelId?.startsWith('custom_')) {
       const endpointId = req.requestedModelId.replace(/^custom_/, '');
-      const endpoint = db.getCustomEndpointById(endpointId);
+      if (!req.userId) {
+        throw new Error('Authentication required: Cannot route to custom model endpoint without user context');
+      }
+      const endpoint = db.getCustomEndpointById(endpointId, req.userId);
       if (endpoint) {
         catalog = modelCatalog.getModels([endpoint]);
+      } else {
+        throw new Error('Custom model endpoint not found or unauthorized: ' + req.requestedModelId);
       }
     }
     const mode = req.mode || 'balanced';
@@ -259,10 +265,16 @@ export class ModelRouter {
         );
       } else if (model.providerId === 'custom' || model.id.startsWith('custom_')) {
         const endpointId = model.id.replace(/^custom_/, '');
-        const endpoint = db.getCustomEndpointById(endpointId);
-        const baseUrl = endpoint?.baseUrl || 'http://localhost:1234/v1';
-        const apiKey = endpoint?.apiKey || 'custom';
-        const realModel = endpoint?.defaultModel || model.id;
+        if (!req.userId) {
+          throw new Error('Authentication required: Cannot route to custom model endpoint without user context');
+        }
+        const endpoint = db.getCustomEndpointById(endpointId, req.userId);
+        if (!endpoint) {
+          throw new Error('Custom model endpoint not found or unauthorized: ' + model.id);
+        }
+        const baseUrl = endpoint.baseUrl;
+        const apiKey = endpoint.apiKey || 'custom';
+        const realModel = endpoint.defaultModel || model.id;
         completedText = await streamOpenAICompatibleResponse(
           { baseUrl, apiKey },
           realModel,
