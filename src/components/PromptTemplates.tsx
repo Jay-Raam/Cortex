@@ -49,9 +49,10 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
 
 interface PromptTemplatesProps {
   onSelectTemplate: (prompt: string) => void;
+  onOpenTemplatesModal?: () => void;
 }
 
-export const PromptTemplates: React.FC<PromptTemplatesProps> = ({ onSelectTemplate }) => {
+export const PromptTemplates: React.FC<PromptTemplatesProps> = ({ onSelectTemplate, onOpenTemplatesModal }) => {
   return (
     <div className="flex items-center gap-2 overflow-x-auto py-1 px-4 mb-2 no-scrollbar text-xs">
       <div className="flex items-center gap-1.5 text-slate-500 text-[11px] font-medium shrink-0">
@@ -69,6 +70,16 @@ export const PromptTemplates: React.FC<PromptTemplatesProps> = ({ onSelectTempla
           <span>{tmpl.title}</span>
         </button>
       ))}
+      {onOpenTemplatesModal && (
+        <button
+          type="button"
+          onClick={onOpenTemplatesModal}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 transition-all shrink-0 cursor-pointer shadow-sm text-[11px]"
+        >
+          <Sparkles className="w-3 h-3" />
+          <span>More Personas...</span>
+        </button>
+      )}
     </div>
   );
 };
