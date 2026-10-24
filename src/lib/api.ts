@@ -1,4 +1,4 @@
-import { ModelInfo, Conversation, Message, Skill, Workspace, WorkspaceArtifact, AgentTask, NotificationItem, User, CustomModelEndpoint } from '../server/types';
+import { ModelInfo, Conversation, Message, Skill, Workspace, WorkspaceArtifact, AgentTask, NotificationItem, User, CustomModelEndpoint, PromptTemplateEntity } from '../server/types';
 
 export async function loginUser(email: string, password: string): Promise<User> {
   const res = await fetch('/api/auth/login', {
@@ -439,4 +439,52 @@ export async function pingCustomEndpointApi(id: string): Promise<{ success: bool
 
   const json = await res.json();
   return json;
+}
+
+export async function fetchPromptTemplatesApi(): Promise<PromptTemplateEntity[]> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/prompts/templates', {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to fetch prompt templates');
+  return json;
+}
+
+export async function savePromptTemplateApi(template: Partial<PromptTemplateEntity>): Promise<PromptTemplateEntity> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/prompts/templates', {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(template),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to save prompt template');
+  return json;
+}
+
+export async function deletePromptTemplateApi(id: string): Promise<void> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/prompts/templates/${id}`, {
+    method: 'DELETE',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to delete prompt template');
 }

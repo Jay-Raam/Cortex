@@ -2173,6 +2173,87 @@ print(fibonacci(10))
     });
   });
 
+  describe('22. Interactive Prompt Template Library & Custom Persona Hub', () => {
+    const customTmpl = {
+      id: `tmpl_custom_${Date.now()}`,
+      userId: '',
+      title: 'FastAPI Microservice Persona',
+      description: 'Generates async FastAPI endpoints with Pydantic v2 schemas and pytest fixtures',
+      category: 'Engineering' as const,
+      prompt: 'Create a production FastAPI service for {{service_name}} handling {{entity}} with Redis caching.',
+      tags: ['python', 'fastapi', 'microservice'],
+      variables: ['service_name', 'entity'],
+      isBuiltin: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    it('loads curated system prompt templates and retrieves by ID', () => {
+      const templates = db.getPromptTemplates(testUser1.id);
+      assert.ok(templates.length >= 7, 'Must include at least 7 built-in curated templates');
+
+      const codeReviewTmpl = db.getPromptTemplateById('tmpl_code_review', testUser1.id);
+      assert.ok(codeReviewTmpl, 'Must find built-in code review template');
+      assert.strictEqual(codeReviewTmpl?.title, 'Code Review & Security Audit');
+      assert.strictEqual(codeReviewTmpl?.isBuiltin, true);
+      assert.strictEqual(codeReviewTmpl?.category, 'Security');
+      assert.ok(codeReviewTmpl?.variables?.includes('language'));
+      assert.ok(codeReviewTmpl?.variables?.includes('code'));
+
+      const sysDesignTmpl = db.getPromptTemplateById('tmpl_system_design', testUser1.id);
+      assert.ok(sysDesignTmpl);
+      assert.strictEqual(sysDesignTmpl?.category, 'Architecture');
+      assert.ok(sysDesignTmpl?.variables?.includes('service_name'));
+    });
+
+    it('creates and persists custom prompt templates with multi-tenant boundary isolation', () => {
+      customTmpl.userId = testUser1.id;
+      const saved = db.savePromptTemplate(customTmpl);
+
+      assert.strictEqual(saved.id, customTmpl.id);
+      assert.strictEqual(saved.title, 'FastAPI Microservice Persona');
+      assert.strictEqual(saved.isBuiltin, false);
+
+      // TestUser1 retrieves their custom template
+      const u1Templates = db.getPromptTemplates(testUser1.id);
+      assert.ok(u1Templates.some((t) => t.id === customTmpl.id), 'User1 must see their own custom template');
+
+      // TestUser2 does NOT see TestUser1's custom template (isolation)
+      const u2Templates = db.getPromptTemplates(testUser2.id);
+      assert.ok(!u2Templates.some((t) => t.id === customTmpl.id), 'User2 must not see User1 custom template');
+
+      // Direct lookup respects tenant boundary
+      const fetchedByU1 = db.getPromptTemplateById(customTmpl.id, testUser1.id);
+      assert.ok(fetchedByU1);
+      assert.strictEqual(fetchedByU1?.title, 'FastAPI Microservice Persona');
+
+      const fetchedByU2 = db.getPromptTemplateById(customTmpl.id, testUser2.id);
+      assert.strictEqual(fetchedByU2, undefined, 'User2 must not access User1 custom template by ID');
+    });
+
+    it('prevents deletion of system built-in templates and unauthorized deletion by other tenants', () => {
+      // User2 cannot delete User1's template
+      const unauthorizedDelete = db.deletePromptTemplate(customTmpl.id, testUser2.id);
+      assert.strictEqual(unauthorizedDelete, false, 'User2 cannot delete User1 custom template');
+
+      // Cannot delete system built-in template
+      const builtinDelete = db.deletePromptTemplate('tmpl_code_review', testUser1.id);
+      assert.strictEqual(builtinDelete, false, 'System built-in templates must not be deleted');
+
+      // Verify built-in still intact
+      const verifyBuiltin = db.getPromptTemplateById('tmpl_code_review', testUser1.id);
+      assert.ok(verifyBuiltin, 'Built-in template must remain intact');
+    });
+
+    it('deletes custom prompt template safely and maintains database hygiene', () => {
+      const authorizedDelete = db.deletePromptTemplate(customTmpl.id, testUser1.id);
+      assert.strictEqual(authorizedDelete, true, 'User1 can delete own custom template');
+
+      const u1TemplatesAfter = db.getPromptTemplates(testUser1.id);
+      assert.ok(!u1TemplatesAfter.some((t) => t.id === customTmpl.id), 'Custom template should no longer exist');
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

@@ -10,7 +10,7 @@ import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
 import { executionRunner } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens } from '../auth/auth';
-import { Message, User, Workspace, CustomModelEndpoint } from '../types';
+import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
 import { contextManager } from '../cowork/context-manager';
 
@@ -1470,4 +1470,108 @@ apiRouter.post('/providers/custom-endpoints/:id/ping', async (req: Request, res:
     error: errorMsg,
     endpoint,
   });
+});
+
+
+// --- Prompt Templates & Custom Persona API Endpoints ---
+
+function extractPromptVariables(prompt: string): string[] {
+  const matches = prompt.matchAll(/\{\{([a-zA-Z0-9_-]+)\}\}/g);
+  const vars = new Set<string>();
+  for (const m of matches) {
+    if (m[1]) vars.add(m[1].trim());
+  }
+  return Array.from(vars);
+}
+
+/**
+ * GET /api/prompts/templates
+ * Retrieve curated system templates merged with tenant-isolated custom templates
+ */
+apiRouter.get('/prompts/templates', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const templates = db.getPromptTemplates(user.id);
+  res.json(templates);
+});
+
+/**
+ * POST /api/prompts/templates
+ * Create or update a custom prompt template for the authenticated user
+ */
+apiRouter.post('/prompts/templates', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { title, description, category, prompt, tags, id } = req.body;
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return res.status(400).json({ error: 'Template title is required' });
+  }
+  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+    return res.status(400).json({ error: 'Template prompt body is required' });
+  }
+
+  // Prevent overriding built-in template IDs
+  if (id && id.startsWith('tmpl_') && !id.startsWith('tmpl_custom_')) {
+    const existing = db.getPromptTemplateById(id, user.id);
+    if (existing && existing.isBuiltin) {
+      return res.status(403).json({ error: 'Cannot modify system built-in prompt templates' });
+    }
+  }
+
+  const variables = extractPromptVariables(prompt);
+  const template: PromptTemplateEntity = {
+    id: id || `tmpl_custom_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    userId: user.id,
+    title: title.trim(),
+    description: (description || '').trim(),
+    category: category || 'Custom',
+    prompt: prompt.trim(),
+    tags: Array.isArray(tags) ? tags.map((t: string) => String(t).trim()).filter(Boolean) : [],
+    variables,
+    isBuiltin: false,
+    createdAt: req.body.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const saved = db.savePromptTemplate(template);
+  res.json(saved);
+});
+
+/**
+ * DELETE /api/prompts/templates/:id
+ * Delete a custom prompt template with tenant validation
+ */
+apiRouter.delete('/prompts/templates/:id', (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const target = db.getPromptTemplateById(id, user.id);
+  if (!target) {
+    return res.status(404).json({ error: 'Template not found' });
+  }
+  if (target.isBuiltin) {
+    return res.status(403).json({ error: 'Cannot delete system built-in templates' });
+  }
+
+  const deleted = db.deletePromptTemplate(id, user.id);
+  if (!deleted) {
+    return res.status(404).json({ error: 'Template not found or unauthorized' });
+  }
+
+  res.json({ success: true });
 });

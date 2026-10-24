@@ -25,6 +25,22 @@ export interface CustomModelEndpoint {
   createdAt: string;
 }
 
+export type PromptCategory = 'Engineering' | 'Architecture' | 'Debugging' | 'Security' | 'Quality' | 'Productivity' | 'Custom';
+
+export interface PromptTemplateEntity {
+  id: string;
+  userId?: string;
+  title: string;
+  description: string;
+  category: PromptCategory;
+  prompt: string;
+  tags?: string[];
+  variables?: string[];
+  isBuiltin: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface ModelInfo {
   id: string;
   providerId: ProviderId;

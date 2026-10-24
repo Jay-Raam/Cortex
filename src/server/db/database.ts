@@ -15,6 +15,7 @@ import {
   ApprovalRequest,
   WorkspaceCheckpoint,
   CustomModelEndpoint,
+  PromptTemplateEntity,
 } from '../types';
 
 
@@ -45,6 +46,7 @@ interface DatabaseSchema {
   preferences: NotificationPreferences[];
   arenaVotes?: ArenaVote[];
   customEndpoints?: CustomModelEndpoint[];
+  promptTemplates?: PromptTemplateEntity[];
 }
 
 const DATA_DIR = process.env.CORTEX_DATA_DIR || path.resolve(process.cwd(), 'data');
@@ -165,6 +167,86 @@ const INITIAL_SKILLS: Skill[] = [
   },
 ];
 
+export const BUILTIN_PROMPT_TEMPLATES: PromptTemplateEntity[] = [
+  {
+    id: 'tmpl_code_review',
+    title: 'Code Review & Security Audit',
+    description: 'Thorough inspection for OWASP vulnerabilities, concurrency bugs, edge conditions, and performance bottlenecks.',
+    category: 'Security',
+    prompt: 'Review the following {{language}} code for security vulnerabilities, logic edge cases, and performance bottlenecks:\n\n```{{language}}\n{{code}}\n```',
+    tags: ['security', 'review', 'audit', 'owasp'],
+    variables: ['language', 'code'],
+    isBuiltin: true,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+  {
+    id: 'tmpl_system_design',
+    title: 'System Architecture & Scalability Spec',
+    description: 'Draft comprehensive high-level design (HLD) specifications with trade-off analysis, bottlenecks, and data model.',
+    category: 'Architecture',
+    prompt: 'Design an end-to-end distributed system architecture for {{service_name}} targeting {{scale_target}} with the following constraints: {{constraints}}.\nInclude:\n1. Component topology & sequence flow\n2. Storage and cache hierarchy\n3. Failure modes & graceful degradation\n4. Latency vs consistency trade-offs',
+    tags: ['architecture', 'system-design', 'scalability', 'hld'],
+    variables: ['service_name', 'scale_target', 'constraints'],
+    isBuiltin: true,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+  {
+    id: 'tmpl_root_cause_debug',
+    title: 'Root-Cause Debugger & Stack Trace Analyzer',
+    description: 'Diagnose runtime errors, unhandled rejections, race conditions, and provide verified patches.',
+    category: 'Debugging',
+    prompt: 'Help diagnose this error. Here is the traceback and code snippet:\n\nError:\n{{error_message}}\n\nSnippet:\n```\n{{code_snippet}}\n```\nProvide root-cause analysis, reproducible test case, and verified fix.',
+    tags: ['debugging', 'traceback', 'fix', 'error'],
+    variables: ['error_message', 'code_snippet'],
+    isBuiltin: true,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+  {
+    id: 'tmpl_clean_refactor',
+    title: 'Clean Code & SOLID Refactoring Engine',
+    description: 'Refactor complex code smells into modular, testable, typed patterns following SOLID and clean architecture.',
+    category: 'Quality',
+    prompt: 'Refactor this {{language}} implementation to eliminate code smells and improve maintainability:\n\n```{{language}}\n{{target_code}}\n```\nFollow strict type safety, modular dependency inversion, and preserve original behavioral semantics.',
+    tags: ['refactoring', 'clean-code', 'solid', 'types'],
+    variables: ['language', 'target_code'],
+    isBuiltin: true,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+  {
+    id: 'tmpl_sql_optimizer',
+    title: 'SQL Query Plan & Index Optimizer',
+    description: 'Analyze query execution plans, indexes, partition pruning, and rewrite queries to minimize scans.',
+    category: 'Engineering',
+    prompt: 'Analyze and optimize this {{dialect}} SQL query for maximum throughput and low latency:\n\n```sql\n{{query}}\n```\nExisting table indexes:\n{{indexes}}\nExplain execution plan changes, composite indexes, and index selectivity improvements.',
+    tags: ['sql', 'database', 'performance', 'indexing'],
+    variables: ['dialect', 'query', 'indexes'],
+    isBuiltin: true,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+  {
+    id: 'tmpl_unit_tests',
+    title: 'Unit Test Suite & Mock Generator',
+    description: 'Generate high-coverage unit tests including boundary cases, error branches, and mock fixtures.',
+    category: 'Engineering',
+    prompt: 'Generate an exhaustive test suite using {{framework}} for the following code:\n\n```\n{{code}}\n```\nCover happy path, boundary edge cases, null/undefined inputs, and async error rejections.',
+    tags: ['testing', 'unit-tests', 'coverage', 'mocks'],
+    variables: ['framework', 'code'],
+    isBuiltin: true,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+  {
+    id: 'tmpl_executive_summary',
+    title: 'Executive Technical Summary & Action Items',
+    description: 'Synthesize complex technical proposals, incident post-mortems, or architecture RFCs into executive briefs.',
+    category: 'Productivity',
+    prompt: 'Synthesize the following document into a concise executive briefing with key decisions, risk assessment, and immediate action items:\n\n{{document_text}}',
+    tags: ['summary', 'executive', 'action-items', 'rfcs'],
+    variables: ['document_text'],
+    isBuiltin: true,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+];
+
 class Database {
   private data: DatabaseSchema;
   private saveTimeout: NodeJS.Timeout | null = null;
@@ -195,6 +277,8 @@ class Database {
           checkpoints: parsed.checkpoints || [],
           notifications: parsed.notifications || [],
           preferences: parsed.preferences || [],
+          customEndpoints: parsed.customEndpoints || [],
+          promptTemplates: parsed.promptTemplates || [],
         };
       }
     } catch (err) {
@@ -680,6 +764,39 @@ class Database {
     const initialLen = this.data.customEndpoints.length;
     this.data.customEndpoints = this.data.customEndpoints.filter((e) => !(e.id === id && e.userId === userId));
     const deleted = this.data.customEndpoints.length < initialLen;
+    if (deleted) this.persist();
+    return deleted;
+  }
+
+  // --- Prompt Templates & Personas ---
+  getPromptTemplates(userId: string): PromptTemplateEntity[] {
+    const custom = (this.data.promptTemplates || []).filter((t) => t.userId === userId);
+    return [...BUILTIN_PROMPT_TEMPLATES, ...custom];
+  }
+
+  getPromptTemplateById(id: string, userId: string): PromptTemplateEntity | undefined {
+    const builtin = BUILTIN_PROMPT_TEMPLATES.find((t) => t.id === id);
+    if (builtin) return builtin;
+    return (this.data.promptTemplates || []).find((t) => t.id === id && t.userId === userId);
+  }
+
+  savePromptTemplate(template: PromptTemplateEntity): PromptTemplateEntity {
+    if (!this.data.promptTemplates) this.data.promptTemplates = [];
+    const idx = this.data.promptTemplates.findIndex((t) => t.id === template.id && t.userId === template.userId);
+    if (idx >= 0) {
+      this.data.promptTemplates[idx] = template;
+    } else {
+      this.data.promptTemplates.unshift(template);
+    }
+    this.persist();
+    return template;
+  }
+
+  deletePromptTemplate(id: string, userId: string): boolean {
+    if (!this.data.promptTemplates) return false;
+    const initialLen = this.data.promptTemplates.length;
+    this.data.promptTemplates = this.data.promptTemplates.filter((t) => !(t.id === id && t.userId === userId && !t.isBuiltin));
+    const deleted = this.data.promptTemplates.length < initialLen;
     if (deleted) this.persist();
     return deleted;
   }
