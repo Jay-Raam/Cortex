@@ -28,6 +28,7 @@ import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/la
 import { apiRouter } from '../src/server/routes/api';
 import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret } from '../src/server/auth/auth';
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
+import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 
 describe('Cortex AI Automated Test Suite', () => {
   let testUser1: User;
@@ -2773,6 +2774,118 @@ print(fibonacci(10))
       assert.ok(escaped.includes('&amp;'));
       assert.ok(escaped.includes('&quot;'));
       assert.ok(escaped.includes('&#39;'));
+    });
+  });
+
+
+  describe('27. Frontend Markdown & HTML XSS Sanitization Defense', () => {
+    it('detects high-risk XSS injection vectors accurately', () => {
+      const maliciousPayloads = [
+        '<script>alert("xss")</script>',
+        '<SCRIPT SRC="https://evil.com/xss.js"></SCRIPT>',
+        '<img src="x" onerror="stealCookies(document.cookie)"/>',
+        '<iframe src="javascript:alert(1)"></iframe>',
+        '<object data="malicious.swf"></object>',
+        '<embed src="evil.pdf"/>',
+        '<form action="https://phishing.com"><input type="submit"/></form>',
+        '<a href="javascript:doEvil()">Click here</a>',
+        '<a href="JAVASCRIPT:alert(1)">Click</a>',
+        '<div onmouseover="leak()">Hover me</div>',
+        '<body onload="exploit()">',
+      ];
+
+      for (const payload of maliciousPayloads) {
+        assert.strictEqual(
+          containsDangerousXssVectors(payload),
+          true,
+          `Payload "${payload}" must be detected as dangerous`
+        );
+      }
+
+      const benignMarkdown = [
+        '# Introduction to Cortex AI',
+        '**Bold text** and *italic text*',
+        '[Legitimate Documentation](https://cortex.ai/docs)',
+        'Here is an inline code snippet: `const token = "secure";`',
+        '| Column 1 | Column 2 |\n|---|---|\n| Val A | Val B |',
+        '- Item 1\n- Item 2\n- Item 3',
+        '> Blockquote explaining system design and architecture.',
+      ];
+
+      for (const markdown of benignMarkdown) {
+        assert.strictEqual(
+          containsDangerousXssVectors(markdown),
+          false,
+          `Benign markdown "${markdown}" must not be flagged as dangerous`
+        );
+      }
+    });
+
+    it('neutralizes dangerous executable tags and inline event handlers', () => {
+      const dirty = [
+        {
+          input: 'Hello <script>alert("pwned")</script> world',
+          mustNotContain: ['<script', 'alert("pwned")', '</script>'],
+        },
+        {
+          input: '<img src="avatar.png" onerror="stealData()"/> User avatar',
+          mustNotContain: ['onerror'],
+        },
+        {
+          input: '<iframe src="https://evil-site.com"></iframe> Embedded frame',
+          mustNotContain: ['<iframe', 'evil-site.com'],
+        },
+        {
+          input: '<a href="javascript:eval(atob(\'bad\'))">Claim Prize</a>',
+          mustNotContain: ['javascript:'],
+        },
+        {
+          input: '<object data="malware.exe"></object>',
+          mustNotContain: ['<object'],
+        },
+      ];
+
+      for (const { input, mustNotContain } of dirty) {
+        const cleaned = sanitizeMarkdownContent(input);
+        for (const token of mustNotContain) {
+          assert.ok(
+            !cleaned.toLowerCase().includes(token.toLowerCase()),
+            `Sanitized output must not contain "${token}". Received: "${cleaned}"`
+          );
+        }
+      }
+    });
+
+    it('preserves legitimate markdown structures, code blocks, and formatting', () => {
+      const markdown = '# Cortex Architecture\n\nUse **strong** and *emphasis*.\n\n```ts\nconst x = 42;\n```\n\n- Bullet 1\n- Bullet 2';
+      const cleaned = sanitizeMarkdownContent(markdown);
+
+      assert.ok(cleaned.includes('# Cortex Architecture'));
+      assert.ok(cleaned.includes('**strong**'));
+      assert.ok(cleaned.includes('*emphasis*'));
+      assert.ok(cleaned.includes('const x = 42;'));
+      assert.ok(cleaned.includes('- Bullet 1'));
+    });
+
+    it('validates safeMarkdownSanitizeSchema rules against XSS vectors', () => {
+      assert.ok(safeMarkdownSanitizeSchema, 'Sanitize schema must be defined');
+      assert.ok(Array.isArray(safeMarkdownSanitizeSchema.tagNames), 'tagNames must be an array');
+
+      // Ensure dangerous tags are not in allowed list
+      const disallowedTags = ['script', 'iframe', 'object', 'embed', 'form', 'base', 'meta'];
+      for (const tag of disallowedTags) {
+        assert.ok(
+          !safeMarkdownSanitizeSchema.tagNames.includes(tag),
+          `Tag "${tag}" must not be in safe sanitize schema tagNames`
+        );
+      }
+
+      // Ensure allowed protocols strictly restrict href and src
+      const protocols = safeMarkdownSanitizeSchema.protocols as any;
+      assert.ok(protocols.href.includes('http'));
+      assert.ok(protocols.href.includes('https'));
+      assert.ok(!protocols.href.includes('javascript'), 'href must not permit javascript protocol');
+      assert.ok(!protocols.href.includes('data'), 'href must not permit data protocol');
     });
   });
 

@@ -3,6 +3,8 @@ import { Copy, Check, RefreshCw, FileText, User, Maximize2, X, Download, Cpu, Ch
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import { safeMarkdownSanitizeSchema, sanitizeMarkdownContent } from '../lib/sanitizer';
 import { Message, ModelInfo } from '../server/types';
 import { CognivoLogo } from './CognivoLogo';
 import { DiagramVisualizerModal } from './diagrams/DiagramVisualizerModal';
@@ -250,10 +252,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
 // Markdown Renderer in light Cognivo aesthetic
 const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+  const sanitizedContent = sanitizeMarkdownContent(content);
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeRaw]}
+      rehypePlugins={[rehypeRaw, [rehypeSanitize, safeMarkdownSanitizeSchema]]}
       components={{
         h1: ({ children }) => (
           <h1 className="text-xl font-bold text-slate-900 mt-4 mb-2 pb-1 border-b border-slate-200">
@@ -313,16 +316,19 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
         hr: () => (
           <hr className="border-t border-slate-200 my-4" />
         ),
-        a: ({ href, children }) => (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#FF6B00] hover:text-[#EA580C] underline underline-offset-2 transition-colors font-medium"
-          >
-            {children}
-          </a>
-        ),
+        a: ({ href, children }) => {
+          const isSafe = href && !/^javascript:/i.test(href.trim()) && !/^data:/i.test(href.trim());
+          return (
+            <a
+              href={isSafe ? href : '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#FF6B00] hover:text-[#EA580C] underline underline-offset-2 transition-colors font-medium"
+            >
+              {children}
+            </a>
+          );
+        },
         table: ({ children }) => (
           <div className="overflow-x-auto my-3 border border-slate-200 rounded-lg shadow-2xs">
             <table className="w-full text-xs text-left border-collapse bg-white">
