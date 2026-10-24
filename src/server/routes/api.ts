@@ -14,6 +14,7 @@ import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } f
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
 import { contextManager } from '../cowork/context-manager';
 import { validateWorkspaceBindPath } from '../security/path-validator';
+import { isValidGitBranchName } from '../security/git-security';
 import {
   validateUploadedFile,
   generateSafeUploadFilename,
@@ -905,6 +906,13 @@ apiRouter.post('/cowork/workspaces/import-github', async (req: Request, res: Res
     return res
       .status(400)
       .json({ error: 'repoUrl is required (e.g. "owner/repo" or "https://github.com/owner/repo")' });
+  }
+
+  if (branch) {
+    const branchValidation = isValidGitBranchName(branch);
+    if (!branchValidation.valid) {
+      return res.status(400).json({ error: `Invalid branch: ${branchValidation.reason}` });
+    }
   }
 
   let parsed: { owner: string; repo: string; fullName: string; httpsUrl: string };
