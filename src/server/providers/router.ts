@@ -246,6 +246,7 @@ export class ModelRouter {
           {
             baseUrl,
             apiKey: 'ollama', // Ollama does not require an API key
+            allowPrivateNetworks: true, // Server-configured local daemon
           },
           realOllamaModel,
           req.messages,

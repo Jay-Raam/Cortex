@@ -47,6 +47,15 @@ import {
   PROHIBITED_EXTENSIONS,
 } from '../src/server/security/upload-policy';
 import cors from 'cors';
+import {
+  validateEndpointUrl,
+  assertSafeEndpointUrl,
+  isCloudMetadataIp,
+  isLoopbackIp,
+  isPrivateIp,
+  isReservedOrMulticastIp,
+  RESTRICTED_PORTS,
+} from '../src/server/security/ssrf-validator';
 
 describe('Cortex AI Automated Test Suite', () => {
   let testUser1: User;
@@ -3800,6 +3809,253 @@ print(fibonacci(10))
       } finally {
         server.close();
         db.deleteWorkspace(wsId, testUser1.id);
+      }
+    });
+  });
+
+  describe('33. Server-Side Request Forgery (SSRF) Defense on Inference Endpoints', () => {
+    it('accurately identifies and permanently blocks cloud metadata IP addresses across formats', () => {
+      // IPv4 cloud metadata
+      assert.strictEqual(isCloudMetadataIp('169.254.169.254'), true, 'Must detect standard IMDS');
+      assert.strictEqual(isCloudMetadataIp('169.254.1.1'), true, 'Must detect link-local metadata');
+      // IPv6 link-local metadata (fe80::/10)
+      assert.strictEqual(isCloudMetadataIp('fe80::1'), true, 'Must detect IPv6 link-local');
+      assert.strictEqual(isCloudMetadataIp('fd00:ec2::254'), true, 'Must detect AWS IPv6 IMDS');
+      // IPv4-mapped IPv6 metadata
+      assert.strictEqual(isCloudMetadataIp('::ffff:169.254.169.254'), true, 'Must detect IPv4-mapped IMDS');
+      assert.strictEqual(isCloudMetadataIp('::ffff:a9fe:a9fe'), true, 'Must detect hex IPv4-mapped IMDS');
+
+      // Legitimate public IPs must not be classified as cloud metadata
+      assert.strictEqual(isCloudMetadataIp('93.184.216.34'), false, 'Public IP is not cloud metadata');
+      assert.strictEqual(isCloudMetadataIp('8.8.8.8'), false, 'Google DNS is not cloud metadata');
+    });
+
+    it('accurately identifies loopback and private RFC1918 / RFC4193 addresses', () => {
+      // Loopback
+      assert.strictEqual(isLoopbackIp('127.0.0.1'), true);
+      assert.strictEqual(isLoopbackIp('127.255.255.255'), true);
+      assert.strictEqual(isLoopbackIp('::1'), true);
+      assert.strictEqual(isLoopbackIp('0.0.0.0'), true);
+      assert.strictEqual(isLoopbackIp('::ffff:127.0.0.1'), true);
+
+      // Private RFC1918
+      assert.strictEqual(isPrivateIp('10.0.0.1'), true);
+      assert.strictEqual(isPrivateIp('172.16.0.1'), true);
+      assert.strictEqual(isPrivateIp('172.31.255.255'), true);
+      assert.strictEqual(isPrivateIp('192.168.1.1'), true);
+      assert.strictEqual(isPrivateIp('100.64.0.1'), true, 'Carrier-grade NAT must be classified private');
+
+      // Private IPv6 ULA (fc00::/7)
+      assert.strictEqual(isPrivateIp('fc00::1'), true);
+      assert.strictEqual(isPrivateIp('fd12:3456:789a::1'), true);
+
+      // Public IPs are not private
+      assert.strictEqual(isPrivateIp('1.1.1.1'), false);
+      assert.strictEqual(isPrivateIp('172.15.255.255'), false);
+      assert.strictEqual(isPrivateIp('172.32.0.1'), false);
+    });
+
+    it('rejects dangerous protocols, credentials in URLs, and malformed targets', async () => {
+      const badProtocols = [
+        'file:///etc/passwd',
+        'ftp://example.com/api',
+        'gopher://127.0.0.1:6379/_GET',
+        'javascript:alert(1)',
+        'data:text/html,<h1>evil</h1>',
+      ];
+      for (const url of badProtocols) {
+        const result = await validateEndpointUrl(url, { skipDnsLookup: true });
+        assert.strictEqual(result.isValid, false, `Must reject protocol in ${url}`);
+        assert.ok(result.reason?.includes('protocol'));
+      }
+
+      // Reject embedded user credentials
+      const credResult = await validateEndpointUrl('http://admin:secret@api.example.com/v1', { skipDnsLookup: true });
+      assert.strictEqual(credResult.isValid, false, 'Must reject userinfo credentials');
+      assert.ok(credResult.reason?.includes('credentials'));
+
+      // Malformed URL
+      const malformed = await validateEndpointUrl('not-a-valid-url');
+      assert.strictEqual(malformed.isValid, false, 'Must reject malformed URL');
+    });
+
+    it('rejects restricted administrative and database ports', async () => {
+      const restrictedPorts = [22, 25, 445, 3306, 5432, 6379, 11211, 27017];
+      for (const port of restrictedPorts) {
+        const result = await validateEndpointUrl(`http://93.184.216.34:${port}/v1`, { skipDnsLookup: true });
+        assert.strictEqual(result.isValid, false, `Must reject restricted port ${port}`);
+        assert.ok(result.reason?.includes('restricted'));
+      }
+    });
+
+    it('permanently blocks cloud metadata hostnames and addresses even with allowPrivateNetworks', async () => {
+      const cloudTargets = [
+        'http://169.254.169.254/latest/meta-data',
+        'http://169.254.1.5/models',
+        'http://metadata.google.internal/computeMetadata/v1',
+        'http://instance-data/latest/meta-data',
+        'http://[::ffff:169.254.169.254]/v1',
+        'http://[fe80::1]/models',
+      ];
+      for (const target of cloudTargets) {
+        const result = await validateEndpointUrl(target, {
+          allowPrivateNetworks: true,
+          skipDnsLookup: true,
+        });
+        assert.strictEqual(result.isValid, false, `Must block cloud target ${target} even with allowPrivateNetworks`);
+        assert.ok(result.reason?.toLowerCase().includes('cloud metadata') || result.reason?.toLowerCase().includes('metadata hostname'));
+      }
+    });
+
+    it('rejects loopback and RFC1918 by default, but allows them when allowPrivateNetworks is true', async () => {
+      // Default (strict mode / no private allowed)
+      const loopbackResult = await validateEndpointUrl('http://127.0.0.1:8080/v1', {
+        allowPrivateNetworks: false,
+        skipDnsLookup: true,
+      });
+      assert.strictEqual(loopbackResult.isValid, false, 'Must reject loopback by default');
+
+      const privateResult = await validateEndpointUrl('http://192.168.1.50:8000/v1', {
+        allowPrivateNetworks: false,
+        skipDnsLookup: true,
+      });
+      assert.strictEqual(privateResult.isValid, false, 'Must reject 192.168.x by default');
+
+      // Allowed when explicitly permitted
+      const allowedLoopback = await validateEndpointUrl('http://127.0.0.1:8080/v1', {
+        allowPrivateNetworks: true,
+        skipDnsLookup: true,
+      });
+      assert.strictEqual(allowedLoopback.isValid, true, 'Must permit loopback when allowPrivateNetworks is true');
+
+      const allowedPrivate = await validateEndpointUrl('http://192.168.1.50:8000/v1', {
+        allowPrivateNetworks: true,
+        skipDnsLookup: true,
+      });
+      assert.strictEqual(allowedPrivate.isValid, true, 'Must permit private network when allowPrivateNetworks is true');
+    });
+
+    it('detects DNS rebinding / hostnames that resolve to forbidden private IPs', async () => {
+      // Mock resolver simulating DNS rebinding to internal IP
+      const rebindingLookup = async (host: string) => {
+        if (host === 'attacker-rebind.com') {
+          return [{ address: '127.0.0.1', family: 4 }];
+        }
+        if (host === 'attacker-metadata-rebind.com') {
+          return [{ address: '169.254.169.254', family: 4 }];
+        }
+        return [{ address: '93.184.216.34', family: 4 }];
+      };
+
+      const rebindingResult = await validateEndpointUrl('http://attacker-rebind.com/v1', {
+        allowPrivateNetworks: false,
+        lookupFn: rebindingLookup,
+      });
+      assert.strictEqual(rebindingResult.isValid, false, 'Must reject domain resolving to loopback');
+
+      const metaRebindingResult = await validateEndpointUrl('http://attacker-metadata-rebind.com/v1', {
+        allowPrivateNetworks: true, // Even with allowPrivateNetworks
+        lookupFn: rebindingLookup,
+      });
+      assert.strictEqual(metaRebindingResult.isValid, false, 'Must reject domain resolving to metadata');
+
+      const safeResult = await validateEndpointUrl('http://safe-domain.com/v1', {
+        lookupFn: rebindingLookup,
+      });
+      assert.strictEqual(safeResult.isValid, true, 'Must accept safe public domain');
+    });
+
+    it('rejects SSRF payloads in POST /api/providers/custom-endpoints with 400 Bad Request', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        // Attempt creating endpoint with AWS metadata
+        const metadataRes = await fetch(`http://127.0.0.1:${port}/api/providers/custom-endpoints`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            name: 'Malicious Metadata Endpoint',
+            baseUrl: 'http://169.254.169.254/latest/meta-data',
+            defaultModel: 'gpt-4o',
+          }),
+        });
+        assert.strictEqual(metadataRes.status, 400, 'Must reject cloud metadata endpoint with 400');
+        const metaJson = await metadataRes.json();
+        assert.ok(metaJson.error?.toLowerCase().includes('cloud metadata'));
+
+        // Attempt creating endpoint with restricted Redis port
+        const portRes = await fetch(`http://127.0.0.1:${port}/api/providers/custom-endpoints`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            name: 'Malicious Redis Endpoint',
+            baseUrl: 'http://93.184.216.34:6379',
+            defaultModel: 'gpt-4o',
+          }),
+        });
+        assert.strictEqual(portRes.status, 400, 'Must reject restricted port with 400');
+        const portJson = await portRes.json();
+        assert.ok(portJson.error?.toLowerCase().includes('restricted'));
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects SSRF payloads in POST /api/providers/custom-endpoints/:id/ping without network fetch', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      // Directly insert an endpoint pointing to metadata to simulate legacy or bypassed DB entry
+      const rawEndpointId = `ep_ssrf_test_${Date.now()}`;
+      db.saveCustomEndpoint({
+        id: rawEndpointId,
+        userId: testUser1.id,
+        name: 'Legacy Malicious Endpoint',
+        baseUrl: 'http://169.254.169.254/latest/meta-data',
+        defaultModel: 'gpt-4o',
+        contextWindow: 4096,
+        isEnabled: true,
+        healthStatus: 'untested',
+        createdAt: new Date().toISOString(),
+      });
+
+      try {
+        const pingRes = await fetch(`http://127.0.0.1:${port}/api/providers/custom-endpoints/${rawEndpointId}/ping`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        assert.strictEqual(pingRes.status, 400, 'Must reject ping to metadata with 400');
+        const pingJson = await pingRes.json();
+        assert.strictEqual(pingJson.success, false);
+        assert.strictEqual(pingJson.healthStatus, 'unreachable');
+        assert.ok(pingJson.error?.includes('SSRF protection blocked ping request'));
+      } finally {
+        server.close();
+        db.deleteCustomEndpoint(rawEndpointId, testUser1.id);
       }
     });
   });
