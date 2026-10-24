@@ -2,6 +2,7 @@ import { ModelMode, ProviderId, ModelInfo } from '../types';
 import { modelCatalog } from './catalog';
 import { streamGeminiResponse } from './gemini';
 import { streamOpenAICompatibleResponse } from './openai-compatible';
+import { db } from '../db/database';
 
 export interface RouteRequest {
   requestedModelId?: string;
@@ -23,7 +24,14 @@ export class ModelRouter {
    * Determine the best model based on mode, requested model, vision needs, and free-first policies.
    */
   resolveModel(req: RouteRequest): { model: ModelInfo; isFallback: boolean; fallbackReason?: string } {
-    const catalog = modelCatalog.getModels();
+    let catalog = modelCatalog.getModels();
+    if (req.requestedModelId?.startsWith('custom_')) {
+      const endpointId = req.requestedModelId.replace(/^custom_/, '');
+      const endpoint = db.getCustomEndpointById(endpointId);
+      if (endpoint) {
+        catalog = modelCatalog.getModels([endpoint]);
+      }
+    }
     const mode = req.mode || 'balanced';
     const forceFree = req.forceFree !== false; // Default: true (Zero-cost prioritized)
     const hasImageAttachments = req.attachments?.some((a) => a.mimeType?.startsWith('image/'));
@@ -240,6 +248,23 @@ export class ModelRouter {
             apiKey: 'ollama', // Ollama does not require an API key
           },
           realOllamaModel,
+          req.messages,
+          req.systemInstruction,
+          {
+            onDelta: handleDelta,
+            onUsage: (usage) => onEvent({ type: 'usage', payload: usage }),
+          },
+          signal
+        );
+      } else if (model.providerId === 'custom' || model.id.startsWith('custom_')) {
+        const endpointId = model.id.replace(/^custom_/, '');
+        const endpoint = db.getCustomEndpointById(endpointId);
+        const baseUrl = endpoint?.baseUrl || 'http://localhost:1234/v1';
+        const apiKey = endpoint?.apiKey || 'custom';
+        const realModel = endpoint?.defaultModel || model.id;
+        completedText = await streamOpenAICompatibleResponse(
+          { baseUrl, apiKey },
+          realModel,
           req.messages,
           req.systemInstruction,
           {

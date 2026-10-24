@@ -1,4 +1,4 @@
-export type ProviderId = 'gemini' | 'openrouter' | 'groq' | 'nvidia' | 'openai' | 'ollama';
+export type ProviderId = 'gemini' | 'openrouter' | 'groq' | 'nvidia' | 'openai' | 'ollama' | 'custom';
 export type ModelMode = 'efficient' | 'balanced' | 'powerful';
 export type ModelAvailability = 'available' | 'degraded' | 'rate_limited' | 'unconfigured';
 
@@ -7,6 +7,22 @@ export interface ModelCapabilities {
   vision: boolean;
   toolCalling: boolean;
   reasoning: boolean;
+}
+
+
+export interface CustomModelEndpoint {
+  id: string;
+  userId: string;
+  name: string;
+  baseUrl: string;
+  apiKey?: string;
+  defaultModel: string;
+  contextWindow?: number;
+  isEnabled: boolean;
+  lastHealthCheck?: string;
+  healthStatus?: 'healthy' | 'unreachable' | 'untested';
+  latencyMs?: number;
+  createdAt: string;
 }
 
 export interface ModelInfo {
