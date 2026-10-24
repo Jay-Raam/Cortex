@@ -4,7 +4,6 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from '../db/database';
 import { User, Session } from '../types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'nexa-ai-development-jwt-secret-replace-in-production';
 const ACCESS_TOKEN_EXPIRY = '2h';
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
@@ -14,6 +13,18 @@ export interface TokenPayload {
   role: 'user' | 'admin';
 }
 
+/**
+ * Retrieve JWT secret strictly from environment.
+ * Fails closed with an explicit fatal error if the secret is missing or empty.
+ */
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || typeof secret !== 'string' || !secret.trim()) {
+    throw new Error('FATAL: JWT_SECRET environment variable is missing or empty. Authentication failing closed.');
+  }
+  return secret.trim();
+}
+
 export function generateTokens(user: User, userAgent?: string): { accessToken: string; refreshToken: string } {
   const payload: TokenPayload = {
     userId: user.id,
@@ -21,7 +32,7 @@ export function generateTokens(user: User, userAgent?: string): { accessToken: s
     role: user.role,
   };
 
-  const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+  const accessToken = jwt.sign(payload, getJwtSecret(), { expiresIn: ACCESS_TOKEN_EXPIRY });
 
   const rawRefreshToken = `${user.id}.${Date.now()}.${Math.random().toString(36).substring(2, 15)}`;
   const refreshTokenHash = bcrypt.hashSync(rawRefreshToken, 8);
@@ -41,7 +52,8 @@ export function generateTokens(user: User, userAgent?: string): { accessToken: s
 
 export function verifyAccessToken(token: string): TokenPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as TokenPayload;
+    const secret = getJwtSecret();
+    return jwt.verify(token, secret) as TokenPayload;
   } catch {
     return null;
   }
@@ -59,7 +71,7 @@ export function extractToken(req: Request): string | null {
     return (req as any).cookies.cortex_access_token;
   }
 
-  // 3. Fallback: Parse raw Cookie header string if cookies middleware not applied
+  // 3. Parse raw Cookie header string if cookies middleware not applied
   const cookieHeader = req.headers.cookie;
   if (cookieHeader) {
     const match = cookieHeader.match(/cortex_access_token=([^;]+)/);
@@ -68,11 +80,7 @@ export function extractToken(req: Request): string | null {
     }
   }
 
-  // 4. Query parameter token (useful for direct file download links like ZIP export)
-  if (req.query && typeof req.query.token === 'string' && req.query.token) {
-    return req.query.token.trim();
-  }
-
+  // NOTE: Query string token extraction was removed to eliminate token leakage vectors in URLs and access logs.
   return null;
 }
 
@@ -90,12 +98,7 @@ export function authenticateRequest(req: Request): User | null {
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const user = authenticateRequest(req);
   if (!user) {
-    // If running in development and no token provided, fallback gracefully to default dev user
-    const devUser = db.getUserById('usr_dev_primary');
-    if (devUser) {
-      (req as any).user = devUser;
-      return next();
-    }
+    // Strictly fail closed. Never fallback to a development user identity.
     return res.status(401).json({ error: 'Unauthorized: Valid Bearer token required' });
   }
   (req as any).user = user;
