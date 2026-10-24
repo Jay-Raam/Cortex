@@ -30,6 +30,7 @@ import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, a
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
+import { isValidGitBranchName, safeExecGit } from '../src/server/security/git-security';
 import {
   validateWorkspaceBindPath,
   canonicalizePath,
@@ -3471,6 +3472,177 @@ print(fibonacci(10))
             db.deleteWorkspace(createdWsId, testUser1.id);
           } catch {}
         }
+      }
+    });
+  });
+
+  describe('31. Git Clone Command & Argument Injection Defense', () => {
+    it('validates safe and conformant Git branch names', () => {
+      const safeBranches = [
+        'main',
+        'master',
+        'develop',
+        'feature/login',
+        'feature/auth-v2.1',
+        'fix/issue_123',
+        'v1.0.0',
+        'release-2026.10',
+      ];
+
+      for (const b of safeBranches) {
+        const result = isValidGitBranchName(b);
+        assert.strictEqual(result.valid, true, `Branch "${b}" must be valid`);
+      }
+
+      // Empty or undefined is valid as branch is optional
+      assert.strictEqual(isValidGitBranchName(undefined).valid, true);
+      assert.strictEqual(isValidGitBranchName('').valid, true);
+    });
+
+    it('strictly rejects Git CLI argument injection flags (starting with dash)', () => {
+      const argInjectionPayloads = [
+        '--upload-pack=touch /tmp/pwned',
+        '--config=core.fsmonitor=calc.exe',
+        '-u',
+        '-b',
+        '--help',
+        '--version',
+        '--exec-path',
+        '--paginate',
+      ];
+
+      for (const payload of argInjectionPayloads) {
+        const result = isValidGitBranchName(payload);
+        assert.strictEqual(result.valid, false, `Payload "${payload}" must be rejected`);
+        assert.ok(
+          result.reason?.includes('argument injection') || result.reason?.includes('hyphen'),
+          `Reason must explain argument injection defense: ${result.reason}`
+        );
+      }
+    });
+
+    it('strictly rejects command injection vectors with shell metacharacters', () => {
+      const cmdInjectionPayloads = [
+        'main" && calc.exe && "',
+        'main; rm -rf /',
+        'main | cat /etc/passwd',
+        'main\x60whoami\x60',
+        'main$(id)',
+        'main\nmalicious',
+        'main\0payload',
+        "main' || dir",
+      ];
+
+      for (const payload of cmdInjectionPayloads) {
+        const result = isValidGitBranchName(payload);
+        assert.strictEqual(result.valid, false, `Command injection payload "${payload}" must be rejected`);
+        assert.ok(
+          result.reason?.includes('forbidden shell') || result.reason?.includes('characters'),
+          `Reason must explain command injection defense: ${result.reason}`
+        );
+      }
+    });
+
+    it('strictly rejects invalid Git reference syntax (dots, slashes, control chars)', () => {
+      const invalidRefPayloads = [
+        'branch..name',
+        'branch//sub',
+        '/leading-slash',
+        'trailing-slash/',
+        'branch.lock',
+        'feature@{yesterday}',
+        'bad~branch',
+        'bad^branch',
+        'bad:branch',
+        'bad?branch',
+        'bad*branch',
+        'bad[branch',
+      ];
+
+      for (const payload of invalidRefPayloads) {
+        const result = isValidGitBranchName(payload);
+        assert.strictEqual(result.valid, false, `Invalid ref payload "${payload}" must be rejected`);
+      }
+    });
+
+    it('executes Git commands safely using argument arrays via safeExecGit', async () => {
+      const { stdout } = await safeExecGit(['version']);
+      assert.ok(stdout.toLowerCase().includes('git version'), 'Must execute git binary and capture version');
+    });
+
+    it('cloneGitHubRepo throws safety error when provided an argument injection branch', async () => {
+      const tempTarget = path.resolve(process.cwd(), 'workspaces', 'test_git_injection_target');
+      const dummyParsed = {
+        owner: 'testowner',
+        repo: 'testrepo',
+        httpsUrl: 'https://github.com/testowner/testrepo',
+      };
+
+      try {
+        await assert.rejects(
+          async () => {
+            await workspaceManager.cloneGitHubRepo(tempTarget, dummyParsed, '--upload-pack=evil');
+          },
+          (err: any) => {
+            assert.ok(err.message.includes('Invalid git branch name'));
+            return true;
+          }
+        );
+      } finally {
+        try {
+          fs.rmSync(tempTarget, { recursive: true, force: true });
+        } catch {}
+      }
+    });
+
+    it('rejects argument and command injection attempts in /cowork/workspaces/import-github with 400 Bad Request', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        // Attempt 1: Argument injection branch
+        const resArg = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/import-github`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            repoUrl: 'octocat/Hello-World',
+            branch: '--upload-pack=malicious',
+          }),
+        });
+
+        assert.strictEqual(resArg.status, 400, 'Must reject argument injection with 400');
+        const jsonArg = await resArg.json();
+        assert.ok(jsonArg.error?.includes('Invalid branch'));
+
+        // Attempt 2: Command injection branch
+        const resCmd = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/import-github`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            repoUrl: 'octocat/Hello-World',
+            branch: 'main; touch /tmp/pwned',
+          }),
+        });
+
+        assert.strictEqual(resCmd.status, 400, 'Must reject command injection with 400');
+        const jsonCmd = await resCmd.json();
+        assert.ok(jsonCmd.error?.includes('Invalid branch'));
+      } finally {
+        server.close();
       }
     });
   });

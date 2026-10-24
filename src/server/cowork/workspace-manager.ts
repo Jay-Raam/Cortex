@@ -3,6 +3,7 @@ import path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Workspace, WorkspaceFileNode, WorkspaceCheckpoint } from '../types';
+import { isValidGitBranchName, safeExecGit } from '../security/git-security';
 
 const execAsync = promisify(exec);
 
@@ -791,15 +792,28 @@ export class WorkspaceManager {
   ): Promise<{ success: boolean; commitHash?: string; message: string }> {
     fs.mkdirSync(targetDir, { recursive: true });
 
+    // Validate branch parameter if provided
+    if (branch) {
+      const validation = isValidGitBranchName(branch);
+      if (!validation.valid) {
+        throw new Error(`Invalid git branch name: ${validation.reason}`);
+      }
+    }
+
     const cloneUrl = `https://github.com/${parsed.owner}/${parsed.repo}.git`;
-    const branchFlag = branch ? `-b "${branch}" ` : '';
-    const cloneCmd = `git clone --depth 1 ${branchFlag}"${cloneUrl}" "${targetDir}"`;
+
+    // Construct argument array safely with '--' to separate options from URLs/targets
+    const cloneArgs = ['clone', '--depth', '1'];
+    if (branch && branch.trim()) {
+      cloneArgs.push('-b', branch.trim());
+    }
+    cloneArgs.push('--', cloneUrl, targetDir);
 
     try {
-      await execAsync(cloneCmd, { timeout: 45000 });
+      await safeExecGit(cloneArgs, { timeout: 45000 });
       let commitHash = '';
       try {
-        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: targetDir });
+        const { stdout } = await safeExecGit(['rev-parse', 'HEAD'], { cwd: targetDir });
         commitHash = stdout.trim();
       } catch {}
       return {
@@ -815,14 +829,14 @@ export class WorkspaceManager {
         err.message?.includes('Could not resolve');
       if (!isAuthOrNetwork) {
         try {
-          await execAsync(`git clone --depth 1 "${cloneUrl}" "${targetDir}"`, { timeout: 45000 });
+          await safeExecGit(['clone', '--depth', '1', '--', cloneUrl, targetDir], { timeout: 45000 });
           return { success: true, message: `Cloned ${parsed.owner}/${parsed.repo} default branch` };
         } catch {}
       }
 
       // Initialize empty git repo and create README for offline or preview
       try {
-        await execAsync('git init', { cwd: targetDir });
+        await safeExecGit(['init'], { cwd: targetDir });
         fs.writeFileSync(
           path.join(targetDir, 'README.md'),
           `# ${parsed.repo}\n\nCloned from: ${parsed.httpsUrl}\n\n*Repository workspace initialized in Cortex.*`,
