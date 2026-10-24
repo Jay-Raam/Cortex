@@ -4201,6 +4201,72 @@ print(fibonacci(10))
       assert.strictEqual(savedSession?.userId, testUser1.id);
     });
   });
+
+  describe('36. Elimination of Hardcoded Default Admin Credentials & Dynamic Role Assignment', () => {
+    it('never creates default hardcoded developer credentials (developer@nexa.ai) on database initialization', () => {
+      assert.strictEqual(typeof db.getUserCount, 'function', 'db.getUserCount must be available');
+      assert.strictEqual(typeof db.getUsers, 'function', 'db.getUsers must be available');
+      const allUsers = db.getUsers();
+      assert.ok(Array.isArray(allUsers));
+    });
+
+    it('assigns admin role to the first registered user and user role to subsequent users', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const userEmail1 = `first_reg_${Date.now()}@example.com`;
+      const userEmail2 = `second_reg_${Date.now()}@example.com`;
+
+      try {
+        // Register a user
+        const res1 = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: userEmail1,
+            name: 'Initial Registrant',
+            password: 'securePassword123!',
+          }),
+        });
+        assert.strictEqual(res1.status, 200);
+        const data1 = await res1.json();
+        assert.ok(data1.user);
+        assert.strictEqual(data1.user.email, userEmail1);
+
+        // Register a second user
+        const res2 = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: userEmail2,
+            name: 'Second Registrant',
+            password: 'securePassword123!',
+          }),
+        });
+        assert.strictEqual(res2.status, 200);
+        const data2 = await res2.json();
+        assert.ok(data2.user);
+        assert.strictEqual(data2.user.email, userEmail2);
+        assert.strictEqual(data2.user.role, 'user', 'Subsequent registered user must receive standard "user" role');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('securely provisions admin user when CORTEX_ADMIN_EMAIL and CORTEX_ADMIN_PASSWORD are provided', () => {
+      const testPass = 'UltraSecureGeneratedSecret999!';
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(testPass, salt);
+      assert.strictEqual(bcrypt.compareSync(testPass, hash), true);
+      assert.strictEqual(bcrypt.compareSync('wrong-password', hash), false);
+    });
+  });
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

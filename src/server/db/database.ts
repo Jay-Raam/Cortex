@@ -301,84 +301,36 @@ class Database {
   }
 
   private ensureSeedData() {
-    // If no users exist, create default developer user
-    if (this.data.users.length === 0) {
-      const devUser: User = {
-        id: 'usr_dev_primary',
-        email: 'developer@nexa.ai',
-        name: 'Nexa Lead Architect',
-        passwordHash: bcrypt.hashSync('nexa1234!', 10),
-        role: 'admin',
+    // Only seed an initial admin user if explicitly configured via environment variables
+    const adminEmail = process.env.CORTEX_ADMIN_EMAIL?.trim();
+    const adminPassword = process.env.CORTEX_ADMIN_PASSWORD?.trim();
+    const adminName = process.env.CORTEX_ADMIN_NAME?.trim() || "System Administrator";
+
+    if (this.data.users.length === 0 && adminEmail && adminPassword) {
+      const adminUser: User = {
+        id: `usr_admin_${Date.now()}`,
+        email: adminEmail,
+        name: adminName,
+        passwordHash: bcrypt.hashSync(adminPassword, 10),
+        role: "admin",
         createdAt: new Date().toISOString(),
       };
-      this.data.users.push(devUser);
+      this.data.users.push(adminUser);
 
-      // Create default workspace
+      // Create default workspace for initial admin
       const defaultWorkspace: Workspace = {
-        id: 'ws_default_01',
-        userId: devUser.id,
-        name: 'General Engineering Workspace',
-        description: 'Default agentic co-work environment for system design, artifacts, and multi-model workflows.',
+        id: `ws_default_${Date.now()}`,
+        userId: adminUser.id,
+        name: "General Engineering Workspace",
+        description: "Default agentic co-work environment for system design, artifacts, and multi-model workflows.",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       this.data.workspaces.push(defaultWorkspace);
-
-      // Create initial artifact
-      const sampleArtifact: WorkspaceArtifact = {
-        id: 'art_arch_01',
-        workspaceId: defaultWorkspace.id,
-        title: 'Nexa AI Architecture Spec',
-        fileName: 'architecture.md',
-        language: 'markdown',
-        content: `# Nexa AI Architecture Specification\n\nNexa AI provides multi-model routing, persistent state, and an agentic Co-Work engine.\n\n- **Efficient Mode**: Sub-second latency models for quick queries\n- **Balanced Mode**: Well-rounded models for development & reasoning\n- **Powerful Mode**: Frontier reasoning models with deep reflection\n\nZero-Cost routing ensures users are never charged unless explicitly opting into premium tiers.`,
-        version: 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      this.data.artifacts.push(sampleArtifact);
-
-      // Create initial conversation
-      const welcomeConv: Conversation = {
-        id: 'conv_welcome_01',
-        userId: devUser.id,
-        title: 'Welcome to Nexa AI Platform',
-        modelId: 'gemini-3.8-flash',
-        providerId: 'gemini',
-        mode: 'balanced',
-        isPinned: true,
-        isArchived: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      this.data.conversations.push(welcomeConv);
-
-      this.data.messages.push({
-        id: 'msg_welcome_01',
-        conversationId: welcomeConv.id,
-        role: 'assistant',
-        content: `Welcome to **Nexa AI** — your next-generation multi-model AI chat & Co-Work platform.\n\nHere is what you can do:\n1. **Multi-Model Routing**: Switch seamlessly between **Efficient**, **Balanced**, and **Powerful** modes, or manually select your favorite model (Gemini, OpenRouter, Groq, NVIDIA NIM).\n2. **Free-First Policy**: Zero-cost models are prioritized with honest status monitoring.\n3. **Agentic Co-Work**: Open the **Co-Work** workspace to delegate multi-step software tasks with real tools, step planning, approval gates, and artifact generation.\n4. **Skills System**: Activate specialized personas like **Software Engineer**, **Code Reviewer**, or **Data Analyst**.\n\nHow can I help you build today?`,
-        modelUsed: 'gemini-3.8-flash',
-        providerUsed: 'gemini',
-        createdAt: new Date().toISOString(),
-      });
-
-      // Default notifications
-      this.data.notifications.push({
-        id: 'notif_welcome',
-        userId: devUser.id,
-        title: 'Welcome to Nexa AI',
-        message: 'Your multi-model routing gateway and agentic Co-Work workspace are active.',
-        channel: 'in_app',
-        type: 'system',
-        read: false,
-        createdAt: new Date().toISOString(),
-      });
-
       this.persist();
     }
 
-    // Ensure skills are present
+        // Ensure skills are present
     if (!this.data.skills || this.data.skills.length === 0) {
       this.data.skills = [...INITIAL_SKILLS];
       this.persist();
@@ -402,6 +354,14 @@ class Database {
   }
 
   // --- Users & Auth ---
+  getUsers(): User[] {
+    return [...this.data.users];
+  }
+
+  getUserCount(): number {
+    return this.data.users.length;
+  }
+
   getUserById(id: string): User | undefined {
     return this.data.users.find((u) => u.id === id);
   }

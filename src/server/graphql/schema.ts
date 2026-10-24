@@ -2,7 +2,7 @@ import { createSchema } from 'graphql-yoga';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/database';
 import { modelCatalog } from '../providers/catalog';
-import { generateTokens } from '../auth/auth';
+import { generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { coworkEngine } from '../cowork/engine';
 import { User, Conversation, Message, Workspace, WorkspaceArtifact, AgentTask } from '../types';
 
@@ -283,11 +283,11 @@ export const schema = createSchema({
         }
 
         const newUser: User = {
-          id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          id: `usr_${Date.now()}_${generateSecureRandomToken(8)}`,
           email: args.email,
           name: args.name,
           passwordHash: bcrypt.hashSync(args.password, 10),
-          role: 'user',
+          role: db.getUserCount() === 0 ? 'admin' : 'user',
           createdAt: new Date().toISOString(),
         };
 
@@ -295,7 +295,7 @@ export const schema = createSchema({
 
         // Create default workspace for new user
         db.createWorkspace({
-          id: `ws_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          id: `ws_${Date.now()}_${generateSecureRandomToken(8)}`,
           userId: newUser.id,
           name: 'Primary Workspace',
           description: 'Default personal workspace for tasks, documents, and code artifacts.',
@@ -367,7 +367,7 @@ export const schema = createSchema({
       createWorkspace: (_: any, args: { name: string; description: string }, context: { user: User }) => {
         if (!context.user) throw new Error('Unauthorized');
         const ws: Workspace = {
-          id: `ws_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          id: `ws_${Date.now()}_${generateSecureRandomToken(8)}`,
           userId: context.user.id,
           name: args.name,
           description: args.description,

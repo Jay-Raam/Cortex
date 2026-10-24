@@ -9,7 +9,7 @@ import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
 import { executionRunner } from '../cowork/execution-runner';
-import { authenticateRequest, generateTokens } from '../auth/auth';
+import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
 import { contextManager } from '../cowork/context-manager';
@@ -89,11 +89,11 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
     }
 
     const newUser: User = {
-      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: `usr_${Date.now()}_${generateSecureRandomToken(8)}`,
       email,
       name,
       passwordHash: bcrypt.hashSync(password, 10),
-      role: 'user',
+      role: db.getUserCount() === 0 ? 'admin' : 'user',
       createdAt: new Date().toISOString(),
     };
 
@@ -101,7 +101,7 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
 
     // Default workspace for new user
     db.createWorkspace({
-      id: `ws_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: `ws_${Date.now()}_${generateSecureRandomToken(8)}`,
       userId: newUser.id,
       name: 'Primary Workspace',
       description: 'Default personal workspace for tasks, documents, and code artifacts.',
