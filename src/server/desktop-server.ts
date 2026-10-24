@@ -10,6 +10,7 @@ import net from 'net';
 import http from 'http';
 import cors from 'cors';
 import { getCorsOptions } from './security/cors-policy';
+import { getUploadsStaticOptions } from './security/upload-policy';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createYoga } from 'graphql-yoga';
@@ -67,7 +68,7 @@ export async function startDesktopServer(options: DesktopServerOptions = {}): Pr
       fs.mkdirSync(uploadsDir, { recursive: true });
     } catch {}
   }
-  app.use('/uploads', express.static(uploadsDir));
+  app.use('/uploads', express.static(uploadsDir, getUploadsStaticOptions()));
 
   // REST API routes
   app.use('/api', apiRouter);

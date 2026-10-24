@@ -172,13 +172,21 @@ export async function uploadFile(file: File): Promise<{ id: string; name: string
   const formData = new FormData();
   formData.append('file', file);
 
+  const token = localStorage.getItem('nexa_auth_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch('/api/upload', {
     method: 'POST',
+    headers,
+    credentials: 'include',
     body: formData,
   });
 
   const json = await res.json();
-  if (!json.success) throw new Error(json.error || 'Failed to upload file');
+  if (!res.ok || !json.success) {
+    throw new Error(json.error || `Failed to upload file (${res.status})`);
+  }
   return json.attachment;
 }
 

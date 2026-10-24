@@ -30,6 +30,15 @@ import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, a
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
+import {
+  validateUploadedFile,
+  generateSafeUploadFilename,
+  getUserUploadQuotaLimit,
+  getUserUploadUsage,
+  checkUserUploadQuota,
+  getUploadsStaticOptions,
+  PROHIBITED_EXTENSIONS,
+} from '../src/server/security/upload-policy';
 import cors from 'cors';
 
 describe('Cortex AI Automated Test Suite', () => {
@@ -3010,6 +3019,252 @@ print(fibonacci(10))
         );
       } finally {
         server.close();
+      }
+    });
+  });
+
+  describe('29. File Upload Authentication, Extension Validation & Storage Quota Enforcement', () => {
+    it('validates allowed extensions and mime types, rejecting dangerous and prohibited files', () => {
+      // Allowed combinations
+      assert.strictEqual(validateUploadedFile('document.txt', 'text/plain').valid, true);
+      assert.strictEqual(validateUploadedFile('notes.md', 'text/markdown').valid, true);
+      assert.strictEqual(validateUploadedFile('data.csv', 'text/csv').valid, true);
+      assert.strictEqual(validateUploadedFile('schema.json', 'application/json').valid, true);
+      assert.strictEqual(validateUploadedFile('report.pdf', 'application/pdf').valid, true);
+      assert.strictEqual(validateUploadedFile('avatar.png', 'image/png').valid, true);
+      assert.strictEqual(validateUploadedFile('photo.jpg', 'image/jpeg').valid, true);
+      assert.strictEqual(validateUploadedFile('code.ts', 'text/plain').valid, true);
+
+      // Prohibited extensions
+      const dangerousFiles = [
+        'exploit.html',
+        'page.htm',
+        'vector.svg',
+        'feed.xml',
+        'binary.exe',
+        'script.bat',
+        'command.cmd',
+        'shell.sh',
+        'powershell.ps1',
+        'macro.vbs',
+        'installer.msi',
+        'payload.php',
+      ];
+      for (const df of dangerousFiles) {
+        const result = validateUploadedFile(df, 'text/plain');
+        assert.strictEqual(result.valid, false, `Must reject dangerous file "${df}"`);
+        assert.ok(result.reason?.includes('prohibited'), `Reason must specify prohibition: ${result.reason}`);
+      }
+
+      // Prohibited MIME types even with seemingly safe extension
+      const svgMimeResult = validateUploadedFile('fake.png', 'image/svg+xml');
+      assert.strictEqual(svgMimeResult.valid, false, 'Must reject image/svg+xml');
+
+      const htmlMimeResult = validateUploadedFile('fake.txt', 'text/html');
+      assert.strictEqual(htmlMimeResult.valid, false, 'Must reject text/html');
+
+      // Missing extension
+      assert.strictEqual(validateUploadedFile('noextension', 'text/plain').valid, false);
+    });
+
+    it('generates collision-resistant, sanitized filenames scoped to the user ID', () => {
+      const filename = generateSafeUploadFilename('usr_abc123', 'My Report (Final) #1.pdf');
+      assert.ok(filename.includes('usr_abc123'), 'Must contain user ID');
+      assert.ok(filename.endsWith('.pdf'), 'Must preserve valid extension');
+      assert.ok(!filename.includes(' '), 'Must sanitize spaces');
+      assert.ok(!filename.includes('#'), 'Must sanitize special characters');
+    });
+
+    it('calculates upload usage and enforces storage quotas accurately', () => {
+      const quota = checkUserUploadQuota('test_user_quota', 1024, path.resolve(process.cwd(), 'uploads'));
+      assert.strictEqual(quota.allowed, true);
+      assert.ok(quota.limit >= 1024);
+
+      // Verify oversized request fails quota
+      const hugeRequest = checkUserUploadQuota('test_user_quota', 100 * 1024 * 1024, path.resolve(process.cwd(), 'uploads'));
+      assert.strictEqual(hugeRequest.allowed, false, 'Must reject upload exceeding quota limit');
+    });
+
+    it('rejects unauthenticated upload requests with 401 Unauthorized via Express integration', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        const formData = new FormData();
+        formData.append('file', new Blob(['test content'], { type: 'text/plain' }), 'test.txt');
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        assert.strictEqual(res.status, 401, 'Unauthenticated upload must be rejected with 401');
+        const json = await res.json();
+        assert.ok(json.error?.includes('Unauthorized') || json.error?.includes('Authentication'));
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects prohibited file types with 400 Bad Request for authenticated users', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', new Blob(['<script>alert(1)</script>'], { type: 'text/html' }), 'exploit.html');
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/upload`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
+
+        assert.strictEqual(res.status, 400, 'Dangerous file type must be rejected with 400');
+        const json = await res.json();
+        assert.ok(json.error?.includes('prohibited') || json.error?.includes('extension'));
+      } finally {
+        server.close();
+      }
+    });
+
+    it('accepts valid file uploads for authenticated users and saves with user scoping', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const { accessToken } = generateTokens(testUser1);
+      let uploadedFilename = '';
+
+      try {
+        const formData = new FormData();
+        const jsonContent = JSON.stringify({ project: 'Cortex', status: 'secure' });
+        formData.append('file', new Blob([jsonContent], { type: 'application/json' }), 'project-meta.json');
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/upload`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
+
+        assert.strictEqual(res.status, 200, 'Valid upload must return 200 OK');
+        const data = await res.json();
+        assert.strictEqual(data.success, true);
+        assert.ok(data.attachment);
+        assert.strictEqual(data.attachment.name, 'project-meta.json');
+        assert.strictEqual(data.attachment.mimeType, 'application/json');
+        assert.ok(data.attachment.url.startsWith('/uploads/'));
+        assert.ok(data.attachment.url.includes(testUser1.id));
+
+        uploadedFilename = path.basename(data.attachment.url);
+        const diskPath = path.resolve(process.cwd(), 'uploads', uploadedFilename);
+        assert.strictEqual(fs.existsSync(diskPath), true, 'Uploaded file must exist on disk');
+        const contentOnDisk = fs.readFileSync(diskPath, 'utf8');
+        assert.strictEqual(contentOnDisk, jsonContent);
+      } finally {
+        server.close();
+        // Clean up created file from disk
+        if (uploadedFilename) {
+          try {
+            fs.unlinkSync(path.resolve(process.cwd(), 'uploads', uploadedFilename));
+          } catch {}
+        }
+      }
+    });
+
+    it('rejects uploads exceeding user storage quota with 413 Payload Too Large', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const { accessToken } = generateTokens(testUser1);
+
+      // Temporarily set a very small quota (100 bytes)
+      const origEnv = process.env.CORTEX_USER_UPLOAD_QUOTA_BYTES;
+      process.env.CORTEX_USER_UPLOAD_QUOTA_BYTES = '100';
+
+      try {
+        const formData = new FormData();
+        // 500 bytes payload > 100 bytes quota
+        const largeText = 'A'.repeat(500);
+        formData.append('file', new Blob([largeText], { type: 'text/plain' }), 'large-notes.txt');
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/upload`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
+
+        assert.strictEqual(res.status, 413, 'Must reject with 413 when user quota is exceeded');
+        const json = await res.json();
+        assert.ok(json.error?.includes('quota exceeded'));
+      } finally {
+        process.env.CORTEX_USER_UPLOAD_QUOTA_BYTES = origEnv;
+        server.close();
+      }
+    });
+
+    it('sets protective security headers (X-Content-Type-Options: nosniff, CSP) on static uploads', async () => {
+      const app = express();
+      const uploadsDir = path.resolve(process.cwd(), 'uploads');
+      app.use('/uploads', express.static(uploadsDir, getUploadsStaticOptions()));
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      // Create a temporary test file in uploads
+      const testFile = 'test-header-probe.txt';
+      const testFilePath = path.join(uploadsDir, testFile);
+      fs.writeFileSync(testFilePath, 'Cortex security header probe', 'utf8');
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/uploads/${testFile}`);
+        assert.strictEqual(res.status, 200);
+        assert.strictEqual(
+          res.headers.get('x-content-type-options'),
+          'nosniff',
+          'Must set X-Content-Type-Options to nosniff'
+        );
+        const csp = res.headers.get('content-security-policy') || '';
+        assert.ok(csp.includes("default-src 'none'"), 'CSP must include default-src none');
+        assert.ok(csp.includes('sandbox'), 'CSP must include sandbox directive');
+      } finally {
+        server.close();
+        try {
+          fs.unlinkSync(testFilePath);
+        } catch {}
       }
     });
   });

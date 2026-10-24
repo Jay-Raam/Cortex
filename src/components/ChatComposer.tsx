@@ -15,6 +15,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { ModelMode } from '../server/types';
+import { uploadFile } from '../lib/api';
 
 interface ChatComposerProps {
   onSendMessage: (content: string, attachments: any[]) => void;
@@ -136,19 +137,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
     setIsUploading(true);
     try {
       const file = files[0];
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (res.ok) {
-        const uploaded = await res.json();
-        setAttachments((prev) => [...prev, uploaded]);
-      }
-    } catch (err) {
+      const attachment = await uploadFile(file);
+      setAttachments((prev) => [...prev, attachment]);
+    } catch (err: any) {
       console.error('Upload failed', err);
     } finally {
       setIsUploading(false);

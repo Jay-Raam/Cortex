@@ -13,6 +13,14 @@ import { authenticateRequest, generateTokens } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
 import { contextManager } from '../cowork/context-manager';
+import {
+  validateUploadedFile,
+  generateSafeUploadFilename,
+  getUserUploadQuotaLimit,
+  getUserUploadUsage,
+  checkUserUploadQuota,
+  MAX_SINGLE_FILE_SIZE_BYTES,
+} from '../security/upload-policy';
 
 export const apiRouter = express.Router();
 
@@ -28,31 +36,23 @@ const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, UPLOADS_DIR);
   },
-  filename: (_req, file, cb) => {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${Date.now()}-${safeName}`);
+  filename: (req: any, file, cb) => {
+    const user = req.user;
+    const userId = user?.id || 'user';
+    const safeFilename = generateSafeUploadFilename(userId, file.originalname);
+    cb(null, safeFilename);
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: MAX_SINGLE_FILE_SIZE_BYTES },
   fileFilter: (_req, file, cb) => {
-    const allowed = [
-      'text/plain',
-      'text/markdown',
-      'text/csv',
-      'application/json',
-      'application/pdf',
-      'image/png',
-      'image/jpeg',
-      'image/webp',
-    ];
-    if (allowed.includes(file.mimetype) || file.originalname.match(/\.(ts|tsx|js|jsx|py|go|rs|json|md|txt|csv|sql)$/i)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Unsupported file type. Permitted: text, code, json, csv, pdf, image.'));
+    const result = validateUploadedFile(file.originalname, file.mimetype);
+    if (!result.valid) {
+      return cb(new Error(result.reason || 'Unsupported file type'));
     }
+    cb(null, true);
   },
 });
 
@@ -422,132 +422,76 @@ apiRouter.post('/chat/stream', async (req: Request, res: Response) => {
 });
 
 /**
- * File upload endpoint
+ * File upload endpoint (requires authenticated user, quota checks, and safe filename)
  */
-apiRouter.post('/upload', upload.single('file'), (req: Request, res: Response) => {
-  try {
-    const file = req.file;
-    if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const attachment = {
-      id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      name: file.originalname,
-      size: file.size,
-      mimeType: file.mimetype,
-      url: `/uploads/${file.filename}`,
-      createdAt: new Date().toISOString(),
-    };
-
-    res.json({ success: true, attachment });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * Run / advance a Co-Work agent task
- */
-apiRouter.post('/cowork/tasks/:id/advance', async (req: Request, res: Response) => {
+apiRouter.post('/upload', (req: Request, res: Response) => {
+  // 1. Strict Authentication enforcement prior to processing upload
   let user: User;
   try {
     user = getReqUser(req);
   } catch {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Unauthorized: Authentication required to upload files' });
   }
 
-  const { id } = req.params;
-  try {
-    const task = await coworkEngine.advanceTask(id, user.id);
-    res.json({ success: true, task });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-});
+  (req as any).user = user;
 
-/**
- * Approve a pending step
- */
-apiRouter.post('/cowork/tasks/:id/approve', async (req: Request, res: Response) => {
-  let user: User;
-  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
-  const { id } = req.params;
-  const { stepId, approvalId } = req.body;
-  const task = db.getTaskById(id, user.id);
-  if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
-
-  if (approvalId) {
-    db.updateApprovalRequest(approvalId, 'approved');
+  // 2. Early Content-Length check against single-file and remaining quota
+  const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+  if (contentLength > MAX_SINGLE_FILE_SIZE_BYTES + 10240) {
+    return res.status(413).json({ error: 'File size exceeds maximum allowed limit (10MB)' });
   }
 
-  const step = task.steps.find((s) => s.id === stepId || s.status === 'awaiting_approval');
-  if (step) {
-    step.isApproved = true;
-    step.status = 'running';
-    db.updateTask(id, user.id, { steps: task.steps });
+  const quotaCheck = checkUserUploadQuota(user.id, contentLength > 0 ? contentLength : 0, UPLOADS_DIR);
+  if (!quotaCheck.allowed) {
+    return res.status(413).json({
+      error: `User upload storage quota exceeded (${Math.round(quotaCheck.limit / 1024 / 1024)}MB limit)`,
+    });
   }
 
-  try {
-    const advanced = await coworkEngine.runTaskLoop(id, user.id);
-    res.json({ success: true, task: advanced });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * Approve the complete task execution plan (Mode B)
- */
-apiRouter.post('/cowork/tasks/:id/plan/approve', async (req: Request, res: Response) => {
-  let user: User;
-  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
-  const { id } = req.params;
-  const { plannedFiles = [] } = req.body;
-  const task = db.getTaskById(id, user.id);
-  if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
-
-  // Extract all file targets from planned steps if not provided explicitly
-  const extractedFiles = [...plannedFiles];
-  for (const step of task.steps) {
-    const f = step.toolInput?.filePath || step.toolInput?.path;
-    if (f && !extractedFiles.includes(f)) {
-      extractedFiles.push(f);
+  // 3. Execute Multer with explicit error handling
+  upload.single('file')(req, res, (err: any) => {
+    if (err) {
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File size exceeds maximum allowed limit (10MB)' });
+      }
+      return res.status(400).json({ error: err.message || 'File upload failed' });
     }
-  }
 
-  db.updateTask(id, user.id, {
-    isPlanApproved: true,
-    plannedFiles: extractedFiles,
-    status: 'running',
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      // 4. Verify post-upload cumulative disk quota
+      const currentUsage = getUserUploadUsage(user.id, UPLOADS_DIR);
+      const quotaLimit = getUserUploadQuotaLimit();
+      if (currentUsage > quotaLimit) {
+        // Discard file immediately
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        } catch {}
+        return res.status(413).json({
+          error: `Upload rejected: User storage quota exceeded (${Math.round(quotaLimit / 1024 / 1024)}MB limit)`,
+        });
+      }
+
+      const attachment = {
+        id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        name: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype,
+        url: `/uploads/${file.filename}`,
+        createdAt: new Date().toISOString(),
+      };
+
+      res.json({ success: true, attachment });
+    } catch (routeErr: any) {
+      res.status(500).json({ error: routeErr.message });
+    }
   });
-
-  try {
-    const advanced = await coworkEngine.runTaskLoop(id, user.id);
-    res.json({ success: true, task: advanced, plannedFiles: extractedFiles });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * Reject the complete task execution plan
- */
-apiRouter.post('/cowork/tasks/:id/plan/reject', async (req: Request, res: Response) => {
-  let user: User;
-  try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
-  const { id } = req.params;
-  const { reason = 'Plan rejected by developer' } = req.body;
-  const task = db.getTaskById(id, user.id);
-  if (!task) return res.status(404).json({ error: 'Task not found or access denied' });
-
-  db.updateTask(id, user.id, {
-    status: 'failed',
-    isPlanApproved: false,
-    error: `Execution plan was rejected: ${reason}`,
-  });
-
-  res.json({ success: true, task: db.getTaskById(id, user.id) });
 });
 
 /**
