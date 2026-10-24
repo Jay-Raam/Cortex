@@ -31,6 +31,12 @@ import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '.
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
 import {
+  validateWorkspaceBindPath,
+  canonicalizePath,
+  isRootDirectory,
+  SENSITIVE_DIR_NAMES,
+} from '../src/server/security/path-validator';
+import {
   validateUploadedFile,
   generateSafeUploadFilename,
   getUserUploadQuotaLimit,
@@ -3265,6 +3271,206 @@ print(fibonacci(10))
         try {
           fs.unlinkSync(testFilePath);
         } catch {}
+      }
+    });
+  });
+
+  describe('30. Workspace Bind Path Traversal Defense & Filesystem Isolation', () => {
+    it('detects and prohibits root directories across platforms', () => {
+      assert.strictEqual(isRootDirectory('/'), true);
+      assert.strictEqual(isRootDirectory('C:\\'), true);
+      assert.strictEqual(isRootDirectory('D:/'), true);
+      assert.strictEqual(isRootDirectory('C:'), true);
+      assert.strictEqual(validateWorkspaceBindPath('/').valid, false);
+      assert.strictEqual(validateWorkspaceBindPath('C:\\').valid, false);
+      assert.strictEqual(validateWorkspaceBindPath('D:/').valid, false);
+    });
+
+    it('strictly prohibits system directories and OS core folders', () => {
+      const systemPaths = [
+        '/etc',
+        '/etc/shadow',
+        '/bin',
+        '/sbin',
+        '/usr',
+        '/var',
+        '/proc',
+        '/sys',
+        'C:\\Windows',
+        'C:\\Windows\\System32',
+        'C:\\Program Files',
+        'C:\\Program Files (x86)',
+        'C:\\ProgramData',
+      ];
+
+      for (const sp of systemPaths) {
+        const result = validateWorkspaceBindPath(sp);
+        assert.strictEqual(result.valid, false, `Must reject system path "${sp}"`);
+        assert.ok(result.reason?.includes('prohibited') || result.reason?.includes('system'));
+      }
+    });
+
+    it('strictly prohibits user credential stores (.ssh, .aws, .gnupg, .kube)', () => {
+      const credPaths = [
+        path.join(process.cwd(), '.ssh'),
+        '/home/developer/.ssh',
+        'C:\\Users\\Developer\\.aws',
+        '/root/.gnupg',
+        '/home/user/.kube',
+      ];
+
+      for (const cp of credPaths) {
+        const result = validateWorkspaceBindPath(cp);
+        assert.strictEqual(result.valid, false, `Must reject credential path "${cp}"`);
+        assert.ok(result.reason?.includes('sensitive') || result.reason?.includes('prohibited'));
+      }
+    });
+
+    it('strictly prohibits binding the server application root (process.cwd()) and its parent directories', () => {
+      const appRoot = process.cwd();
+      const parentDir = path.dirname(appRoot);
+
+      const appRootResult = validateWorkspaceBindPath(appRoot);
+      assert.strictEqual(appRootResult.valid, false, 'Must reject binding the application root directory');
+      assert.ok(appRootResult.reason?.includes('application root'));
+
+      const parentResult = validateWorkspaceBindPath(parentDir);
+      assert.strictEqual(parentResult.valid, false, 'Must reject binding a parent directory of the application');
+      assert.ok(
+        parentResult.reason?.includes('parent directory') || parentResult.reason?.includes('root directory'),
+        `Reason must indicate root or parent restriction: ${parentResult.reason}`
+      );
+    });
+
+    it('authorizes safe project subdirectories inside managed workspaces', () => {
+      const safeProject = path.join(process.cwd(), 'workspaces', 'test_safe_project_1');
+      const result = validateWorkspaceBindPath(safeProject);
+      assert.strictEqual(result.valid, true, 'Must authorize safe project within workspaces');
+      assert.ok(result.resolvedPath);
+    });
+
+    it('rejects unauthenticated requests to bind-local with 401 Unauthorized', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/bind-local`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderPath: '/tmp/test-project' }),
+        });
+
+        assert.strictEqual(res.status, 401, 'Unauthenticated bind-local must be rejected with 401');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects prohibited system/app paths in bind-local endpoint with 400 Bad Request', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        // Attempt 1: Server application root
+        const resAppRoot = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/bind-local`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ folderPath: process.cwd() }),
+        });
+        assert.strictEqual(resAppRoot.status, 400, 'Attempting to bind app root must return 400');
+        const jsonAppRoot = await resAppRoot.json();
+        assert.ok(jsonAppRoot.error?.includes('prohibited'));
+
+        // Attempt 2: System directory
+        const systemTarget = process.platform === 'win32' ? 'C:\\Windows' : '/etc';
+        const resSys = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/bind-local`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ folderPath: systemTarget }),
+        });
+        assert.strictEqual(resSys.status, 400, 'Attempting to bind system dir must return 400');
+        const jsonSys = await resSys.json();
+        assert.ok(jsonSys.error?.includes('prohibited'));
+      } finally {
+        server.close();
+      }
+    });
+
+    it('safely allocates a managed cloud workspace in cloud environments', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const { accessToken } = generateTokens(testUser1);
+
+      // Simulate cloud environment (RENDER=true)
+      const origRender = process.env.RENDER;
+      process.env.RENDER = 'true';
+      let createdWsId = '';
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/bind-local`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            folderPath: 'D:\\MySecretClientFolder',
+            name: 'Cloud Bound Project',
+          }),
+        });
+
+        assert.strictEqual(res.status, 200);
+        const data = await res.json();
+        assert.strictEqual(data.success, true);
+        assert.ok(data.workspace);
+        assert.ok(data.workspace.id.startsWith('ws_cloud_'));
+        createdWsId = data.workspace.id;
+
+        // Verify project root is safely inside workspaces/ and NOT host D:\MySecretClientFolder
+        const wsRoot = data.workspace.projectRoot;
+        assert.ok(wsRoot.includes('workspaces'), 'Cloud workspace root must be located under workspaces/');
+        assert.strictEqual(fs.existsSync(path.join(wsRoot, 'README.md')), true);
+      } finally {
+        process.env.RENDER = origRender;
+        server.close();
+
+        // Clean up created cloud workspace
+        if (createdWsId) {
+          const wsPath = path.resolve(process.cwd(), 'workspaces', createdWsId);
+          try {
+            fs.rmSync(wsPath, { recursive: true, force: true });
+          } catch {}
+          try {
+            db.deleteWorkspace(createdWsId, testUser1.id);
+          } catch {}
+        }
       }
     });
   });
