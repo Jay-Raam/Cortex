@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
+const { executeSafeDesktopCommand, escapeHtml } = require('./security.cjs');
 
 // ============================================================================
 // LOW-MEMORY & HARDWARE COMPATIBILITY OPTIMIZATIONS (Windows 10 & 11)
@@ -183,7 +184,7 @@ function renderFallbackScreen(targetUrl, errorMsg) {
         <div class="card">
           <h2>Starting Cortex Engine...</h2>
           <p>Connecting to internal background services. If this takes longer than expected, click retry.</p>
-          <div class="error">${errorMsg || 'Connection waiting'}</div>
+          <div class="error">${escapeHtml(errorMsg || 'Connection waiting')}</div>
           <button onclick="window.location.href='${targetUrl}'">Retry Connection</button>
         </div>
       </body>
@@ -201,26 +202,9 @@ ipcMain.handle('dialog:openFolder', async () => {
   });
 });
 
-// Safe Shell Command Execution IPC for Desktop Terminal
+// Safe Shell Command Execution IPC for Desktop Terminal (Hardened against RCE)
 ipcMain.handle('shell:execute', async (_event, command) => {
-  return new Promise((resolve) => {
-    if (!command || typeof command !== 'string') {
-      return resolve({ stdout: '', stderr: 'Invalid command string', exitCode: 1 });
-    }
-    // Protect against destructive host wipes
-    const disallowed = [/rmdir\s+\/s\s+\/q\s+[c-z]:\\/i, /format\s+[c-z]:/i, /diskpart/i];
-    if (disallowed.some((regex) => regex.test(command))) {
-      return resolve({ stdout: '', stderr: 'Command blocked by security policy.', exitCode: 1 });
-    }
-
-    exec(command, { timeout: 30000, maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-      resolve({
-        stdout: stdout || '',
-        stderr: stderr || (error ? error.message : ''),
-        exitCode: error ? (error.code ?? 1) : 0,
-      });
-    });
-  });
+  return executeSafeDesktopCommand(command);
 });
 
 // Native System Metrics for Diagnostics
