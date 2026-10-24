@@ -87,7 +87,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
-    userId: 'usr_dev_primary',
+    userId: '',
     emailEnabled: true,
     pushEnabled: true,
     whatsappEnabled: false,
