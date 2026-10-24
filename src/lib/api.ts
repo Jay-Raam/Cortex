@@ -552,3 +552,62 @@ export async function generateReleaseNotesApi(
   if (!res.ok) throw new Error(json.error || 'Failed to generate release notes');
   return json;
 }
+
+export interface SearchReplaceOptions {
+  query: string;
+  replacement?: string;
+  isRegex?: boolean;
+  matchCase?: boolean;
+  wholeWord?: boolean;
+  filePattern?: string;
+  dryRun?: boolean;
+  maxResults?: number;
+}
+
+export interface SearchMatch {
+  file: string;
+  line: number;
+  column: number;
+  lineContent: string;
+  matchText: string;
+  preview: string;
+}
+
+export interface FileReplacePreview {
+  file: string;
+  matchesCount: number;
+  diff: string;
+}
+
+export interface SearchReplaceResult {
+  query: string;
+  replacement?: string;
+  isRegex: boolean;
+  matchCase: boolean;
+  wholeWord: boolean;
+  totalMatches: number;
+  filesCount: number;
+  matches: SearchMatch[];
+  filePreviews: FileReplacePreview[];
+  applied: boolean;
+}
+
+export async function searchAndReplaceApi(
+  workspaceId: string,
+  options: SearchReplaceOptions
+): Promise<SearchReplaceResult> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${workspaceId}/search-replace`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(options),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Search and replace failed');
+  return json;
+}

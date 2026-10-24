@@ -2474,6 +2474,206 @@ print(fibonacci(10))
     });
   });
 
+
+  describe('25. Workspace Multi-File Search & Replace with Regex and Match Preview', () => {
+    let srWs: any;
+    let wsRoot: string;
+
+    before(async () => {
+      srWs = db.createWorkspace({
+        id: `ws_search_replace_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Search & Replace Test Workspace',
+        description: 'Testing multi-file search and replace',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      wsRoot = workspaceManager.getWorkspaceRoot(srWs);
+
+      // Create test files
+      await workspaceManager.createFile(
+        wsRoot,
+        'src/utils.ts',
+        `export const API_URL = 'http://api.local';\nexport const api_url = 'http://backup.local';\nexport function getEndpoint() { return API_URL; }`
+      );
+      await workspaceManager.createFile(
+        wsRoot,
+        'src/config.ts',
+        `export const AppConfig = {\n  url: API_URL,\n  apiUrl: 'http://production.com',\n  mode: 'debug'\n};`
+      );
+      await workspaceManager.createFile(
+        wsRoot,
+        'docs/readme.txt',
+        `Documentation for API_URL configuration.`
+      );
+    });
+
+    it('matches case-sensitively and respects whole-word boundary options', async () => {
+      // 1. Case-sensitive search for API_URL (should match API_URL only, not api_url or apiUrl)
+      const resCase = await workspaceManager.searchAndReplace(wsRoot, {
+        query: 'API_URL',
+        matchCase: true,
+        wholeWord: true,
+        dryRun: true,
+      });
+      assert.strictEqual(resCase.matchCase, true);
+      assert.strictEqual(resCase.wholeWord, true);
+      assert.ok(resCase.totalMatches >= 3, `Expected at least 3 matches, got ${resCase.totalMatches}`);
+      for (const m of resCase.matches) {
+        assert.strictEqual(m.matchText, 'API_URL');
+      }
+
+      // 2. Case-insensitive search for api_url with wholeWord
+      const resInsensitive = await workspaceManager.searchAndReplace(wsRoot, {
+        query: 'api_url',
+        matchCase: false,
+        wholeWord: true,
+        dryRun: true,
+      });
+      assert.ok(resInsensitive.totalMatches >= 4, `Expected at least 4 matches, got ${resInsensitive.totalMatches}`);
+      for (const m of resInsensitive.matches) {
+        assert.ok(
+          m.matchText.toLowerCase() === 'api_url',
+          `Match text ${m.matchText} should equal api_url case-insensitively`
+        );
+      }
+    });
+
+    it('filters target search files based on filePattern glob/extension filters', async () => {
+      // Only search in *.txt files
+      const resTxt = await workspaceManager.searchAndReplace(wsRoot, {
+        query: 'API_URL',
+        filePattern: '*.txt',
+        dryRun: true,
+      });
+      assert.strictEqual(resTxt.filesCount, 1);
+      assert.strictEqual(resTxt.matches[0].file, 'docs/readme.txt');
+
+      // Only search in *.ts files
+      const resTs = await workspaceManager.searchAndReplace(wsRoot, {
+        query: 'API_URL',
+        filePattern: '*.ts',
+        dryRun: true,
+      });
+      assert.strictEqual(resTs.filesCount, 2);
+      for (const m of resTs.matches) {
+        assert.ok(m.file.endsWith('.ts'));
+      }
+    });
+
+    it('performs regex search with capture group replacement preview in dry-run mode without mutating disk', async () => {
+      const originalUtils = await workspaceManager.readFile(wsRoot, 'src/utils.ts');
+
+      const resRegex = await workspaceManager.searchAndReplace(wsRoot, {
+        query: 'export const (\\w+) = (.*);',
+        replacement: 'export let $1 = $2;',
+        isRegex: true,
+        dryRun: true,
+      });
+
+      assert.strictEqual(resRegex.isRegex, true);
+      assert.strictEqual(resRegex.applied, false, 'Dry run must not set applied = true');
+      assert.ok(resRegex.totalMatches >= 2);
+      assert.ok(resRegex.filePreviews.length >= 1);
+
+      // Verify diff generation
+      const utilsPreview = resRegex.filePreviews.find((p) => p.file === 'src/utils.ts');
+      assert.ok(utilsPreview, 'File preview for src/utils.ts must exist');
+      assert.ok(utilsPreview.diff.includes('- export const'));
+      assert.ok(utilsPreview.diff.includes('+ export let'));
+
+      // Ensure disk was untouched
+      const currentUtils = await workspaceManager.readFile(wsRoot, 'src/utils.ts');
+      assert.strictEqual(currentUtils.content, originalUtils.content, 'Dry run must not mutate disk content');
+    });
+
+    it('executes atomic batch replacement across files on disk when dryRun is false', async () => {
+      const resApply = await workspaceManager.searchAndReplace(wsRoot, {
+        query: 'http://api.local',
+        replacement: 'https://api.cortex.ai/v1',
+        isRegex: false,
+        dryRun: false,
+      });
+
+      assert.strictEqual(resApply.applied, true, 'Replacement must be applied');
+      assert.strictEqual(resApply.totalMatches, 1);
+
+      // Verify file content on disk has been updated
+      const updatedUtils = await workspaceManager.readFile(wsRoot, 'src/utils.ts');
+      assert.ok(
+        updatedUtils.content.includes('https://api.cortex.ai/v1'),
+        'File on disk must reflect replacement'
+      );
+      assert.ok(
+        !updatedUtils.content.includes('http://api.local'),
+        'Original text must be completely replaced'
+      );
+    });
+
+    it('exposes POST /api/cowork/workspaces/:id/search-replace and enforces tenant isolation', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = server.address().port;
+
+      const { accessToken: u1Token } = generateTokens(testUser1);
+      const { accessToken: u2Token } = generateTokens(testUser2);
+
+      try {
+        // 1. Authorized user search and replace preview
+        const resPreview = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${srWs.id}/search-replace`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${u1Token}`,
+          },
+          body: JSON.stringify({
+            query: 'API_URL',
+            replacement: 'REMOTE_GATEWAY_URL',
+            dryRun: true,
+          }),
+        });
+        assert.strictEqual(resPreview.status, 200);
+        const dataPreview = await resPreview.json();
+        assert.strictEqual(dataPreview.success, true);
+        assert.ok(dataPreview.totalMatches >= 3);
+        assert.strictEqual(dataPreview.applied, false);
+
+        // 2. Unauthorized cross-tenant attempt (User2 accessing User1 workspace)
+        const resForbidden = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${srWs.id}/search-replace`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${u2Token}`,
+          },
+          body: JSON.stringify({
+            query: 'API_URL',
+            dryRun: true,
+          }),
+        });
+        assert.strictEqual(resForbidden.status, 404, 'Must reject cross-tenant access with 404');
+
+        // 3. Unauthenticated request rejected with 401
+        const resUnauth = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${srWs.id}/search-replace`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: 'API_URL',
+          }),
+        });
+        assert.strictEqual(resUnauth.status, 401, 'Must reject unauthenticated request with 401');
+      } finally {
+        server.close();
+      }
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

@@ -43,6 +43,7 @@ import { downloadWorkspaceZip, createGitHubPrApi } from '../../lib/api';
 import { parseAnsiToHtml } from './ansi';
 import { CodeEditor } from './CodeEditor';
 import { GitReleaseModal } from './GitReleaseModal';
+import { SearchReplaceModal } from './SearchReplaceModal';
 
 function pathBasename(p: string): string {
   const parts = p.split(/[\/\\]/);
@@ -117,6 +118,20 @@ export const CoworkCanvas: React.FC<CoworkCanvasProps> = ({
       setIsDownloadingZip(false);
     }
   };
+
+  const [isSearchReplaceOpen, setIsSearchReplaceOpen] = useState(false);
+
+  // Global Ctrl+Shift+F hotkey to open Search & Replace Modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault();
+        setIsSearchReplaceOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const [isGitReleaseModalOpen, setIsGitReleaseModalOpen] = useState(false);
 
@@ -861,6 +876,19 @@ const [openTabs, setOpenTabs] = useState<string[]>([]);
                 </button>
               )}
 
+              {/* Multi-File Search & Replace */}
+              {workspace?.id && (
+                <button
+                  type="button"
+                  onClick={() => setIsSearchReplaceOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#141d2c] hover:bg-[#1a2638] text-slate-200 border border-[#233145] shadow-2xs transition-colors cursor-pointer"
+                  title="Multi-file search and replace in workspace (Ctrl+Shift+F)"
+                >
+                  <Search className="w-3 h-3 text-cyan-400" />
+                  <span className="hidden sm:inline">Search &amp; Replace</span>
+                </button>
+              )}
+
               {/* Git Semantic Commit & Release Assistant */}
               {workspace?.id && (
                 <button
@@ -1372,6 +1400,15 @@ const [openTabs, setOpenTabs] = useState<string[]>([]);
           </div>
         </div>
       )}
+
+      {/* Workspace Multi-File Search & Replace Modal */}
+      <SearchReplaceModal
+        isOpen={isSearchReplaceOpen}
+        onClose={() => setIsSearchReplaceOpen(false)}
+        workspaceId={workspace?.id || ''}
+        workspaceName={workspace?.name}
+        onFileSelect={(filePath) => onSelectFile(filePath)}
+      />
 
       {/* Git Semantic Commit & Release Assistant Modal */}
       <GitReleaseModal
