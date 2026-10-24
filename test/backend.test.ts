@@ -26,7 +26,7 @@ import { User, Conversation, Message, AgentTask, Workspace } from '../src/server
 import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
 import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/language-generators';
 import { apiRouter } from '../src/server/routes/api';
-import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret } from '../src/server/auth/auth';
+import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret, generateSecureRandomToken } from '../src/server/auth/auth';
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
@@ -4153,6 +4153,54 @@ print(fibonacci(10))
     });
   });
 
+
+  describe('35. Cryptographically Secure Refresh Token & Session ID Generation (CSPRNG)', () => {
+    it('generates high-entropy hexadecimal tokens with correct byte lengths', () => {
+      const token16 = generateSecureRandomToken(16);
+      assert.strictEqual(token16.length, 32, '16 bytes must yield 32 hex chars');
+      assert.match(token16, /^[0-9a-f]{32}$/, 'Must be lowercase hex string');
+
+      const token32 = generateSecureRandomToken(32);
+      assert.strictEqual(token32.length, 64, '32 bytes must yield 64 hex chars');
+      assert.match(token32, /^[0-9a-f]{64}$/, 'Must be lowercase hex string');
+    });
+
+    it('produces collision-free tokens across high-volume generations', () => {
+      const tokens = new Set<string>();
+      const iterations = 1000;
+      for (let i = 0; i < iterations; i++) {
+        const t = generateSecureRandomToken(32);
+        assert.strictEqual(tokens.has(t), false, 'Collision detected at iteration ' + i);
+        tokens.add(t);
+      }
+      assert.strictEqual(tokens.size, iterations);
+    });
+
+    it('generates secure session IDs and refresh tokens containing 256-bit CSPRNG entropy', () => {
+      const { accessToken, refreshToken } = generateTokens(testUser1);
+      assert.ok(accessToken, 'Must generate access token');
+      assert.ok(refreshToken, 'Must generate refresh token');
+
+      // format: sessionId:rawRefreshToken
+      const [sessionId, rawToken] = refreshToken.split(':');
+      assert.ok(sessionId && rawToken, 'Refresh token format must be sessionId:rawRefreshToken');
+
+      // sessionId format: sess_<timestamp>_<32-hex-chars>
+      const sessionParts = sessionId.split('_');
+      assert.strictEqual(sessionParts[0], 'sess');
+      assert.match(sessionParts[2], /^[0-9a-f]{32}$/, 'Session ID random suffix must be 32 hex chars (128 bits CSPRNG)');
+
+      // rawToken format: <userId>.<timestamp>.<64-hex-chars>
+      const tokenParts = rawToken.split('.');
+      assert.strictEqual(tokenParts[0], testUser1.id);
+      assert.match(tokenParts[2], /^[0-9a-f]{64}$/, 'Refresh token random suffix must be 64 hex chars (256 bits CSPRNG)');
+
+      // Check database session
+      const savedSession = db.getSession(sessionId);
+      assert.ok(savedSession, 'Session must exist in database');
+      assert.strictEqual(savedSession?.userId, testUser1.id);
+    });
+  });
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

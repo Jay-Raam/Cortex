@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { Request, Response, NextFunction } from 'express';
@@ -25,6 +26,13 @@ export function getJwtSecret(): string {
   return secret.trim();
 }
 
+/**
+ * Generates a cryptographically secure random hexadecimal token using CSPRNG.
+ */
+export function generateSecureRandomToken(bytes: number = 32): string {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
 export function generateTokens(user: User, userAgent?: string): { accessToken: string; refreshToken: string } {
   const payload: TokenPayload = {
     userId: user.id,
@@ -34,11 +42,11 @@ export function generateTokens(user: User, userAgent?: string): { accessToken: s
 
   const accessToken = jwt.sign(payload, getJwtSecret(), { expiresIn: ACCESS_TOKEN_EXPIRY });
 
-  const rawRefreshToken = `${user.id}.${Date.now()}.${Math.random().toString(36).substring(2, 15)}`;
+  const rawRefreshToken = `${user.id}.${Date.now()}.${generateSecureRandomToken(32)}`;
   const refreshTokenHash = bcrypt.hashSync(rawRefreshToken, 8);
 
   const session: Session = {
-    id: `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    id: `sess_${Date.now()}_${generateSecureRandomToken(16)}`,
     userId: user.id,
     refreshTokenHash,
     expiresAt: Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
