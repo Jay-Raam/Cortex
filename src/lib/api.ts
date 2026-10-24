@@ -488,3 +488,67 @@ export async function deletePromptTemplateApi(id: string): Promise<void> {
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Failed to delete prompt template');
 }
+
+export interface SemanticCommitResult {
+  hasChanges: boolean;
+  commitType: string;
+  scope: string;
+  commitTitle: string;
+  commitBody: string;
+  fullMessage: string;
+  files: Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>;
+  committed: boolean;
+  commitHash?: string;
+}
+
+export interface ReleaseNotesResult {
+  versionTag: string;
+  title: string;
+  markdown: string;
+  stats: {
+    totalCommits: number;
+    featuresCount: number;
+    fixesCount: number;
+    choresCount: number;
+  };
+}
+
+export async function generateSemanticCommitApi(
+  workspaceId: string,
+  autoCommit: boolean = false
+): Promise<SemanticCommitResult> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${workspaceId}/git/semantic-commit`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify({ autoCommit }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to generate semantic commit');
+  return json;
+}
+
+export async function generateReleaseNotesApi(
+  workspaceId: string,
+  options?: { versionTag?: string; title?: string }
+): Promise<ReleaseNotesResult> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${workspaceId}/git/release-notes`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(options || {}),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to generate release notes');
+  return json;
+}

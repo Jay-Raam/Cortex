@@ -710,6 +710,262 @@ export class WorkspaceManager {
       message: prUrl ? `Pull request created: ${prUrl}` : `Branch ${branchName} created and ready for Pull Request.`,
     };
   }
+
+  /**
+   * Analyzes workspace Git status and diffs, generating a structured Conventional Commit message.
+   * Optionally commits the changes automatically.
+   */
+  async generateSemanticCommit(
+    workspaceRoot: string,
+    autoCommit: boolean = false
+  ): Promise<{
+    hasChanges: boolean;
+    commitType: string;
+    scope: string;
+    commitTitle: string;
+    commitBody: string;
+    fullMessage: string;
+    files: Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>;
+    committed: boolean;
+    commitHash?: string;
+  }> {
+    const gitDir = path.join(workspaceRoot, '.git');
+    if (!fs.existsSync(gitDir)) {
+      throw new Error('Workspace is not a Git repository. Initialize git first.');
+    }
+
+    const { stdout: statusOut } = await execAsync('git status --porcelain -uall', { cwd: workspaceRoot });
+    const lines = statusOut.split('\n').filter(Boolean);
+    if (lines.length === 0) {
+      return {
+        hasChanges: false,
+        commitType: 'chore',
+        scope: 'workspace',
+        commitTitle: 'chore: no changes detected',
+        commitBody: 'Working tree clean.',
+        fullMessage: 'chore: no changes detected\n\nWorking tree clean.',
+        files: [],
+        committed: false,
+      };
+    }
+
+    const files: Array<{ file: string; status: 'modified' | 'added' | 'deleted' }> = [];
+    for (const line of lines) {
+      const code = line.substring(0, 2);
+      const file = line.substring(3).trim();
+      let status: 'modified' | 'added' | 'deleted' = 'modified';
+      if (code.includes('?') || code.includes('A')) status = 'added';
+      else if (code.includes('D')) status = 'deleted';
+      files.push({ file, status });
+    }
+
+    // Determine primary scope from file paths
+    let scope = 'workspace';
+    const firstFile = files[0].file;
+    const cleanFile = firstFile.replace(/^[\"']|[\"']$/g, '').replace(/\\/g, '/').replace(/\/+$/, '');
+    const parts = cleanFile.split('/').filter(Boolean);
+    if (parts.length > 2) {
+      scope = parts[parts.length - 2].toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    } else if (parts.length === 2) {
+      scope = parts[0].toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    } else if (parts.length === 1) {
+      scope = path.basename(parts[0], path.extname(parts[0])).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+    if (!scope || scope === 'src' || scope === 'lib') scope = 'core';
+
+    // Determine type
+    let commitType = 'feat';
+    const allTests = files.every((f) => f.file.includes('test') || f.file.includes('spec'));
+    const allDocs = files.every((f) => f.file.endsWith('.md') || f.file.includes('docs'));
+    const allStyles = files.every((f) => f.file.endsWith('.css') || f.file.endsWith('.scss'));
+    const allConfigs = files.every((f) => f.file.includes('config') || f.file.endsWith('.json') || f.file.startsWith('.'));
+
+    if (allTests) {
+      commitType = 'test';
+    } else if (allDocs) {
+      commitType = 'docs';
+    } else if (allStyles) {
+      commitType = 'style';
+    } else if (allConfigs) {
+      commitType = 'chore';
+    } else {
+      try {
+        const { stdout: diffOut } = await execAsync('git diff HEAD', { cwd: workspaceRoot });
+        const lowerDiff = diffOut.toLowerCase();
+        if (lowerDiff.includes('fix') || lowerDiff.includes('error') || lowerDiff.includes('catch') || lowerDiff.includes('bug')) {
+          commitType = 'fix';
+        } else if (lowerDiff.includes('perf') || lowerDiff.includes('optimize') || lowerDiff.includes('cache')) {
+          commitType = 'perf';
+        } else if (lowerDiff.includes('refactor') || lowerDiff.includes('cleanup')) {
+          commitType = 'refactor';
+        }
+      } catch {}
+    }
+
+    const actionVerb =
+      commitType === 'fix'
+        ? 'resolve issues in'
+        : commitType === 'test'
+        ? 'add tests for'
+        : commitType === 'docs'
+        ? 'update documentation for'
+        : 'implement updates for';
+
+    const commitTitle = `${commitType}(${scope}): ${actionVerb} ${files.slice(0, 2).map((f) => path.basename(f.file)).join(', ')}${files.length > 2 ? ` and ${files.length - 2} other file(s)` : ''}`;
+
+    const bodyLines = [
+      `### Summary of Changes`,
+      `- Automated conventional commit synthesized from ${files.length} modified file(s).`,
+      `- Scope: ${scope}`,
+      ``,
+      `### Modified Files:`,
+      ...files.map((f) => `- [${f.status.toUpperCase()}] \`${f.file}\``),
+    ];
+    const commitBody = bodyLines.join('\n');
+    const fullMessage = `${commitTitle}\n\n${commitBody}`;
+
+    let committed = false;
+    let commitHash: string | undefined;
+
+    if (autoCommit) {
+      await execAsync('git add -A', { cwd: workspaceRoot });
+      const safeMessage = fullMessage.replace(/"/g, '\\"');
+      await execAsync(`git commit -m "${safeMessage}"`, { cwd: workspaceRoot });
+      const { stdout: revOut } = await execAsync('git rev-parse --short HEAD', { cwd: workspaceRoot });
+      committed = true;
+      commitHash = revOut.trim();
+    }
+
+    return {
+      hasChanges: true,
+      commitType,
+      scope,
+      commitTitle,
+      commitBody,
+      fullMessage,
+      files,
+      committed,
+      commitHash,
+    };
+  }
+
+  /**
+   * Generates structured Release Notes & Changelog Markdown from recent Git commits.
+   */
+  async generateReleaseNotes(
+    workspaceRoot: string,
+    options?: { versionTag?: string; title?: string }
+  ): Promise<{
+    versionTag: string;
+    title: string;
+    markdown: string;
+    stats: {
+      totalCommits: number;
+      featuresCount: number;
+      fixesCount: number;
+      choresCount: number;
+    };
+  }> {
+    const gitDir = path.join(workspaceRoot, '.git');
+    if (!fs.existsSync(gitDir)) {
+      throw new Error('Workspace is not a Git repository.');
+    }
+
+    const versionTag = options?.versionTag || `v1.0.${Math.floor(Date.now() / 1000) % 1000}`;
+    const releaseTitle = options?.title || 'Production Sprint Release';
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    let commits: Array<{ hash: string; subject: string; author: string; date: string }> = [];
+    try {
+      const { stdout } = await execAsync('git log -n 25 --pretty=format:"%h|%s|%an|%ad" --date=short', {
+        cwd: workspaceRoot,
+      });
+      commits = stdout
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [hash, subject, author, date] = line.split('|');
+          return { hash: hash || '', subject: subject || '', author: author || '', date: date || '' };
+        });
+    } catch {
+      commits = [];
+    }
+
+    const features: string[] = [];
+    const fixes: string[] = [];
+    const perfs: string[] = [];
+    const chores: string[] = [];
+
+    for (const c of commits) {
+      const sub = c.subject.trim();
+      const lower = sub.toLowerCase();
+      const item = `- **${c.hash}**: ${sub} _(by ${c.author})_`;
+
+      if (lower.startsWith('feat')) {
+        features.push(item);
+      } else if (lower.startsWith('fix')) {
+        fixes.push(item);
+      } else if (lower.startsWith('perf')) {
+        perfs.push(item);
+      } else {
+        chores.push(item);
+      }
+    }
+
+    const mdSections: string[] = [
+      `# Release Notes: ${versionTag} — ${releaseTitle}`,
+      ``,
+      `> Generated on ${dateStr} for workspace repository.`,
+      ``,
+      `### 📊 Release Summary`,
+      `- **Version**: \`${versionTag}\``,
+      `- **Total Commits Included**: ${commits.length}`,
+      `- **Features**: ${features.length} | **Bug Fixes**: ${fixes.length} | **Maintenance & Chores**: ${chores.length + perfs.length}`,
+      ``,
+    ];
+
+    if (features.length > 0) {
+      mdSections.push(`### 🚀 New Features`);
+      mdSections.push(...features);
+      mdSections.push(``);
+    }
+
+    if (fixes.length > 0) {
+      mdSections.push(`### 🐛 Bug Fixes & Stability`);
+      mdSections.push(...fixes);
+      mdSections.push(``);
+    }
+
+    if (perfs.length > 0) {
+      mdSections.push(`### ⚡ Performance & Optimization`);
+      mdSections.push(...perfs);
+      mdSections.push(``);
+    }
+
+    if (chores.length > 0) {
+      mdSections.push(`### 🧹 Refactoring & Maintenance`);
+      mdSections.push(...chores);
+      mdSections.push(``);
+    }
+
+    if (commits.length === 0) {
+      mdSections.push(`_No prior commits found in git log._`);
+    }
+
+    const markdown = mdSections.join('\n');
+
+    return {
+      versionTag,
+      title: releaseTitle,
+      markdown,
+      stats: {
+        totalCommits: commits.length,
+        featuresCount: features.length,
+        fixesCount: fixes.length,
+        choresCount: chores.length + perfs.length,
+      },
+    };
+  }
 }
 
 export const workspaceManager = new WorkspaceManager();
