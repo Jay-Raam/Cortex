@@ -77,6 +77,23 @@ export function isValidGitBranchName(branch?: string): { valid: boolean; reason?
 }
 
 /**
+ * Sanitizes a Git commit title by stripping newlines, control characters, and clamping length.
+ */
+export function sanitizeCommitTitle(title?: string): string {
+  if (!title || typeof title !== 'string') {
+    return 'feat: autonomous agent updates via Cortex';
+  }
+
+  // Strip newlines, carriage returns, null bytes
+  const sanitized = title.replace(/[\r\n\0]/g, ' ').trim();
+  if (!sanitized) {
+    return 'feat: autonomous agent updates via Cortex';
+  }
+
+  return sanitized.substring(0, 200);
+}
+
+/**
  * Safely executes Git commands using direct execFile argument arrays.
  * Bypasses the system shell entirely to eliminate command injection vulnerabilities.
  */
@@ -84,14 +101,32 @@ export async function safeExecGit(
   args: string[],
   options: { cwd?: string; timeout?: number; env?: NodeJS.ProcessEnv } = {}
 ): Promise<{ stdout: string; stderr: string }> {
-  // Ensure all arguments are strings and pass directly to git executable
   const sanitizedArgs = args.map((a) => String(a));
 
   return execFileAsync('git', sanitizedArgs, {
     cwd: options.cwd,
     timeout: options.timeout || 45000,
     env: options.env || process.env,
-    maxBuffer: 10 * 1024 * 1024, // 10MB output buffer
+    maxBuffer: 10 * 1024 * 1024,
+    windowsHide: true,
+  });
+}
+
+/**
+ * Safely executes GitHub CLI (`gh`) commands using direct execFile argument arrays.
+ * Bypasses the system shell entirely to eliminate command injection vulnerabilities.
+ */
+export async function safeExecGh(
+  args: string[],
+  options: { cwd?: string; timeout?: number; env?: NodeJS.ProcessEnv } = {}
+): Promise<{ stdout: string; stderr: string }> {
+  const sanitizedArgs = args.map((a) => String(a));
+
+  return execFileAsync('gh', sanitizedArgs, {
+    cwd: options.cwd,
+    timeout: options.timeout || 25000,
+    env: options.env || process.env,
+    maxBuffer: 10 * 1024 * 1024,
     windowsHide: true,
   });
 }
