@@ -998,6 +998,13 @@ apiRouter.post('/cowork/workspaces/:id/create-github-pr', async (req: Request, r
   if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
 
   const { title = 'feat: autonomous agent updates via Cortex', body = '', branchName } = req.body;
+
+  if (branchName) {
+    const branchVal = isValidGitBranchName(branchName);
+    if (!branchVal.valid) {
+      return res.status(400).json({ error: `Invalid branch name: ${branchVal.reason}` });
+    }
+  }
   const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
 
   try {

@@ -22,7 +22,7 @@ import { coworkEngine } from '../src/server/cowork/engine';
 import { workspaceManager } from '../src/server/cowork/workspace-manager';
 import { executionRunner } from '../src/server/cowork/execution-runner';
 import { contextManager } from '../src/server/cowork/context-manager';
-import { User, Conversation, Message, AgentTask } from '../src/server/types';
+import { User, Conversation, Message, AgentTask, Workspace } from '../src/server/types';
 import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
 import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/language-generators';
 import { apiRouter } from '../src/server/routes/api';
@@ -30,7 +30,7 @@ import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, a
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
-import { isValidGitBranchName, safeExecGit } from '../src/server/security/git-security';
+import { isValidGitBranchName, safeExecGit, safeExecGh, sanitizeCommitTitle } from '../src/server/security/git-security';
 import {
   validateWorkspaceBindPath,
   canonicalizePath,
@@ -3643,6 +3643,163 @@ print(fibonacci(10))
         assert.ok(jsonCmd.error?.includes('Invalid branch'));
       } finally {
         server.close();
+      }
+    });
+  });
+
+  describe('32. Pull Request Generation Command Injection & Argument Defense', () => {
+    it('sanitizes commit titles, stripping newlines and clamping length', () => {
+      const multilineTitle = 'feat: add user authentication\n\nBREAKING CHANGE: changes schema\r\nadditional details';
+      const sanitized = sanitizeCommitTitle(multilineTitle);
+      assert.ok(!sanitized.includes('\n'), 'Must not contain line feed');
+      assert.ok(!sanitized.includes('\r'), 'Must not contain carriage return');
+      assert.ok(sanitized.startsWith('feat: add user authentication'));
+
+      // Empty fallback
+      assert.strictEqual(sanitizeCommitTitle(''), 'feat: autonomous agent updates via Cortex');
+      assert.strictEqual(sanitizeCommitTitle(undefined), 'feat: autonomous agent updates via Cortex');
+
+      // Clamping
+      const longTitle = 'a'.repeat(300);
+      assert.strictEqual(sanitizeCommitTitle(longTitle).length, 200);
+    });
+
+    it('rejects malicious branch names in createGitHubPullRequest with safety error', async () => {
+      const wsId = `ws_pr_test_${Date.now()}`;
+      const wsRoot = path.resolve(process.cwd(), 'workspaces', wsId);
+      fs.mkdirSync(wsRoot, { recursive: true });
+
+      // Init git repo
+      await safeExecGit(['init'], { cwd: wsRoot });
+      fs.writeFileSync(path.join(wsRoot, 'sample.txt'), 'hello cortex', 'utf8');
+      await safeExecGit(['add', '-A'], { cwd: wsRoot });
+      await safeExecGit(['commit', '-m', 'initial commit'], { cwd: wsRoot });
+
+      try {
+        await assert.rejects(
+          async () => {
+            await workspaceManager.createGitHubPullRequest(wsRoot, {
+              title: 'feat: malicious pr',
+              branchName: '--upload-pack=touch /tmp/pwned',
+            });
+          },
+          (err: any) => {
+            assert.ok(err.message.includes('Invalid branch name'));
+            return true;
+          }
+        );
+      } finally {
+        try {
+          fs.rmSync(wsRoot, { recursive: true, force: true });
+        } catch {}
+      }
+    });
+
+    it('creates PR branch safely without shell interpolation when valid inputs are provided', async () => {
+      const wsId = `ws_pr_safe_${Date.now()}`;
+      const wsRoot = path.resolve(process.cwd(), 'workspaces', wsId);
+      fs.mkdirSync(wsRoot, { recursive: true });
+
+      // Init git repo
+      await safeExecGit(['init'], { cwd: wsRoot });
+      fs.writeFileSync(path.join(wsRoot, 'index.js'), 'console.log("hello");', 'utf8');
+      await safeExecGit(['add', '-A'], { cwd: wsRoot });
+      await safeExecGit(['commit', '-m', 'initial commit'], { cwd: wsRoot });
+
+      // Add a modification
+      fs.writeFileSync(path.join(wsRoot, 'index.js'), 'console.log("hello world updated");', 'utf8');
+
+      try {
+        const result = await workspaceManager.createGitHubPullRequest(wsRoot, {
+          title: 'feat: safe update $(whoami)',
+          body: 'Automated description\n\nwith multiline markdown details.',
+          branchName: 'feature/safe-update-v1',
+          repoFullName: 'testowner/testrepo',
+        });
+
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(result.branchName, 'feature/safe-update-v1');
+        assert.ok(result.compareUrl?.includes('feature/safe-update-v1'));
+
+        // Check git status shows clean working directory on new branch
+        const { stdout: branchOut } = await safeExecGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: wsRoot });
+        assert.strictEqual(branchOut.trim(), 'feature/safe-update-v1');
+      } finally {
+        try {
+          fs.rmSync(wsRoot, { recursive: true, force: true });
+        } catch {}
+      }
+    });
+
+    it('rejects unauthenticated requests to create-github-pr with 401 Unauthorized', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/ws_dummy_123/create-github-pr`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'New PR' }),
+        });
+
+        assert.strictEqual(res.status, 401, 'Unauthenticated request must return 401');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('rejects malicious branch names in create-github-pr endpoint with 400 Bad Request', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const { accessToken } = generateTokens(testUser1);
+
+      // Create a test workspace in DB
+      const wsId = `ws_endpoint_pr_${Date.now()}`;
+      const dummyWorkspace: Workspace = {
+        id: wsId,
+        userId: testUser1.id,
+        name: 'PR Endpoint Test Workspace',
+        description: 'Testing create-github-pr endpoint security',
+        projectRoot: path.resolve(process.cwd(), 'workspaces', wsId),
+        isLocalBinding: false,
+        permissionMode: 'approve_plan',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.createWorkspace(dummyWorkspace);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${wsId}/create-github-pr`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title: 'feat: malicious payload',
+            branchName: 'branch; calc.exe;',
+          }),
+        });
+
+        assert.strictEqual(res.status, 400, 'Must reject malicious branch with 400');
+        const json = await res.json();
+        assert.ok(json.error?.includes('Invalid branch name'));
+      } finally {
+        server.close();
+        db.deleteWorkspace(wsId, testUser1.id);
       }
     });
   });
