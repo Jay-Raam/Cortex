@@ -26,7 +26,7 @@ import { User, Conversation, Message, AgentTask } from '../src/server/types';
 import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
 import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/language-generators';
 import { apiRouter } from '../src/server/routes/api';
-import { generateTokens } from '../src/server/auth/auth';
+import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret } from '../src/server/auth/auth';
 
 describe('Cortex AI Automated Test Suite', () => {
   let testUser1: User;
@@ -1409,7 +1409,7 @@ print(fibonacci(10))
       const { accessToken } = generateTokens(testUser1);
 
       try {
-        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/export-zip?token=${accessToken}`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/export-zip`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
         assert.strictEqual(res.status, 200, 'ZIP export endpoint must return 200 OK');
         assert.ok(res.headers.get('content-type')?.includes('application/zip'), 'Content-Type must be application/zip');
         assert.ok(
@@ -1455,7 +1455,7 @@ print(fibonacci(10))
 
         // Other user's token provided
         const { accessToken: u2Token } = generateTokens(testUser2);
-        const res2 = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/export-zip?token=${u2Token}`);
+        const res2 = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/export-zip`, { headers: { 'Authorization': `Bearer ${u2Token}` } });
         assert.strictEqual(res2.status, 404, 'Must reject unauthorized tenant access with 404');
       } finally {
         server.close();
@@ -2342,6 +2342,135 @@ print(fibonacci(10))
       // TestUser2 cannot access TestUser1 workspace by ID
       const user2WorkspaceLookup = db.getWorkspaceById(gitTestWs.id, testUser2.id);
       assert.strictEqual(user2WorkspaceLookup, undefined, 'User2 cannot access User1 workspace');
+    });
+  });
+
+  describe('24. Authentication Security Hardening & Regression Suite', () => {
+    it('fails closed when JWT_SECRET is missing or empty', () => {
+      const origSecret = process.env.JWT_SECRET;
+      try {
+        delete process.env.JWT_SECRET;
+
+        // Generating tokens must throw fatal error
+        assert.throws(
+          () => generateTokens(testUser1),
+          /FATAL: JWT_SECRET/i,
+          'Must throw fatal error failing closed when secret is missing'
+        );
+
+        // Verification must return null rather than accepting any token
+        const dummyToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
+        const verified = verifyAccessToken(dummyToken);
+        assert.strictEqual(verified, null, 'Must fail closed and return null on missing secret');
+
+        // Authentication of mock request must return null
+        const mockReq = { headers: { authorization: `Bearer ${dummyToken}` } } as any;
+        const user = authenticateRequest(mockReq);
+        assert.strictEqual(user, null, 'Must fail closed when secret is missing');
+      } finally {
+        process.env.JWT_SECRET = origSecret;
+      }
+    });
+
+    it('strictly rejects unauthenticated requests with 401 and never falls back to development user', () => {
+      // Seed usr_dev_primary in database to verify middleware does NOT fall back to it
+      db.createUser({
+        id: 'usr_dev_primary',
+        email: 'dev_primary_probe@nexa.ai',
+        name: 'Dev Primary Probe',
+        passwordHash: 'hash',
+        role: 'user',
+        createdAt: new Date().toISOString(),
+      });
+
+      const mockReq: any = { headers: {}, cookies: {} };
+      let statusCode = 0;
+      let jsonPayload: any = null;
+      let nextCalled = false;
+
+      const mockRes: any = {
+        status(code: number) {
+          statusCode = code;
+          return this;
+        },
+        json(data: any) {
+          jsonPayload = data;
+          return this;
+        },
+      };
+
+      authMiddleware(mockReq, mockRes, () => {
+        nextCalled = true;
+      });
+
+      assert.strictEqual(nextCalled, false, 'next() must not be called when unauthenticated');
+      assert.strictEqual(statusCode, 401, 'Must respond with 401 Unauthorized');
+      assert.ok(jsonPayload?.error?.includes('Unauthorized'), 'Error message must specify Unauthorized');
+      assert.strictEqual(mockReq.user, undefined, 'req.user must NOT fall back to usr_dev_primary');
+    });
+
+    it('rejects query-string tokens to prevent token leakage in URLs and access logs', () => {
+      const { accessToken } = generateTokens(testUser1);
+
+      // Create request with token ONLY in query parameter
+      const mockReq: any = {
+        headers: {},
+        cookies: {},
+        query: { token: accessToken },
+      };
+
+      const extracted = extractToken(mockReq);
+      assert.strictEqual(extracted, null, 'Query-string tokens must be ignored and return null');
+
+      const authenticated = authenticateRequest(mockReq);
+      assert.strictEqual(authenticated, null, 'Authentication must fail when token is only in query string');
+
+      let statusCode = 0;
+      const mockRes: any = {
+        status(code: number) {
+          statusCode = code;
+          return this;
+        },
+        json() {
+          return this;
+        },
+      };
+      let nextCalled = false;
+      authMiddleware(mockReq, mockRes, () => {
+        nextCalled = true;
+      });
+
+      assert.strictEqual(statusCode, 401, 'Must reject query token with 401');
+      assert.strictEqual(nextCalled, false);
+    });
+
+    it('authenticates requests strictly via Bearer header or cortex_access_token cookie', () => {
+      const { accessToken } = generateTokens(testUser1);
+
+      // 1. Bearer header
+      const reqBearer: any = {
+        headers: { authorization: `Bearer ${accessToken}` },
+      };
+      const userBearer = authenticateRequest(reqBearer);
+      assert.ok(userBearer, 'Must authenticate via Bearer header');
+      assert.strictEqual(userBearer?.id, testUser1.id);
+
+      // 2. Parsed cookie
+      const reqCookie: any = {
+        headers: {},
+        cookies: { cortex_access_token: accessToken },
+      };
+      const userCookie = authenticateRequest(reqCookie);
+      assert.ok(userCookie, 'Must authenticate via parsed cookie');
+      assert.strictEqual(userCookie?.id, testUser1.id);
+
+      // 3. Raw Cookie header string
+      const reqRawCookie: any = {
+        headers: { cookie: `session_id=abc; cortex_access_token=${accessToken}; theme=dark` },
+      };
+      const userRawCookie = authenticateRequest(reqRawCookie);
+      assert.ok(userRawCookie, 'Must authenticate via raw Cookie header');
+      assert.strictEqual(userRawCookie?.id, testUser1.id);
     });
   });
 
