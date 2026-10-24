@@ -9,6 +9,7 @@ import fs from 'fs';
 import net from 'net';
 import http from 'http';
 import cors from 'cors';
+import { getCorsOptions } from './security/cors-policy';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createYoga } from 'graphql-yoga';
@@ -54,12 +55,7 @@ export async function startDesktopServer(options: DesktopServerOptions = {}): Pr
   const app = express();
   const PORT = options.port || (await findAvailablePort(parseInt(process.env.PORT || '3000', 10)));
 
-  app.use(
-    cors({
-      origin: true,
-      credentials: true,
-    })
-  );
+  app.use(cors(getCorsOptions()));
   app.use(cookieParser());
   app.use(express.json({ limit: '30mb' }));
   app.use(express.urlencoded({ extended: true, limit: '30mb' }));

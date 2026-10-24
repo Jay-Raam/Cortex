@@ -29,6 +29,8 @@ import { apiRouter } from '../src/server/routes/api';
 import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret } from '../src/server/auth/auth';
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
+import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
+import cors from 'cors';
 
 describe('Cortex AI Automated Test Suite', () => {
   let testUser1: User;
@@ -2886,6 +2888,129 @@ print(fibonacci(10))
       assert.ok(protocols.href.includes('https'));
       assert.ok(!protocols.href.includes('javascript'), 'href must not permit javascript protocol');
       assert.ok(!protocols.href.includes('data'), 'href must not permit data protocol');
+    });
+  });
+
+
+  describe('28. CORS Origin Hardening & Credential Protection', () => {
+    it('authorizes same-origin and non-browser requests without Origin header', () => {
+      assert.strictEqual(isAllowedCorsOrigin(undefined), true);
+      assert.strictEqual(isAllowedCorsOrigin(''), true);
+    });
+
+    it('authorizes desktop Electron local file contexts (null, file://)', () => {
+      assert.strictEqual(isAllowedCorsOrigin('null'), true);
+      assert.strictEqual(isAllowedCorsOrigin('file://'), true);
+    });
+
+    it('authorizes local development loopback origins across ports', () => {
+      const allowedLoopbacks = [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173',
+        'https://localhost:8443',
+        'http://localhost',
+        'http://127.0.0.1',
+      ];
+
+      for (const origin of allowedLoopbacks) {
+        assert.strictEqual(
+          isAllowedCorsOrigin(origin),
+          true,
+          `Loopback origin "${origin}" must be authorized`
+        );
+      }
+    });
+
+    it('authorizes custom origins explicitly set in CORTEX_ALLOWED_ORIGINS environment variable', () => {
+      const origEnv = process.env.CORTEX_ALLOWED_ORIGINS;
+      try {
+        process.env.CORTEX_ALLOWED_ORIGINS = 'https://cortex.nexa.ai, https://app.cortex-dev.internal';
+
+        assert.strictEqual(isAllowedCorsOrigin('https://cortex.nexa.ai'), true);
+        assert.strictEqual(isAllowedCorsOrigin('https://app.cortex-dev.internal'), true);
+        assert.strictEqual(isAllowedCorsOrigin('https://unlisted.cortex.ai'), false);
+      } finally {
+        process.env.CORTEX_ALLOWED_ORIGINS = origEnv;
+      }
+    });
+
+    it('strictly rejects untrusted external origins and spoofed subdomains', () => {
+      const untrustedOrigins = [
+        'https://attacker.com',
+        'https://evil-phishing.org',
+        'http://localhost.attacker.com', // Subdomain spoofing
+        'http://127.0.0.1.attacker.com',
+        'http://attacker-localhost:3000',
+        'http://malicious.org:3000',
+        'https://fake-cortex.com',
+      ];
+
+      for (const origin of untrustedOrigins) {
+        assert.strictEqual(
+          isAllowedCorsOrigin(origin),
+          false,
+          `Untrusted origin "${origin}" must be rejected by CORS policy`
+        );
+      }
+    });
+
+    it('integrates with Express to reflect authorized origins and reject untrusted origins', async () => {
+      const app = express();
+      app.use(cors(getCorsOptions()));
+      app.get('/api/cors-probe', (_req, res) => {
+        res.json({ ok: true });
+      });
+
+      // Error handler for rejected CORS origins
+      app.use((err: any, _req: any, res: any, next: any) => {
+        if (err.message && err.message.includes('CORS Error')) {
+          return res.status(403).json({ error: 'CORS access denied' });
+        }
+        next(err);
+      });
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        // 1. Authorized loopback origin request
+        const resAllowed = await fetch(`http://127.0.0.1:${port}/api/cors-probe`, {
+          headers: {
+            Origin: 'http://localhost:5173',
+          },
+        });
+        assert.strictEqual(resAllowed.status, 200);
+        assert.strictEqual(
+          resAllowed.headers.get('access-control-allow-origin'),
+          'http://localhost:5173',
+          'Must set Access-Control-Allow-Origin to authorized origin'
+        );
+        assert.strictEqual(
+          resAllowed.headers.get('access-control-allow-credentials'),
+          'true',
+          'Must allow credentials for authorized origin'
+        );
+
+        // 2. Untrusted attacker origin request
+        const resBlocked = await fetch(`http://127.0.0.1:${port}/api/cors-probe`, {
+          headers: {
+            Origin: 'https://attacker.com',
+          },
+        });
+        assert.strictEqual(resBlocked.status, 403, 'Must reject untrusted origin with 403 Forbidden');
+        assert.strictEqual(
+          resBlocked.headers.get('access-control-allow-origin'),
+          null,
+          'Must NEVER reflect untrusted origin in Access-Control-Allow-Origin'
+        );
+      } finally {
+        server.close();
+      }
     });
   });
 

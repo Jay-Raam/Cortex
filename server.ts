@@ -6,6 +6,7 @@ try {
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
+import { getCorsOptions } from './src/server/security/cors-policy';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createYoga } from 'graphql-yoga';
@@ -20,10 +21,7 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
-  app.use(cors({
-    origin: true,
-    credentials: true,
-  }));
+  app.use(cors(getCorsOptions()));
   app.use(cookieParser());
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
