@@ -1575,3 +1575,63 @@ apiRouter.delete('/prompts/templates/:id', (req: Request, res: Response) => {
 
   res.json({ success: true });
 });
+
+
+// --- Workspace Semantic Git Commit & Release Notes Endpoints ---
+
+/**
+ * POST /api/cowork/workspaces/:id/git/semantic-commit
+ * Synthesize conventional commit message from workspace diffs and optionally commit
+ */
+apiRouter.post('/cowork/workspaces/:id/git/semantic-commit', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+  try {
+    const result = await workspaceManager.generateSemanticCommit(wsRoot, req.body.autoCommit === true);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to generate semantic commit' });
+  }
+});
+
+/**
+ * POST /api/cowork/workspaces/:id/git/release-notes
+ * Generate structured Release Notes & Changelog Markdown from recent Git commits
+ */
+apiRouter.post('/cowork/workspaces/:id/git/release-notes', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+  try {
+    const result = await workspaceManager.generateReleaseNotes(wsRoot, {
+      versionTag: req.body.versionTag,
+      title: req.body.title,
+    });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to generate release notes' });
+  }
+});

@@ -34,6 +34,7 @@ import {
   FileText,
   Download,
   GitPullRequest,
+  GitCommit,
 } from 'lucide-react';
 import { CoworkCanvasProps } from './types';
 import { UnifiedDiffViewer } from './UnifiedDiffViewer';
@@ -41,6 +42,7 @@ import { WorkspaceFileNode } from '../../server/types';
 import { downloadWorkspaceZip, createGitHubPrApi } from '../../lib/api';
 import { parseAnsiToHtml } from './ansi';
 import { CodeEditor } from './CodeEditor';
+import { GitReleaseModal } from './GitReleaseModal';
 
 function pathBasename(p: string): string {
   const parts = p.split(/[\/\\]/);
@@ -115,6 +117,8 @@ export const CoworkCanvas: React.FC<CoworkCanvasProps> = ({
       setIsDownloadingZip(false);
     }
   };
+
+  const [isGitReleaseModalOpen, setIsGitReleaseModalOpen] = useState(false);
 
   // GitHub Pull Request creation state
   const [isPrModalOpen, setIsPrModalOpen] = useState(false);
@@ -857,6 +861,19 @@ const [openTabs, setOpenTabs] = useState<string[]>([]);
                 </button>
               )}
 
+              {/* Git Semantic Commit & Release Assistant */}
+              {workspace?.id && (
+                <button
+                  type="button"
+                  onClick={() => setIsGitReleaseModalOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#141d2c] hover:bg-[#1a2638] text-slate-200 border border-[#233145] shadow-2xs transition-colors cursor-pointer"
+                  title="Semantic conventional commit & release notes generator"
+                >
+                  <GitCommit className="w-3 h-3 text-cyan-400" />
+                  <span className="hidden sm:inline">Release &amp; Commit</span>
+                </button>
+              )}
+
               {workspace?.id && (
                 <button
                   type="button"
@@ -1355,6 +1372,14 @@ const [openTabs, setOpenTabs] = useState<string[]>([]);
           </div>
         </div>
       )}
+
+      {/* Git Semantic Commit & Release Assistant Modal */}
+      <GitReleaseModal
+        isOpen={isGitReleaseModalOpen}
+        onClose={() => setIsGitReleaseModalOpen(false)}
+        workspaceId={workspace?.id || ''}
+        workspaceName={workspace?.name}
+      />
     </div>
   );
 };

@@ -2254,6 +2254,97 @@ print(fibonacci(10))
     });
   });
 
+  describe('23. Automated Semantic Git Commit & Release Notes Generator', () => {
+    let gitTestWs: any;
+    let gitWsRoot: string;
+
+    before(async () => {
+      gitTestWs = db.createWorkspace({
+        id: `ws_sem_git_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Semantic Git Project',
+        description: 'Workspace for automated semantic commit testing',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      gitWsRoot = workspaceManager.getWorkspaceRoot(gitTestWs);
+      if (!fs.existsSync(gitWsRoot)) {
+        fs.mkdirSync(gitWsRoot, { recursive: true });
+      }
+
+      const { execSync } = await import('node:child_process');
+      execSync('git init && git config user.email "bot@cortex.ai" && git config user.name "Cortex Bot"', {
+        cwd: gitWsRoot,
+      });
+
+      // Initial baseline commit
+      fs.writeFileSync(path.join(gitWsRoot, 'README.md'), '# Semantic Project\nInitial baseline.');
+      execSync('git add -A && git commit -m "chore(init): initial repository setup"', { cwd: gitWsRoot });
+    });
+
+    it('synthesizes conventional commit messages from workspace diffs and classifies types accurately', async () => {
+      // Create a new feature file in auth module
+      const authDir = path.join(gitWsRoot, 'src', 'auth');
+      if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+      fs.writeFileSync(path.join(authDir, 'jwt.ts'), 'export function verifyJwt() { return true; }');
+
+      const res = await workspaceManager.generateSemanticCommit(gitWsRoot, false);
+
+      assert.strictEqual(res.hasChanges, true);
+      assert.strictEqual(res.commitType, 'feat');
+      assert.strictEqual(res.scope, 'auth');
+      assert.ok(res.commitTitle.includes('feat(auth):'));
+      assert.ok(res.commitBody.includes('jwt.ts'));
+      assert.strictEqual(res.committed, false, 'Should not commit when autoCommit is false');
+      assert.ok(res.files.some((f) => f.file.includes('jwt.ts')));
+    });
+
+    it('performs atomic git commit when autoCommit flag is enabled', async () => {
+      const res = await workspaceManager.generateSemanticCommit(gitWsRoot, true);
+
+      assert.strictEqual(res.committed, true);
+      assert.ok(res.commitHash, 'Must return commit SHA hash');
+      assert.strictEqual(typeof res.commitHash, 'string');
+
+      // Calling again should report clean working tree
+      const cleanCheck = await workspaceManager.generateSemanticCommit(gitWsRoot, false);
+      assert.strictEqual(cleanCheck.hasChanges, false);
+      assert.ok(cleanCheck.commitTitle.includes('no changes'));
+    });
+
+    it('generates structured Release Notes & Changelog Markdown grouping commits', async () => {
+      const { execSync } = await import('node:child_process');
+      // Add a bug fix commit
+      fs.writeFileSync(path.join(gitWsRoot, 'src', 'auth', 'jwt.ts'), 'export function verifyJwt(token: string) { return !!token; }');
+      execSync('git add -A && git commit -m "fix(auth): prevent empty token bypass vulnerability"', { cwd: gitWsRoot });
+
+      // Add a performance commit
+      fs.writeFileSync(path.join(gitWsRoot, 'src', 'auth', 'cache.ts'), 'export const cache = new Map();');
+      execSync('git add -A && git commit -m "perf(auth): add in-memory token validation cache"', { cwd: gitWsRoot });
+
+      const releaseNotes = await workspaceManager.generateReleaseNotes(gitWsRoot, {
+        versionTag: 'v2.1.0',
+        title: 'Authentication Hardening Milestone',
+      });
+
+      assert.strictEqual(releaseNotes.versionTag, 'v2.1.0');
+      assert.strictEqual(releaseNotes.title, 'Authentication Hardening Milestone');
+      assert.ok(releaseNotes.markdown.includes('# Release Notes: v2.1.0 — Authentication Hardening Milestone'));
+      assert.ok(releaseNotes.markdown.includes('### 🚀 New Features'));
+      assert.ok(releaseNotes.markdown.includes('### 🐛 Bug Fixes & Stability'));
+      assert.ok(releaseNotes.markdown.includes('### ⚡ Performance & Optimization'));
+      assert.ok(releaseNotes.stats.totalCommits >= 4);
+      assert.ok(releaseNotes.stats.featuresCount >= 1);
+      assert.ok(releaseNotes.stats.fixesCount >= 1);
+    });
+
+    it('enforces multi-tenant data isolation on workspace git endpoints', () => {
+      // TestUser2 cannot access TestUser1 workspace by ID
+      const user2WorkspaceLookup = db.getWorkspaceById(gitTestWs.id, testUser2.id);
+      assert.strictEqual(user2WorkspaceLookup, undefined, 'User2 cannot access User1 workspace');
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');
