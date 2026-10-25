@@ -56,6 +56,12 @@ import {
   isReservedOrMulticastIp,
   RESTRICTED_PORTS,
 } from '../src/server/security/ssrf-validator';
+import {
+  securityHeadersMiddleware,
+  getDefaultSecurityHeaders,
+  DEFAULT_CSP_DIRECTIVES,
+  DEFAULT_PERMISSIONS_POLICY,
+} from '../src/server/security/security-headers';
 
 describe('Cortex AI Automated Test Suite', () => {
   let testUser1: User;
@@ -4265,6 +4271,91 @@ print(fibonacci(10))
       const hash = bcrypt.hashSync(testPass, salt);
       assert.strictEqual(bcrypt.compareSync(testPass, hash), true);
       assert.strictEqual(bcrypt.compareSync('wrong-password', hash), false);
+    });
+  });
+
+  describe('37. Standard HTTP Security Headers (Helmet, CSP & Clickjacking Defense)', () => {
+    it('provides standard baseline security headers dictionary', () => {
+      const headers = getDefaultSecurityHeaders();
+      assert.strictEqual(headers['X-Frame-Options'], 'DENY', 'Must set X-Frame-Options to DENY');
+      assert.strictEqual(headers['X-Content-Type-Options'], 'nosniff', 'Must enforce nosniff');
+      assert.strictEqual(headers['X-XSS-Protection'], '0', 'Must disable legacy buggy XSS auditor');
+      assert.strictEqual(headers['Referrer-Policy'], 'strict-origin-when-cross-origin');
+      assert.strictEqual(headers['Cross-Origin-Opener-Policy'], 'same-origin');
+      assert.strictEqual(headers['Cross-Origin-Resource-Policy'], 'same-origin');
+      assert.ok(headers['Permissions-Policy'].includes('camera=()'));
+      assert.ok(headers['Permissions-Policy'].includes('microphone=(self)'));
+      assert.ok(headers['Content-Security-Policy'].includes("default-src 'self'"));
+      assert.ok(headers['Content-Security-Policy'].includes("frame-ancestors 'none'"));
+    });
+
+    it('attaches standard security headers and removes X-Powered-By via Express middleware', async () => {
+      const app = express();
+      app.disable('x-powered-by');
+      app.use(securityHeadersMiddleware());
+      app.get('/test-headers', (_req, res) => {
+        res.json({ ok: true });
+      });
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/test-headers`);
+        assert.strictEqual(res.status, 200);
+
+        // Verify headers
+        assert.strictEqual(res.headers.get('x-frame-options'), 'DENY');
+        assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff');
+        assert.strictEqual(res.headers.get('x-xss-protection'), '0');
+        assert.strictEqual(res.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+        assert.strictEqual(res.headers.get('cross-origin-opener-policy'), 'same-origin');
+        assert.strictEqual(res.headers.get('cross-origin-resource-policy'), 'same-origin');
+        assert.ok(res.headers.get('permissions-policy')?.includes('camera=()'));
+        assert.ok(res.headers.get('content-security-policy')?.includes("frame-ancestors 'none'"));
+        assert.strictEqual(res.headers.get('x-powered-by'), null, 'X-Powered-By must not be present');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('sets Strict-Transport-Security (HSTS) when secure or forwarded as HTTPS', async () => {
+      const app = express();
+      app.use(securityHeadersMiddleware());
+      app.get('/test-hsts', (_req, res) => {
+        res.json({ secure: true });
+      });
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/test-hsts`, {
+          headers: {
+            'X-Forwarded-Proto': 'https',
+          },
+        });
+        assert.strictEqual(res.status, 200);
+        assert.strictEqual(
+          res.headers.get('strict-transport-security'),
+          'max-age=31536000; includeSubDomains'
+        );
+      } finally {
+        server.close();
+      }
+    });
+
+    it('supports customizing CSP and framing options', () => {
+      const sameoriginHeaders = getDefaultSecurityHeaders({
+        frameOptions: 'SAMEORIGIN',
+        enableCsp: false,
+      });
+      assert.strictEqual(sameoriginHeaders['X-Frame-Options'], 'SAMEORIGIN');
+      assert.strictEqual(sameoriginHeaders['Content-Security-Policy'], undefined);
     });
   });
   after(() => {

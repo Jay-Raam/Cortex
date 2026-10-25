@@ -7,6 +7,7 @@ import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import { getCorsOptions } from './src/server/security/cors-policy';
+import { securityHeadersMiddleware } from './src/server/security/security-headers';
 import { getUploadsStaticOptions } from './src/server/security/upload-policy';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
@@ -20,8 +21,10 @@ dotenv.config();
 
 async function startServer() {
   const app = express();
+  app.disable('x-powered-by');
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
+  app.use(securityHeadersMiddleware());
   app.use(cors(getCorsOptions()));
   app.use(cookieParser());
   app.use(express.json({ limit: '20mb' }));

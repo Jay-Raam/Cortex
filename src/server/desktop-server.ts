@@ -10,6 +10,7 @@ import net from 'net';
 import http from 'http';
 import cors from 'cors';
 import { getCorsOptions } from './security/cors-policy';
+import { securityHeadersMiddleware } from './security/security-headers';
 import { getUploadsStaticOptions } from './security/upload-policy';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
@@ -54,8 +55,10 @@ export async function startDesktopServer(options: DesktopServerOptions = {}): Pr
   url: string;
 }> {
   const app = express();
+  app.disable('x-powered-by');
   const PORT = options.port || (await findAvailablePort(parseInt(process.env.PORT || '3000', 10)));
 
+  app.use(securityHeadersMiddleware());
   app.use(cors(getCorsOptions()));
   app.use(cookieParser());
   app.use(express.json({ limit: '30mb' }));
