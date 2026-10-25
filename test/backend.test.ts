@@ -5393,6 +5393,115 @@ print(fibonacci(10))
     });
   });
 
+
+  describe('Test Suite 44: Git Semantic Commit Command Injection Mitigation (CWE-78)', () => {
+    let suiteWs: Workspace;
+    let gitWsRoot: string;
+
+    before(async () => {
+      gitWsRoot = path.resolve(process.cwd(), 'workspaces', `ws_git_inject_${Date.now()}`);
+      if (!fs.existsSync(gitWsRoot)) {
+        fs.mkdirSync(gitWsRoot, { recursive: true });
+      }
+
+      await safeExecGit(['init'], { cwd: gitWsRoot });
+      await safeExecGit(['config', 'user.email', 'security-bot@cortex.ai'], { cwd: gitWsRoot });
+      await safeExecGit(['config', 'user.name', 'Cortex Security Bot'], { cwd: gitWsRoot });
+
+      // Initial commit
+      fs.writeFileSync(path.join(gitWsRoot, 'README.md'), '# Injection Defense Test');
+      await safeExecGit(['add', '-A'], { cwd: gitWsRoot });
+      await safeExecGit(['commit', '-m', 'chore: initial commit'], { cwd: gitWsRoot });
+
+      suiteWs = db.createWorkspace({
+        id: `ws_git_inject_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Git Injection Test Workspace',
+        description: 'Test repository for semantic commit injection defense',
+        projectRoot: gitWsRoot,
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('Scenario A: Safely synthesizes and commits changes without shell interpolation', async () => {
+      const srcDir = path.join(gitWsRoot, 'src', 'calc');
+      if (!fs.existsSync(srcDir)) fs.mkdirSync(srcDir, { recursive: true });
+      fs.writeFileSync(path.join(srcDir, 'math.ts'), 'export function add(a: number, b: number) { return a + b; }');
+
+      const res = await workspaceManager.generateSemanticCommit(gitWsRoot, true);
+      assert.strictEqual(res.hasChanges, true);
+      assert.strictEqual(res.committed, true);
+      assert.ok(typeof res.commitHash === 'string' && res.commitHash.length >= 7);
+    });
+
+    it('Scenario B: Safely commits changes with filenames containing shell metacharacters and command injection payloads', async () => {
+      const evilMarkerPath = path.join(gitWsRoot, 'injected_marker.txt');
+      if (fs.existsSync(evilMarkerPath)) fs.unlinkSync(evilMarkerPath);
+
+      // Create a file with command injection characters in its name or content
+      const payloadFile = path.join(gitWsRoot, 'src', 'calc', 'util_$(echo injected).ts');
+      fs.writeFileSync(payloadFile, 'export const payload = "injected test string";');
+
+      const res = await workspaceManager.generateSemanticCommit(gitWsRoot, true);
+      assert.strictEqual(res.committed, true);
+      assert.ok(res.commitHash);
+
+      // Verify that the command injection marker was NEVER created
+      assert.strictEqual(fs.existsSync(evilMarkerPath), false, 'Command injection payload must not execute');
+
+      // Verify git log contains the commit cleanly
+      const log = await safeExecGit(['log', '-n', '1', '--pretty=format:%B'], { cwd: gitWsRoot });
+      assert.ok(log.stdout.includes('util_$(echo injected).ts'));
+    });
+
+    it('Scenario C: autoCommit=false accurately generates semantic metadata without modifying HEAD', async () => {
+      const beforeHash = (await safeExecGit(['rev-parse', 'HEAD'], { cwd: gitWsRoot })).stdout.trim();
+
+      fs.writeFileSync(path.join(gitWsRoot, 'src', 'calc', 'extra.ts'), 'export const extra = 42;');
+      const preview = await workspaceManager.generateSemanticCommit(gitWsRoot, false);
+
+      assert.strictEqual(preview.hasChanges, true);
+      assert.strictEqual(preview.committed, false);
+      assert.strictEqual(preview.commitHash, undefined);
+
+      const afterHash = (await safeExecGit(['rev-parse', 'HEAD'], { cwd: gitWsRoot })).stdout.trim();
+      assert.strictEqual(beforeHash, afterHash, 'HEAD must remain unchanged when autoCommit is false');
+    });
+
+    it('Scenario D: REST /api/cowork/workspaces/:id/semantic-commit executes safe atomic commit', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      try {
+        const tokens = generateTokens(testUser1);
+        fs.writeFileSync(path.join(gitWsRoot, 'src', 'calc', 'rest.ts'), 'export const rest = true;');
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${suiteWs.id}/git/semantic-commit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({ autoCommit: true }),
+        });
+
+        assert.strictEqual(res.status, 200);
+        const json: any = await res.json();
+        assert.strictEqual(json.success, true);
+        assert.strictEqual(json.committed, true);
+        assert.ok(typeof json.commitHash === 'string');
+      } finally {
+        server.close();
+      }
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');

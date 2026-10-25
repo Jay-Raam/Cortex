@@ -1,12 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { Workspace, WorkspaceFileNode, WorkspaceCheckpoint } from '../types';
 import { isValidGitBranchName, safeExecGit, safeExecGh, sanitizeCommitTitle } from '../security/git-security';
 import { validateSafeRegex, MAX_REGEX_EXECUTION_MS } from '../security/redos-validator';
-
-const execAsync = promisify(exec);
 
 const SENSITIVE_FILE_PATTERNS = [
   /^\.env(\..+)?$/i,
@@ -771,10 +767,10 @@ export class WorkspaceManager {
     }
 
     try {
-      const { stdout: branchOut } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout: branchOut } = await safeExecGit(['rev-parse', '--abbrev-ref', 'HEAD'], {
         cwd: workspaceRoot,
       });
-      const { stdout: statusOut } = await execAsync('git status --porcelain', {
+      const { stdout: statusOut } = await safeExecGit(['status', '--porcelain'], {
         cwd: workspaceRoot,
       });
 
@@ -1060,7 +1056,7 @@ export class WorkspaceManager {
       throw new Error('Workspace is not a Git repository. Initialize git first.');
     }
 
-    const { stdout: statusOut } = await execAsync('git status --porcelain -uall', { cwd: workspaceRoot });
+    const { stdout: statusOut } = await safeExecGit(['status', '--porcelain', '-uall'], { cwd: workspaceRoot });
     const lines = statusOut.split('\n').filter(Boolean);
     if (lines.length === 0) {
       return {
@@ -1116,7 +1112,7 @@ export class WorkspaceManager {
       commitType = 'chore';
     } else {
       try {
-        const { stdout: diffOut } = await execAsync('git diff HEAD', { cwd: workspaceRoot });
+        const { stdout: diffOut } = await safeExecGit(['diff', 'HEAD'], { cwd: workspaceRoot });
         const lowerDiff = diffOut.toLowerCase();
         if (lowerDiff.includes('fix') || lowerDiff.includes('error') || lowerDiff.includes('catch') || lowerDiff.includes('bug')) {
           commitType = 'fix';
@@ -1154,10 +1150,9 @@ export class WorkspaceManager {
     let commitHash: string | undefined;
 
     if (autoCommit) {
-      await execAsync('git add -A', { cwd: workspaceRoot });
-      const safeMessage = fullMessage.replace(/"/g, '\\"');
-      await execAsync(`git commit -m "${safeMessage}"`, { cwd: workspaceRoot });
-      const { stdout: revOut } = await execAsync('git rev-parse --short HEAD', { cwd: workspaceRoot });
+      await safeExecGit(['add', '-A'], { cwd: workspaceRoot });
+      await safeExecGit(['commit', '-m', fullMessage], { cwd: workspaceRoot });
+      const { stdout: revOut } = await safeExecGit(['rev-parse', '--short', 'HEAD'], { cwd: workspaceRoot });
       committed = true;
       commitHash = revOut.trim();
     }
@@ -1203,7 +1198,7 @@ export class WorkspaceManager {
 
     let commits: Array<{ hash: string; subject: string; author: string; date: string }> = [];
     try {
-      const { stdout } = await execAsync('git log -n 25 --pretty=format:"%h|%s|%an|%ad" --date=short', {
+      const { stdout } = await safeExecGit(['log', '-n', '25', '--pretty=format:%h|%s|%an|%ad', '--date=short'], {
         cwd: workspaceRoot,
       });
       commits = stdout
