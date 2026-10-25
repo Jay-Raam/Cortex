@@ -1,8 +1,10 @@
 import { createSchema } from 'graphql-yoga';
+import { GraphQLError } from 'graphql';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/database';
 import { modelCatalog } from '../providers/catalog';
 import { generateTokens, generateSecureRandomToken } from '../auth/auth';
+import { validateRegistrationInput, validateLoginInput } from '../security/auth-validator';
 import { coworkEngine } from '../cowork/engine';
 import { User, Conversation, Message, Workspace, WorkspaceArtifact, AgentTask } from '../types';
 
@@ -277,15 +279,22 @@ export const schema = createSchema({
     },
     Mutation: {
       register: (_: any, args: { email: string; name: string; password: string }) => {
-        const existing = db.getUserByEmail(args.email);
+        const validation = validateRegistrationInput(args);
+        if (!validation.valid) {
+          throw new GraphQLError(validation.error || 'Invalid registration input.');
+        }
+
+        const cleanEmail = validation.sanitizedEmail!;
+        const cleanName = validation.sanitizedName!;
+        const existing = db.getUserByEmail(cleanEmail);
         if (existing) {
-          throw new Error('An account with this email already exists.');
+          throw new GraphQLError('An account with this email already exists.');
         }
 
         const newUser: User = {
           id: `usr_${Date.now()}_${generateSecureRandomToken(8)}`,
-          email: args.email,
-          name: args.name,
+          email: cleanEmail,
+          name: cleanName,
           passwordHash: bcrypt.hashSync(args.password, 10),
           role: db.getUserCount() === 0 ? 'admin' : 'user',
           createdAt: new Date().toISOString(),
@@ -308,9 +317,15 @@ export const schema = createSchema({
       },
 
       login: (_: any, args: { email: string; password: string }) => {
-        const user = db.getUserByEmail(args.email);
+        const validation = validateLoginInput(args);
+        if (!validation.valid) {
+          throw new GraphQLError(validation.error || 'Invalid registration input.');
+        }
+
+        const cleanEmail = validation.sanitizedEmail!;
+        const user = db.getUserByEmail(cleanEmail);
         if (!user || !bcrypt.compareSync(args.password, user.passwordHash)) {
-          throw new Error('Invalid email or password.');
+          throw new GraphQLError('Invalid email or password.');
         }
 
         const { accessToken, refreshToken } = generateTokens(user);

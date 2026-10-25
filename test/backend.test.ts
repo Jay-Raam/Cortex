@@ -29,6 +29,9 @@ import { apiRouter } from '../src/server/routes/api';
 import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret, generateSecureRandomToken } from '../src/server/auth/auth';
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
+import { createYoga } from 'graphql-yoga';
+import { schema } from '../src/server/graphql/schema';
+import { validateRegistrationInput, validateLoginInput } from '../src/server/security/auth-validator';
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
 import { isValidGitBranchName, safeExecGit, safeExecGh, sanitizeCommitTitle } from '../src/server/security/git-security';
@@ -4690,6 +4693,180 @@ print(fibonacci(10))
         assert.strictEqual(goodRes.status, 200);
         const goodJson: any = await goodRes.json();
         assert.strictEqual(goodJson.totalMatches > 0, true);
+      } finally {
+        server.close();
+      }
+    });
+  });
+
+
+  describe('Test Suite 40: Input Validation, Email Syntax & Password Policy in GraphQL & REST (CWE-521 / CWE-20 / CWE-400)', () => {
+    it('Scenario A: Unit validation enforces email format, name bounds, and 8-128 character password constraints', () => {
+      // 1. Password length < 8 rejected
+      const shortPass = validateRegistrationInput({
+        email: 'user@example.com',
+        name: 'Valid Name',
+        password: 'short',
+      });
+      assert.strictEqual(shortPass.valid, false);
+      assert.strictEqual(shortPass.error?.includes('at least 8 characters'), true);
+
+      // 2. Password length > 128 rejected (bcrypt DoS mitigation)
+      const longPass = validateRegistrationInput({
+        email: 'user@example.com',
+        name: 'Valid Name',
+        password: 'a'.repeat(129),
+      });
+      assert.strictEqual(longPass.valid, false);
+      assert.strictEqual(longPass.error?.includes('must not exceed 128 characters'), true);
+
+      // 3. Invalid email rejected
+      assert.strictEqual(validateRegistrationInput({ email: 'invalid-email', name: 'Name', password: 'password123' }).valid, false);
+      assert.strictEqual(validateRegistrationInput({ email: 'user@', name: 'Name', password: 'password123' }).valid, false);
+      assert.strictEqual(validateRegistrationInput({ email: '@domain.com', name: 'Name', password: 'password123' }).valid, false);
+
+      // 4. Missing or empty name rejected
+      assert.strictEqual(validateRegistrationInput({ email: 'user@example.com', name: '', password: 'password123' }).valid, false);
+      assert.strictEqual(validateRegistrationInput({ email: 'user@example.com', name: '   ', password: 'password123' }).valid, false);
+      assert.strictEqual(validateRegistrationInput({ email: 'user@example.com', name: 'a'.repeat(101), password: 'password123' }).valid, false);
+
+      // 5. Valid registration input succeeds and canonicalizes email
+      const valid = validateRegistrationInput({
+        email: '  User.Test@Example.COM  ',
+        name: '  Test User  ',
+        password: 'ValidPassword123!',
+      });
+      assert.strictEqual(valid.valid, true);
+      assert.strictEqual(valid.sanitizedEmail, 'user.test@example.com');
+      assert.strictEqual(valid.sanitizedName, 'Test User');
+
+      // 6. Login validation
+      assert.strictEqual(validateLoginInput({ email: 'bad-email', password: 'password123' }).valid, false);
+      assert.strictEqual(validateLoginInput({ email: 'user@example.com', password: '' }).valid, false);
+      assert.strictEqual(validateLoginInput({ email: 'user@example.com', password: 'a'.repeat(129) }).valid, false);
+      assert.strictEqual(validateLoginInput({ email: 'user@example.com', password: 'validPassword123' }).valid, true);
+    });
+
+    it('Scenario B: GraphQL Mutation.register rejects weak passwords and malformed emails', async () => {
+      const yoga = createYoga({ schema, maskedErrors: false });
+
+      // 1. Weak password (length < 8)
+      const resWeak = await yoga.fetch('http://localhost/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            mutation {
+              register(email: "gql_weak@example.com", name: "GQL User", password: "123") {
+                token
+              }
+            }
+          `,
+        }),
+      });
+      const dataWeak: any = await resWeak.json();
+      assert.ok(dataWeak.errors && dataWeak.errors.length > 0);
+      assert.strictEqual(dataWeak.errors[0].message.includes('at least 8 characters'), true);
+
+      // 2. Malformed email
+      const resBadEmail = await yoga.fetch('http://localhost/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            mutation {
+              register(email: "not-an-email", name: "GQL User", password: "securePassword123!") {
+                token
+              }
+            }
+          `,
+        }),
+      });
+      const dataBadEmail: any = await resBadEmail.json();
+      assert.ok(dataBadEmail.errors && dataBadEmail.errors.length > 0);
+      assert.strictEqual(dataBadEmail.errors[0].message.includes('valid email'), true);
+
+      // 3. Valid registration succeeds
+      const uniqueEmail = `gql_valid_${Date.now()}@example.com`;
+      const resGood = await yoga.fetch('http://localhost/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            mutation {
+              register(email: "${uniqueEmail}", name: "GQL Valid User", password: "securePassword123!") {
+                token
+                refreshToken
+                user {
+                  id
+                  email
+                  name
+                }
+              }
+            }
+          `,
+        }),
+      });
+      const dataGood: any = await resGood.json();
+      assert.strictEqual(dataGood.errors, undefined);
+      assert.ok(dataGood.data?.register?.token);
+      assert.strictEqual(dataGood.data.register.user.email, uniqueEmail);
+    });
+
+    it('Scenario C: REST /api/auth/register rejects weak passwords and invalid emails with HTTP 400', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      try {
+        // 1. Password < 8 characters -> HTTP 400
+        const resWeak = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: 'rest_weak@example.com',
+            name: 'Rest User',
+            password: '12345',
+          }),
+        });
+        assert.strictEqual(resWeak.status, 400);
+        const jsonWeak: any = await resWeak.json();
+        assert.strictEqual(jsonWeak.error.includes('at least 8 characters'), true);
+
+        // 2. Malformed email -> HTTP 400
+        const resBadEmail = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: 'notanemail',
+            name: 'Rest User',
+            password: 'validPassword123!',
+          }),
+        });
+        assert.strictEqual(resBadEmail.status, 400);
+        const jsonBadEmail: any = await resBadEmail.json();
+        assert.strictEqual(jsonBadEmail.error.includes('valid email'), true);
+
+        // 3. Valid registration -> HTTP 200
+        const uniqueEmail = `rest_valid_${Date.now()}@example.com`;
+        const resGood = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: uniqueEmail,
+            name: 'Rest Valid User',
+            password: 'validPassword123!',
+          }),
+        });
+        assert.strictEqual(resGood.status, 200);
+        const jsonGood: any = await resGood.json();
+        assert.strictEqual(jsonGood.success, true);
+        assert.strictEqual(jsonGood.user.email, uniqueEmail);
       } finally {
         server.close();
       }
