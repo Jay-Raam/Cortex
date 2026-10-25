@@ -28,6 +28,7 @@ import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/la
 import { apiRouter } from '../src/server/routes/api';
 import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret, generateSecureRandomToken } from '../src/server/auth/auth';
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
+import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
 import { isValidGitBranchName, safeExecGit, safeExecGh, sanitizeCommitTitle } from '../src/server/security/git-security';
@@ -4535,6 +4536,166 @@ print(fibonacci(10))
       }
     });
   });
+
+  describe('Test Suite 39: Regular Expression Denial of Service (ReDoS) Defense (CWE-1333 / CWE-400 / CWE-835)', () => {
+    let testWsRoot: string;
+    let testWs: Workspace;
+
+    before(() => {
+      testWsRoot = path.resolve(process.cwd(), 'workspaces', 'ws_sec_redos_test');
+      if (!fs.existsSync(testWsRoot)) {
+        fs.mkdirSync(testWsRoot, { recursive: true });
+      }
+
+      // Populate sample source files
+      fs.writeFileSync(
+        path.join(testWsRoot, 'index.ts'),
+        'export const apiUrl = "https://api.cortex.ai";\nexport const timeout = 5000;\nfunction test() { return true; }\n',
+        'utf8'
+      );
+
+      testWs = db.createWorkspace({
+        id: `ws_redos_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'ReDoS Test Workspace',
+        description: 'ReDoS verification sandbox',
+        projectRoot: testWsRoot,
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    after(() => {
+      if (fs.existsSync(testWsRoot)) {
+        try {
+          fs.rmSync(testWsRoot, { recursive: true, force: true });
+        } catch {}
+      }
+    });
+
+    it('Scenario A: Identifies catastrophic backtracking patterns and complexity violations', () => {
+      // 1. Nested quantifiers (a+)+
+      assert.strictEqual(validateSafeRegex('(a+)+$').safe, false);
+      assert.strictEqual(validateSafeRegex('(a+)*$').safe, false);
+      assert.strictEqual(validateSafeRegex('([a-zA-Z0-9]+)+').safe, false);
+      assert.strictEqual(validateSafeRegex('((a+)+)').safe, false);
+
+      // 2. Ambiguous alternations with outer quantifiers
+      assert.strictEqual(validateSafeRegex('(a|a?)+$').safe, false);
+      assert.strictEqual(validateSafeRegex('(a|b+)+').safe, false);
+      assert.strictEqual(validateSafeRegex('(a|aa)+').safe, false);
+
+      // 3. Double quantifiers adjacent
+      assert.strictEqual(validateSafeRegex('a++').safe, false);
+
+      // 4. Excessive length (> 500 chars)
+      const oversized = 'a'.repeat(501);
+      assert.strictEqual(validateSafeRegex(oversized).safe, false);
+
+      // 5. Excessive group nesting (> 4 levels)
+      assert.strictEqual(validateSafeRegex('(((((a)))))').safe, false);
+
+      // 6. Unbalanced parentheses
+      assert.strictEqual(validateSafeRegex('(abc').safe, false);
+      assert.strictEqual(validateSafeRegex('abc)').safe, false);
+
+      // 7. Legitimate regex patterns must pass safely
+      assert.strictEqual(validateSafeRegex('export const (\\w+) = (.*);').safe, true);
+      assert.strictEqual(validateSafeRegex('function\\s+([a-zA-Z0-9_]+)\\s*\\(').safe, true);
+      assert.strictEqual(validateSafeRegex('\\b(import|export)\\b').safe, true);
+      assert.strictEqual(validateSafeRegex('^https?://[a-z0-9.-]+').safe, true);
+    });
+
+    it('Scenario B: WorkspaceManager.searchAndReplace rejects vulnerable patterns with Security Policy error', async () => {
+      await assert.rejects(
+        () =>
+          workspaceManager.searchAndReplace(testWsRoot, {
+            query: '(a+)+$',
+            isRegex: true,
+          }),
+        /Security Policy: Potentially vulnerable regular expression pattern detected/
+      );
+
+      await assert.rejects(
+        () =>
+          workspaceManager.searchAndReplace(testWsRoot, {
+            query: '(a|aa)+',
+            isRegex: true,
+          }),
+        /Security Policy: Potentially vulnerable regular expression pattern detected/
+      );
+    });
+
+    it('Scenario C: Prevents infinite loop on zero-width match regular expressions', async () => {
+      // Testing ^ (line start) - zero-width match
+      const startResult = await workspaceManager.searchAndReplace(testWsRoot, {
+        query: '^',
+        isRegex: true,
+        dryRun: true,
+      });
+      assert.strictEqual(startResult.totalMatches > 0, true);
+      assert.strictEqual(startResult.applied, false);
+
+      // Testing $ (line end) - zero-width match
+      const endResult = await workspaceManager.searchAndReplace(testWsRoot, {
+        query: '$',
+        isRegex: true,
+        dryRun: true,
+      });
+      assert.strictEqual(endResult.totalMatches > 0, true);
+    });
+
+    it('Scenario D: REST API endpoint returns HTTP 400 Bad Request on ReDoS queries', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        // ReDoS attempt -> 400 Bad Request
+        const badRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${testWs.id}/search-replace`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            query: '(a+)+$',
+            isRegex: true,
+          }),
+        });
+        assert.strictEqual(badRes.status, 400);
+        const badJson: any = await badRes.json();
+        assert.strictEqual(badJson.error.includes('Security Policy'), true);
+
+        // Valid safe regex query -> 200 OK
+        const goodRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${testWs.id}/search-replace`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            query: 'export const (\\w+) = (.*);',
+            isRegex: true,
+            dryRun: true,
+          }),
+        });
+        assert.strictEqual(goodRes.status, 200);
+        const goodJson: any = await goodRes.json();
+        assert.strictEqual(goodJson.totalMatches > 0, true);
+      } finally {
+        server.close();
+      }
+    });
+  });
+
 
   after(() => {
     // Purge temporary test workspaces from disk

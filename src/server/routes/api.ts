@@ -1673,6 +1673,12 @@ apiRouter.post('/cowork/workspaces/:id/search-replace', async (req: Request, res
     });
     res.json({ success: true, ...result });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to execute search and replace' });
+    const isClientError =
+      err.message &&
+      (err.message.includes('Security Policy') ||
+        err.message.includes('Invalid regular expression') ||
+        err.message.includes('pattern'));
+    const statusCode = isClientError ? 400 : 500;
+    res.status(statusCode).json({ error: err.message || 'Failed to execute search and replace' });
   }
 });
