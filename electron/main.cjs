@@ -3,14 +3,13 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
-const { executeSafeDesktopCommand, escapeHtml } = require('./security.cjs');
+const { executeSafeDesktopCommand, escapeHtml, isAllowedNavigationUrl } = require('./security.cjs');
 
 // ============================================================================
 // LOW-MEMORY & HARDWARE COMPATIBILITY OPTIMIZATIONS (Windows 10 & 11)
 // Tested for 4GB low-end laptops up to high-end workstations
 // ============================================================================
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
-app.commandLine.appendSwitch('disable-site-isolation-trials');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
@@ -140,6 +139,25 @@ function createWindow(initialUrl) {
   };
 
   loadTarget(initialUrl);
+
+  // Intercept in-window navigation and block untrusted redirects/links
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    if (!isAllowedNavigationUrl(navigationUrl, initialUrl)) {
+      event.preventDefault();
+      if (navigationUrl.startsWith('http:') || navigationUrl.startsWith('https:')) {
+        shell.openExternal(navigationUrl);
+      }
+    }
+  });
+
+  mainWindow.webContents.on('will-redirect', (event, navigationUrl) => {
+    if (!isAllowedNavigationUrl(navigationUrl, initialUrl)) {
+      event.preventDefault();
+      if (navigationUrl.startsWith('http:') || navigationUrl.startsWith('https:')) {
+        shell.openExternal(navigationUrl);
+      }
+    }
+  });
 
   // Open external links in user's default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

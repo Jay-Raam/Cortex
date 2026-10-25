@@ -151,3 +151,42 @@ export function escapeHtml(unsafe: unknown): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+/**
+ * Validates whether a navigation URL is authorized to load within the Electron BrowserWindow.
+ * Only internal application origins (e.g. localhost, 127.0.0.1, or the configured allowedOrigin) are permitted.
+ * Dangerous pseudo-protocols ('javascript:', 'data:', 'vbscript:', 'file:') and external web URLs are blocked.
+ */
+export function isAllowedNavigationUrl(targetUrl: unknown, allowedOrigin?: string): boolean {
+  if (!targetUrl || typeof targetUrl !== 'string') return false;
+
+  try {
+    const parsed = new URL(targetUrl);
+
+    // Strictly block dangerous pseudo-protocols
+    if (['javascript:', 'data:', 'vbscript:', 'file:'].includes(parsed.protocol)) {
+      return false;
+    }
+
+    if (allowedOrigin) {
+      try {
+        const allowed = new URL(allowedOrigin);
+        if (parsed.origin === allowed.origin) {
+          return true;
+        }
+      } catch {}
+    }
+
+    // Permit local loopback origins (dev server, desktop server)
+    if (
+      (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}

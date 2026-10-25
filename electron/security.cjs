@@ -113,9 +113,45 @@ function escapeHtml(unsafe) {
     .replace(/'/g, '&#39;');
 }
 
+
+function isAllowedNavigationUrl(targetUrl, allowedOrigin) {
+  if (!targetUrl || typeof targetUrl !== 'string') return false;
+
+  try {
+    const parsed = new URL(targetUrl);
+
+    // Strictly block dangerous pseudo-protocols
+    if (['javascript:', 'data:', 'vbscript:', 'file:'].includes(parsed.protocol)) {
+      return false;
+    }
+
+    if (allowedOrigin) {
+      try {
+        const allowed = new URL(allowedOrigin);
+        if (parsed.origin === allowed.origin) {
+          return true;
+        }
+      } catch {}
+    }
+
+    // Permit local loopback origins (dev server, desktop server)
+    if (
+      (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   ALLOWED_DESKTOP_BINARIES,
   validateDesktopCommand,
   executeSafeDesktopCommand,
+  isAllowedNavigationUrl,
   escapeHtml,
 };

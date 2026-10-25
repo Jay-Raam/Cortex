@@ -27,7 +27,7 @@ import { performWebSearch, formatSearchAugmentation } from '../src/server/servic
 import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/language-generators';
 import { apiRouter } from '../src/server/routes/api';
 import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret, generateSecureRandomToken } from '../src/server/auth/auth';
-import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml } from '../src/server/security/desktop-security';
+import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml, isAllowedNavigationUrl } from '../src/server/security/desktop-security';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -5501,6 +5501,49 @@ print(fibonacci(10))
       }
     });
   });
+
+describe('Test Suite 45: Electron In-Window Navigation Guards & Site Isolation', () => {
+    it('Scenario A: Permits loopback dev server and local origins', () => {
+      assert.strictEqual(isAllowedNavigationUrl('http://localhost:3000'), true);
+      assert.strictEqual(isAllowedNavigationUrl('http://localhost:5173/chat'), true);
+      assert.strictEqual(isAllowedNavigationUrl('http://127.0.0.1:4173/'), true);
+      assert.strictEqual(isAllowedNavigationUrl('http://127.0.0.1:8080/dashboard'), true);
+      assert.strictEqual(isAllowedNavigationUrl('https://localhost:8443/'), true);
+    });
+
+    it('Scenario B: Permits navigation matching allowedOrigin', () => {
+      assert.strictEqual(isAllowedNavigationUrl('http://app.internal:3000/app', 'http://app.internal:3000'), true);
+      assert.strictEqual(isAllowedNavigationUrl('https://desktop.cortex.internal/settings', 'https://desktop.cortex.internal'), true);
+      assert.strictEqual(isAllowedNavigationUrl('https://evil.cortex.internal', 'https://desktop.cortex.internal'), false);
+    });
+
+    it('Scenario C: Strictly blocks external domains and untrusted hosts', () => {
+      assert.strictEqual(isAllowedNavigationUrl('https://evil-hacker.com/malicious.html'), false);
+      assert.strictEqual(isAllowedNavigationUrl('http://attacker.org'), false);
+      assert.strictEqual(isAllowedNavigationUrl('https://google.com'), false);
+      assert.strictEqual(isAllowedNavigationUrl('https://github.com/login'), false);
+    });
+
+    it('Scenario D: Strictly rejects dangerous pseudo-protocols', () => {
+      assert.strictEqual(isAllowedNavigationUrl('javascript:alert(1)'), false);
+      assert.strictEqual(isAllowedNavigationUrl('javascript://alert(document.domain)'), false);
+      assert.strictEqual(isAllowedNavigationUrl('data:text/html,<script>alert(1)</script>'), false);
+      assert.strictEqual(isAllowedNavigationUrl('file:///C:/Windows/System32/calc.exe'), false);
+      assert.strictEqual(isAllowedNavigationUrl('file:///etc/passwd'), false);
+      assert.strictEqual(isAllowedNavigationUrl('vbscript:msgbox(1)'), false);
+    });
+
+    it('Scenario E: Handles malformed and non-string inputs safely without crashing', () => {
+      assert.strictEqual(isAllowedNavigationUrl(null), false);
+      assert.strictEqual(isAllowedNavigationUrl(undefined), false);
+      assert.strictEqual(isAllowedNavigationUrl(''), false);
+      assert.strictEqual(isAllowedNavigationUrl(12345), false);
+      assert.strictEqual(isAllowedNavigationUrl({}), false);
+      assert.strictEqual(isAllowedNavigationUrl('not-a-valid-url'), false);
+      assert.strictEqual(isAllowedNavigationUrl('://bad-url'), false);
+    });
+  });
+
 
   after(() => {
     // Purge temporary test workspaces from disk
