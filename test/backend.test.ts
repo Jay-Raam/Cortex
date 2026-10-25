@@ -4358,6 +4358,184 @@ print(fibonacci(10))
       assert.strictEqual(sameoriginHeaders['Content-Security-Policy'], undefined);
     });
   });
+
+  describe('Test Suite 38: Workspace Sensitive File Disclosure & Mutation Prevention (CWE-200 / CWE-538 / CWE-73)', () => {
+    let testWsRoot: string;
+
+    before(() => {
+      testWsRoot = path.resolve(process.cwd(), 'workspaces', 'ws_sec_sensitive_test');
+      if (!fs.existsSync(testWsRoot)) {
+        fs.mkdirSync(testWsRoot, { recursive: true });
+      }
+    });
+
+    after(() => {
+      if (fs.existsSync(testWsRoot)) {
+        try {
+          fs.rmSync(testWsRoot, { recursive: true, force: true });
+        } catch {}
+      }
+    });
+
+    it('Scenario A: Identifies sensitive paths including .git internals, SSH, AWS, and credential files', () => {
+      // Sensitive files & internals
+      assert.strictEqual(workspaceManager.isSensitiveFile('.env'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.env.production'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.git/config'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.git/hooks/pre-commit'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.ssh/id_rsa'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.ssh/authorized_keys'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.aws/credentials'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.npmrc'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.yarnrc.yml'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('credentials.json'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('service-account.json'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('client_secret.json'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('cert.pem'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('server.key'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('keystore.pfx'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('id_ed25519'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('id_ecdsa'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.bash_history'), true);
+      assert.strictEqual(workspaceManager.isSensitiveFile('.bashrc'), true);
+
+      // Safe application files
+      assert.strictEqual(workspaceManager.isSensitiveFile('src/index.ts'), false);
+      assert.strictEqual(workspaceManager.isSensitiveFile('package.json'), false);
+      assert.strictEqual(workspaceManager.isSensitiveFile('README.md'), false);
+      assert.strictEqual(workspaceManager.isSensitiveFile('components/Header.tsx'), false);
+      assert.strictEqual(workspaceManager.isSensitiveFile('docs/architecture.png'), false);
+    });
+
+    it('Scenario B: Blocks readFile on sensitive files unless allowSensitive is explicitly true', async () => {
+      // Create test sensitive files directly on disk
+      fs.writeFileSync(path.join(testWsRoot, '.env'), 'SECRET_API_KEY=supersecret', 'utf8');
+      const gitDir = path.join(testWsRoot, '.git');
+      fs.mkdirSync(gitDir, { recursive: true });
+      fs.writeFileSync(path.join(gitDir, 'config'), '[core]\n\trepositoryformatversion = 0', 'utf8');
+
+      // Attempting to read .env should throw
+      await assert.rejects(
+        () => workspaceManager.readFile(testWsRoot, '.env'),
+        /Security Policy: Access to sensitive file "\.env" is restricted by default\./
+      );
+
+      // Attempting to read .git/config should throw
+      await assert.rejects(
+        () => workspaceManager.readFile(testWsRoot, '.git/config'),
+        /Security Policy: Access to sensitive file "\.git\/config" is restricted by default\./
+      );
+
+      // Explicit allowSensitive permits read
+      const envRead = await workspaceManager.readFile(testWsRoot, '.env', true);
+      assert.strictEqual(envRead.content, 'SECRET_API_KEY=supersecret');
+    });
+
+    it('Scenario C: Blocks createFile, editFile, deleteFile, createDirectory, and applyPatch on sensitive targets', async () => {
+      // createFile
+      await assert.rejects(
+        () => workspaceManager.createFile(testWsRoot, '.git/hooks/pre-commit', '#!/bin/sh\nmalicious'),
+        /Security Policy: Writing to sensitive or restricted file "\.git\/hooks\/pre-commit" is prohibited\./
+      );
+      await assert.rejects(
+        () => workspaceManager.createFile(testWsRoot, '.npmrc', '//registry.npmjs.org/:_authToken=fake'),
+        /Security Policy: Writing to sensitive or restricted file "\.npmrc" is prohibited\./
+      );
+
+      // editFile
+      await assert.rejects(
+        () => workspaceManager.editFile(testWsRoot, '.env', 'TAMPERED=true'),
+        /Security Policy: Modifying sensitive or restricted file "\.env" is prohibited\./
+      );
+
+      // deleteFile
+      await assert.rejects(
+        () => workspaceManager.deleteFile(testWsRoot, '.env'),
+        /Security Policy: Deleting sensitive or restricted file "\.env" is prohibited\./
+      );
+
+      // createDirectory
+      await assert.rejects(
+        () => workspaceManager.createDirectory(testWsRoot, '.ssh'),
+        /Security Policy: Creating restricted directory "\.ssh" is prohibited\./
+      );
+
+      // applyPatch
+      await assert.rejects(
+        () => workspaceManager.applyPatch(testWsRoot, '.env', 'NEW_PATCH'),
+        /Security Policy: Patching sensitive or restricted file "\.env" is prohibited\./
+      );
+    });
+
+    it('Scenario D: REST file endpoints return HTTP 403 Forbidden on sensitive file access or creation', async () => {
+      const ws = db.createWorkspace({
+        id: `ws_sec_sensitive_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Sensitive File Test WS',
+        description: 'Sensitive test',
+        projectRoot: testWsRoot,
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        // 1. GET /cowork/workspaces/:id/file?path=.env -> HTTP 403
+        const getRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/file?path=.env`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        assert.strictEqual(getRes.status, 403);
+        const getJson: any = await getRes.json();
+        assert.strictEqual(getJson.error.includes('Security Policy'), true);
+
+        // 2. POST /cowork/workspaces/:id/file with path: .git/hooks/pre-commit -> HTTP 403
+        const postRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/file`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            path: '.git/hooks/pre-commit',
+            content: 'evil hook',
+          }),
+        });
+        assert.strictEqual(postRes.status, 403);
+        const postJson: any = await postRes.json();
+        assert.strictEqual(postJson.error.includes('Security Policy'), true);
+
+        // 3. Normal safe file creation -> HTTP 200
+        const normalPost = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ws.id}/file`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            path: 'src/config.ts',
+            content: 'export const config = {};',
+          }),
+        });
+        assert.strictEqual(normalPost.status, 200);
+        const normalJson: any = await normalPost.json();
+        assert.strictEqual(normalJson.success, true);
+      } finally {
+        server.close();
+      }
+    });
+  });
+
   after(() => {
     // Purge temporary test workspaces from disk
     const baseWorkspaces = path.resolve(process.cwd(), 'workspaces');
