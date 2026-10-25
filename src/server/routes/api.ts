@@ -8,7 +8,7 @@ import { db, ArenaVote } from '../db/database';
 import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
-import { executionRunner } from '../cowork/execution-runner';
+import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
 import { performWebSearch, formatSearchAugmentation } from '../services/search';
@@ -1117,23 +1117,37 @@ apiRouter.post('/cowork/workspaces/:id/terminal/execute', async (req: Request, r
   let user: User;
   try { user = getReqUser(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
   const { id } = req.params;
-  const { command, timeoutMs = 30000 } = req.body;
-  if (!command || typeof command !== 'string') {
-    return res.status(400).json({ error: 'command string is required' });
+  const { command, timeoutMs: rawTimeoutMs } = req.body;
+
+  const commandCheck = validateExecutionCommand(command);
+  if (!commandCheck.valid) {
+    return res.status(400).json({ error: commandCheck.error });
   }
 
   const workspace = db.getWorkspaceById(id, user.id);
   if (!workspace) return res.status(404).json({ error: 'Workspace not found or access denied' });
 
+  const abortController = new AbortController();
+  const onClientClose = () => {
+    if (!res.writableEnded) {
+      abortController.abort();
+    }
+  };
+  req.on('close', onClientClose);
+
   try {
     const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+    const timeoutMs = clampExecutionTimeout(rawTimeoutMs);
     const result = await executionRunner.executeCommand(command, {
       cwd: wsRoot,
       timeoutMs,
+      abortSignal: abortController.signal,
     });
     res.json({ success: result.exitCode === 0, result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  } finally {
+    req.off('close', onClientClose);
   }
 });
 
