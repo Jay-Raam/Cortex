@@ -20,7 +20,7 @@ import { modelCatalog } from '../src/server/providers/catalog';
 import { modelRouter } from '../src/server/providers/router';
 import { coworkEngine } from '../src/server/cowork/engine';
 import { workspaceManager } from '../src/server/cowork/workspace-manager';
-import { executionRunner } from '../src/server/cowork/execution-runner';
+import { executionRunner, isSensitiveEnvKey, ALLOWED_SYSTEM_ENV_VARS, SENSITIVE_ENV_KEYS } from '../src/server/cowork/execution-runner';
 import { contextManager } from '../src/server/cowork/context-manager';
 import { User, Conversation, Message, AgentTask, Workspace } from '../src/server/types';
 import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
@@ -4873,6 +4873,166 @@ print(fibonacci(10))
     });
   });
 
+
+
+  describe('Test Suite 41: Co-Work Execution Runner Environment Secret Leakage Defense (CWE-200 / CWE-214)', () => {
+    let suiteWs: Workspace;
+
+    before(() => {
+      const suiteWsRoot = path.resolve(process.cwd(), 'workspaces', `ws_env_leak_${Date.now()}`);
+      if (!fs.existsSync(suiteWsRoot)) {
+        fs.mkdirSync(suiteWsRoot, { recursive: true });
+      }
+
+      suiteWs = db.createWorkspace({
+        id: `ws_env_leak_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Execution Runner Env Leak Test Workspace',
+        description: 'Verifies environment scrubbing in execution runner',
+        projectRoot: suiteWsRoot,
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('Scenario A: Identifies sensitive environment keys and blocks dangerous patterns', () => {
+      // Sensitive patterns
+      assert.strictEqual(isSensitiveEnvKey('GH_TOKEN'), true);
+      assert.strictEqual(isSensitiveEnvKey('GITHUB_TOKEN'), true);
+      assert.strictEqual(isSensitiveEnvKey('OPENAI_API_KEY'), true);
+      assert.strictEqual(isSensitiveEnvKey('ANTHROPIC_API_KEY'), true);
+      assert.strictEqual(isSensitiveEnvKey('AWS_SECRET_ACCESS_KEY'), true);
+      assert.strictEqual(isSensitiveEnvKey('AZURE_CLIENT_SECRET'), true);
+      assert.strictEqual(isSensitiveEnvKey('CORTEX_ADMIN_PASSWORD'), true);
+      assert.strictEqual(isSensitiveEnvKey('CORTEX_ADMIN_EMAIL'), true);
+      assert.strictEqual(isSensitiveEnvKey('DATABASE_URL'), true);
+      assert.strictEqual(isSensitiveEnvKey('DB_PASSWORD'), true);
+      assert.strictEqual(isSensitiveEnvKey('JWT_SECRET'), true);
+      assert.strictEqual(isSensitiveEnvKey('REFRESH_TOKEN_SECRET'), true);
+      assert.strictEqual(isSensitiveEnvKey('USER_SESSION_TOKEN'), true);
+      assert.strictEqual(isSensitiveEnvKey('SSH_PRIVATE_KEY'), true);
+      assert.strictEqual(isSensitiveEnvKey('SSL_CERT_KEY'), true);
+
+      // Safe system variables
+      assert.strictEqual(isSensitiveEnvKey('PATH'), false);
+      assert.strictEqual(isSensitiveEnvKey('SHELL'), false);
+      assert.strictEqual(isSensitiveEnvKey('LANG'), false);
+      assert.strictEqual(isSensitiveEnvKey('TEMP'), false);
+      assert.strictEqual(isSensitiveEnvKey('CI'), false);
+      assert.strictEqual(isSensitiveEnvKey('NODE_ENV'), false);
+    });
+
+    it('Scenario B: getSanitizedEnv only permits allowed system keys and strips host secrets', () => {
+      const prevSecret = process.env.DATABASE_URL;
+      const prevGhToken = process.env.GH_TOKEN;
+      const prevCustomSecret = process.env.CUSTOM_TEST_SECRET_KEY;
+
+      try {
+        process.env.DATABASE_URL = 'postgres://admin:supersecret@localhost:5432/cortex';
+        process.env.GH_TOKEN = 'gho_dummy_token_for_test_123456';
+        process.env.CUSTOM_TEST_SECRET_KEY = 'super_confidential_key';
+        process.env.ARBITRARY_HOST_ENV_VAR = 'should_not_leak';
+
+        const sanitized = executionRunner.getSanitizedEnv();
+
+        // System keys should be preserved
+        const hasPath = typeof sanitized.PATH === 'string' || typeof sanitized.Path === 'string';
+        assert.strictEqual(hasPath, true, 'PATH must be preserved for executable resolution');
+
+        // Defaults should be set
+        assert.strictEqual(sanitized.CI, 'true');
+        assert.strictEqual(sanitized.FORCE_COLOR, '1');
+
+        // All server secrets must be completely absent
+        assert.strictEqual(sanitized.DATABASE_URL, undefined);
+        assert.strictEqual(sanitized.GH_TOKEN, undefined);
+        assert.strictEqual(sanitized.CUSTOM_TEST_SECRET_KEY, undefined);
+        assert.strictEqual(sanitized.ARBITRARY_HOST_ENV_VAR, undefined);
+      } finally {
+        if (prevSecret) process.env.DATABASE_URL = prevSecret; else delete process.env.DATABASE_URL;
+        if (prevGhToken) process.env.GH_TOKEN = prevGhToken; else delete process.env.GH_TOKEN;
+        if (prevCustomSecret) process.env.CUSTOM_TEST_SECRET_KEY = prevCustomSecret; else delete process.env.CUSTOM_TEST_SECRET_KEY;
+        delete process.env.ARBITRARY_HOST_ENV_VAR;
+      }
+    });
+
+    it('Scenario C: Filters sensitive keys from custom user/workspace environment options', () => {
+      const customEnv = {
+        PROJECT_NAME: 'cortex-frontend',
+        BUILD_MODE: 'release',
+        AWS_SECRET_ACCESS_KEY: 'leaked_aws_secret',
+        STRIPE_API_KEY: 'sk_test_12345',
+        SAFE_VARIABLE_NUM: '42',
+      };
+
+      const sanitized = executionRunner.getSanitizedEnv(customEnv);
+
+      // Safe custom keys are allowed
+      assert.strictEqual(sanitized.PROJECT_NAME, 'cortex-frontend');
+      assert.strictEqual(sanitized.BUILD_MODE, 'release');
+      assert.strictEqual(sanitized.SAFE_VARIABLE_NUM, '42');
+
+      // Sensitive keys are scrubbed
+      assert.strictEqual(sanitized.AWS_SECRET_ACCESS_KEY, undefined);
+      assert.strictEqual(sanitized.STRIPE_API_KEY, undefined);
+    });
+
+    it('Scenario D: Spawned child process execution does not leak host secrets in stdout/process.env', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(suiteWs);
+      const testSecretKey = 'CORTEX_TEST_SECRET_MUST_NOT_LEAK';
+      process.env[testSecretKey] = 'confidential_payload_123';
+
+      try {
+        const cmd = `node -e "console.log(process.env.CORTEX_TEST_SECRET_MUST_NOT_LEAK || 'PROTECTED')"`;
+        const result = await executionRunner.executeCommand(cmd, {
+          cwd: wsRoot,
+          timeoutMs: 5000,
+        });
+
+        assert.strictEqual(result.exitCode, 0);
+        assert.ok(result.stdout.includes('PROTECTED'), 'Child process must not see host environment secret');
+        assert.ok(!result.stdout.includes('confidential_payload_123'));
+      } finally {
+        delete process.env[testSecretKey];
+      }
+    });
+
+    it('Scenario E: Co-Work terminal REST endpoint executes with sanitized environment', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      const testSecretVal = 'terminal_endpoint_secret_token_abc';
+      process.env.SECRET_BEARER_TOKEN = testSecretVal;
+
+      try {
+        const tokens = generateTokens(testUser1);
+        const cmd = `node -e "console.log(process.env.SECRET_BEARER_TOKEN || 'CLEAN_NO_LEAK')"`;
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${suiteWs.id}/terminal/execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({ command: cmd }),
+        });
+
+        assert.strictEqual(res.status, 200);
+        const json: any = await res.json();
+        assert.strictEqual(json.success, true);
+        assert.ok(json.result.stdout.includes('CLEAN_NO_LEAK'));
+        assert.ok(!json.result.stdout.includes(testSecretVal));
+      } finally {
+        delete process.env.SECRET_BEARER_TOKEN;
+        server.close();
+      }
+    });
+  });
 
   after(() => {
     // Purge temporary test workspaces from disk
