@@ -32,6 +32,7 @@ import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
 import { validateRegistrationInput, validateLoginInput } from '../src/server/security/auth-validator';
+import { MemoryRateLimiter, loginRateLimiter, registerRateLimiter, defaultKeyGenerator } from '../src/server/security/rate-limiter';
 import { containsDangerousXssVectors, sanitizeMarkdownContent, safeMarkdownSanitizeSchema } from '../src/lib/sanitizer';
 import { isAllowedCorsOrigin, getCorsOptions } from '../src/server/security/cors-policy';
 import { isValidGitBranchName, safeExecGit, safeExecGh, sanitizeCommitTitle } from '../src/server/security/git-security';
@@ -5187,6 +5188,208 @@ print(fibonacci(10))
 
       // Child process was terminated by abort signal before 30000ms
       assert.ok(result.durationMs < 10000, 'Process should be terminated early via abort signal');
+    });
+  });
+
+
+  describe('Test Suite 43: Authentication Rate Limiting & Brute-Force Defense (CWE-307 / CWE-799)', () => {
+    it('Scenario A: MemoryRateLimiter tracks hits, computes remaining allowance, and blocks excess requests', () => {
+      const limiter = new MemoryRateLimiter({
+        windowMs: 2000,
+        max: 3,
+        message: 'Rate limit exceeded in test',
+      });
+
+      const mockReq = {
+        headers: {},
+        ip: '192.168.1.100',
+        body: {},
+      } as any;
+
+      // Request 1
+      const res1 = limiter.check(mockReq);
+      assert.strictEqual(res1.allowed, true);
+      assert.strictEqual(res1.remaining, 2);
+
+      // Request 2
+      const res2 = limiter.check(mockReq);
+      assert.strictEqual(res2.allowed, true);
+      assert.strictEqual(res2.remaining, 1);
+
+      // Request 3
+      const res3 = limiter.check(mockReq);
+      assert.strictEqual(res3.allowed, true);
+      assert.strictEqual(res3.remaining, 0);
+
+      // Request 4 -> Exceeded
+      const res4 = limiter.check(mockReq);
+      assert.strictEqual(res4.allowed, false);
+      assert.strictEqual(res4.remaining, 0);
+      assert.ok(res4.retryAfterSec >= 1);
+
+      // Reset
+      limiter.resetAll();
+      const res5 = limiter.check(mockReq);
+      assert.strictEqual(res5.allowed, true);
+      assert.strictEqual(res5.remaining, 2);
+    });
+
+    it('Scenario B: Middleware attaches standard RateLimit and Retry-After headers', async () => {
+      const testLimiter = new MemoryRateLimiter({
+        windowMs: 5000,
+        max: 2,
+        message: 'Throttled test',
+      });
+
+      const app = express();
+      app.use(express.json());
+      app.get('/test-throttle', testLimiter.middleware(), (_req, res) => {
+        res.json({ ok: true });
+      });
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      try {
+        // Attempt 1: 200 OK
+        const r1 = await fetch(`http://127.0.0.1:${port}/test-throttle`);
+        assert.strictEqual(r1.status, 200);
+        assert.strictEqual(r1.headers.get('RateLimit-Limit'), '2');
+        assert.strictEqual(r1.headers.get('RateLimit-Remaining'), '1');
+        assert.ok(r1.headers.get('RateLimit-Reset') !== null);
+
+        // Attempt 2: 200 OK
+        const r2 = await fetch(`http://127.0.0.1:${port}/test-throttle`);
+        assert.strictEqual(r2.status, 200);
+        assert.strictEqual(r2.headers.get('RateLimit-Remaining'), '0');
+
+        // Attempt 3: 429 Too Many Requests
+        const r3 = await fetch(`http://127.0.0.1:${port}/test-throttle`);
+        assert.strictEqual(r3.status, 429);
+        assert.strictEqual(r3.headers.get('RateLimit-Remaining'), '0');
+        assert.ok(r3.headers.get('Retry-After') !== null);
+        const json3: any = await r3.json();
+        assert.strictEqual(json3.error, 'Throttled test');
+        assert.ok(typeof json3.retryAfter === 'number');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario C: defaultKeyGenerator isolates attempts across separate accounts and client IPs', () => {
+      const req1 = {
+        headers: { 'x-forwarded-for': '203.0.113.195' },
+        body: { email: 'userA@example.com' },
+      } as any;
+
+      const req2 = {
+        headers: { 'x-forwarded-for': '203.0.113.195' },
+        body: { email: 'userB@example.com' },
+      } as any;
+
+      const req3 = {
+        headers: { 'x-forwarded-for': '198.51.100.42' },
+        body: { email: 'userA@example.com' },
+      } as any;
+
+      const key1 = defaultKeyGenerator(req1);
+      const key2 = defaultKeyGenerator(req2);
+      const key3 = defaultKeyGenerator(req3);
+
+      assert.strictEqual(key1, '203.0.113.195:usera@example.com');
+      assert.strictEqual(key2, '203.0.113.195:userb@example.com');
+      assert.strictEqual(key3, '198.51.100.42:usera@example.com');
+      assert.notStrictEqual(key1, key2);
+      assert.notStrictEqual(key1, key3);
+    });
+
+    it('Scenario D: REST /api/auth/login throttles excessive failed authentication attempts with HTTP 429', async () => {
+      loginRateLimiter.resetAll();
+
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      const targetEmail = `target_brute_${Date.now()}@example.com`;
+
+      try {
+        // Send 10 failed login requests (max limit)
+        for (let i = 0; i < 10; i++) {
+          const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: targetEmail,
+              password: 'wrongPassword123!',
+            }),
+          });
+          assert.strictEqual(res.status, 401);
+        }
+
+        // 11th request must be rejected with HTTP 429 Too Many Requests
+        const throttledRes = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: targetEmail,
+            password: 'wrongPassword123!',
+          }),
+        });
+
+        assert.strictEqual(throttledRes.status, 429);
+        const throttledJson: any = await throttledRes.json();
+        assert.ok(throttledJson.error.includes('Too many authentication attempts'));
+        assert.ok(throttledRes.headers.get('Retry-After') !== null);
+      } finally {
+        loginRateLimiter.resetAll();
+        server.close();
+      }
+    });
+
+    it('Scenario E: REST /api/auth/register enforces rate limits against bulk account creation', async () => {
+      const customRegisterLimiter = new MemoryRateLimiter({
+        windowMs: 5000,
+        max: 3,
+        message: 'Registration limit reached',
+        keyGenerator: (req: any) => req.ip || req.socket?.remoteAddress || '127.0.0.1',
+      });
+
+      const app = express();
+      app.use(express.json());
+      app.post('/test-register', customRegisterLimiter.middleware(), (_req, res) => {
+        res.json({ success: true });
+      });
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      try {
+        // 3 registrations allowed
+        for (let i = 0; i < 3; i++) {
+          const r = await fetch(`http://127.0.0.1:${port}/test-register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: `bulk_${i}@example.com` }),
+          });
+          assert.strictEqual(r.status, 200);
+        }
+
+        // 4th registration rejected with 429
+        const rBlocked = await fetch(`http://127.0.0.1:${port}/test-register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'bulk_blocked@example.com' }),
+        });
+
+        assert.strictEqual(rBlocked.status, 429);
+        const blockedJson: any = await rBlocked.json();
+        assert.strictEqual(blockedJson.error, 'Registration limit reached');
+      } finally {
+        server.close();
+      }
     });
   });
 
