@@ -4,6 +4,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Workspace, WorkspaceFileNode, WorkspaceCheckpoint } from '../types';
 import { isValidGitBranchName, safeExecGit, safeExecGh, sanitizeCommitTitle } from '../security/git-security';
+import { validateSafeRegex, MAX_REGEX_EXECUTION_MS } from '../security/redos-validator';
 
 const execAsync = promisify(exec);
 
@@ -428,12 +429,16 @@ export class WorkspaceManager {
 
     const files = flatten(tree);
 
+    const startTime = Date.now();
     for (const relPath of files) {
       if (this.isSensitiveFile(relPath)) continue;
       try {
         const { content } = await this.readFile(workspaceRoot, relPath);
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
+          if (Date.now() - startTime > MAX_REGEX_EXECUTION_MS) {
+            throw new Error('Security Policy: Regular expression search exceeded maximum execution time limit (ReDoS protection).');
+          }
           if (lines[i].toLowerCase().includes(q)) {
             results.push({
               file: relPath,
@@ -512,6 +517,14 @@ export class WorkspaceManager {
       };
     }
 
+    // Validate regular expression against ReDoS (catastrophic backtracking & complexity)
+    if (isRegex) {
+      const validation = validateSafeRegex(options.query);
+      if (!validation.safe) {
+        throw new Error(`Security Policy: ${validation.reason}`);
+      }
+    }
+
     // Build regular expression safely
     let patternStr = options.query;
     if (!isRegex) {
@@ -580,13 +593,21 @@ export class WorkspaceManager {
       diff: string;
     }> = [];
 
+    const startTime = Date.now();
+
     for (const relPath of targetFiles) {
+      if (Date.now() - startTime > MAX_REGEX_EXECUTION_MS) {
+        throw new Error('Security Policy: Regular expression search exceeded maximum execution time limit (ReDoS protection).');
+      }
       try {
         const { content: originalContent } = await this.readFile(workspaceRoot, relPath);
         const lines = originalContent.split('\n');
         let fileMatchCount = 0;
 
         for (let i = 0; i < lines.length; i++) {
+          if (Date.now() - startTime > MAX_REGEX_EXECUTION_MS) {
+            throw new Error('Security Policy: Regular expression search exceeded maximum execution time limit (ReDoS protection).');
+          }
           const lineText = lines[i];
           const lineRegex = new RegExp(patternStr, flags);
           let match: RegExpExecArray | null;
@@ -613,6 +634,12 @@ export class WorkspaceManager {
               });
             }
             if (!matchCase && !lineRegex.global) break;
+
+            // Guard against infinite loop on zero-width match (e.g. ^, $, lookaheads)
+            if (match[0].length === 0) {
+              lineRegex.lastIndex++;
+              if (lineRegex.lastIndex > lineText.length) break;
+            }
           }
         }
 
