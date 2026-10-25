@@ -25,6 +25,7 @@ import {
   MAX_SINGLE_FILE_SIZE_BYTES,
 } from '../security/upload-policy';
 import { validateRegistrationInput, validateLoginInput } from '../security/auth-validator';
+import { loginRateLimiter, registerRateLimiter } from '../security/rate-limiter';
 
 export const apiRouter = express.Router();
 
@@ -74,7 +75,7 @@ function setAuthCookie(res: Response, token: string) {
 /**
  * REST Authentication: Register with HTTP-Only Cookie
  */
-apiRouter.post('/auth/register', (req: Request, res: Response) => {
+apiRouter.post('/auth/register', registerRateLimiter.middleware(), (req: Request, res: Response) => {
   try {
     const validation = validateRegistrationInput(req.body);
     if (!validation.valid) {
@@ -123,7 +124,7 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
 /**
  * REST Authentication: Login with HTTP-Only Cookie
  */
-apiRouter.post('/auth/login', (req: Request, res: Response) => {
+apiRouter.post('/auth/login', loginRateLimiter.middleware(), (req: Request, res: Response) => {
   try {
     const validation = validateLoginInput(req.body);
     if (!validation.valid) {
