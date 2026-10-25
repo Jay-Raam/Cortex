@@ -24,6 +24,7 @@ import {
   checkUserUploadQuota,
   MAX_SINGLE_FILE_SIZE_BYTES,
 } from '../security/upload-policy';
+import { validateRegistrationInput, validateLoginInput } from '../security/auth-validator';
 
 export const apiRouter = express.Router();
 
@@ -75,24 +76,24 @@ function setAuthCookie(res: Response, token: string) {
  */
 apiRouter.post('/auth/register', (req: Request, res: Response) => {
   try {
-    const { email, name, password } = req.body;
-    if (!email || !name || !password) {
-      return res.status(400).json({ error: 'Email, name, and password are required.' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    const validation = validateRegistrationInput(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
     }
 
-    const existing = db.getUserByEmail(email);
+    const cleanEmail = validation.sanitizedEmail!;
+    const cleanName = validation.sanitizedName!;
+
+    const existing = db.getUserByEmail(cleanEmail);
     if (existing) {
       return res.status(400).json({ error: 'An account with this email already exists.' });
     }
 
     const newUser: User = {
       id: `usr_${Date.now()}_${generateSecureRandomToken(8)}`,
-      email,
-      name,
-      passwordHash: bcrypt.hashSync(password, 10),
+      email: cleanEmail,
+      name: cleanName,
+      passwordHash: bcrypt.hashSync(req.body.password, 10),
       role: db.getUserCount() === 0 ? 'admin' : 'user',
       createdAt: new Date().toISOString(),
     };
@@ -124,13 +125,14 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
  */
 apiRouter.post('/auth/login', (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
+    const validation = validateLoginInput(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
     }
 
-    const user = db.getUserByEmail(email);
-    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+    const cleanEmail = validation.sanitizedEmail!;
+    const user = db.getUserByEmail(cleanEmail);
+    if (!user || !bcrypt.compareSync(req.body.password, user.passwordHash)) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
