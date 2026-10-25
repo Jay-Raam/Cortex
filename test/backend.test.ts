@@ -20,7 +20,7 @@ import { modelCatalog } from '../src/server/providers/catalog';
 import { modelRouter } from '../src/server/providers/router';
 import { coworkEngine } from '../src/server/cowork/engine';
 import { workspaceManager } from '../src/server/cowork/workspace-manager';
-import { executionRunner, isSensitiveEnvKey, ALLOWED_SYSTEM_ENV_VARS, SENSITIVE_ENV_KEYS } from '../src/server/cowork/execution-runner';
+import { executionRunner, isSensitiveEnvKey, ALLOWED_SYSTEM_ENV_VARS, SENSITIVE_ENV_KEYS, clampExecutionTimeout, validateExecutionCommand, MIN_EXECUTION_TIMEOUT_MS, MAX_EXECUTION_TIMEOUT_MS, DEFAULT_EXECUTION_TIMEOUT_MS, MAX_COMMAND_LENGTH } from '../src/server/cowork/execution-runner';
 import { contextManager } from '../src/server/cowork/context-manager';
 import { User, Conversation, Message, AgentTask, Workspace } from '../src/server/types';
 import { performWebSearch, formatSearchAugmentation } from '../src/server/services/search';
@@ -5031,6 +5031,162 @@ print(fibonacci(10))
         delete process.env.SECRET_BEARER_TOKEN;
         server.close();
       }
+    });
+  });
+
+
+  describe('Test Suite 42: Terminal Execution Timeout Clamping & Resource Bounds (CWE-400 / CWE-770)', () => {
+    let suiteWs: Workspace;
+
+    before(() => {
+      const suiteWsRoot = path.resolve(process.cwd(), 'workspaces', `ws_timeout_guard_${Date.now()}`);
+      if (!fs.existsSync(suiteWsRoot)) {
+        fs.mkdirSync(suiteWsRoot, { recursive: true });
+      }
+
+      suiteWs = db.createWorkspace({
+        id: `ws_timeout_guard_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Timeout Guard Test Workspace',
+        description: 'Verifies timeout bounds and command validation in terminal runner',
+        projectRoot: suiteWsRoot,
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('Scenario A: clampExecutionTimeout constrains arbitrary, negative, and excessive timeout parameters', () => {
+      // Default fallback for invalid or non-positive values
+      assert.strictEqual(clampExecutionTimeout(0), DEFAULT_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout(-100), DEFAULT_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout(null), DEFAULT_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout(undefined), DEFAULT_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout('30000'), DEFAULT_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout(NaN), DEFAULT_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout(Infinity), DEFAULT_EXECUTION_TIMEOUT_MS);
+
+      // Clamping to minimum
+      assert.strictEqual(clampExecutionTimeout(10), MIN_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout(99), MIN_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout(100), 100);
+
+      // Normal valid ranges
+      assert.strictEqual(clampExecutionTimeout(5000), 5000);
+      assert.strictEqual(clampExecutionTimeout(60000), 60000);
+
+      // Clamping to maximum (120,000ms = 2 min)
+      assert.strictEqual(clampExecutionTimeout(150000), MAX_EXECUTION_TIMEOUT_MS);
+      assert.strictEqual(clampExecutionTimeout(999999999), MAX_EXECUTION_TIMEOUT_MS);
+    });
+
+    it('Scenario B: validateExecutionCommand enforces non-empty strings and bounds command length', () => {
+      // Invalid types and emptiness
+      assert.strictEqual(validateExecutionCommand(null).valid, false);
+      assert.strictEqual(validateExecutionCommand(undefined).valid, false);
+      assert.strictEqual(validateExecutionCommand(12345).valid, false);
+      assert.strictEqual(validateExecutionCommand('').valid, false);
+      assert.strictEqual(validateExecutionCommand('   ').valid, false);
+
+      // Valid commands
+      assert.strictEqual(validateExecutionCommand('echo hello').valid, true);
+      assert.strictEqual(validateExecutionCommand('npm test -- --reporter=spec').valid, true);
+
+      // Excessive command length (> 4096 characters)
+      const oversized = 'echo ' + 'x'.repeat(MAX_COMMAND_LENGTH + 10);
+      const res = validateExecutionCommand(oversized);
+      assert.strictEqual(res.valid, false);
+      assert.ok(res.error?.includes('exceeds maximum permitted length'));
+    });
+
+    it('Scenario C: ExecutionRunner automatically terminates runaway command when timeout fires', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(suiteWs);
+
+      // Run node command sleeping 5000ms with a 150ms clamped timeout
+      const result = await executionRunner.executeCommand('node -e "setTimeout(() => {}, 5000)"', {
+        cwd: wsRoot,
+        timeoutMs: 150,
+      });
+
+      assert.strictEqual(result.timedOut, true, 'Command must be flagged as timedOut');
+      assert.ok(result.durationMs >= 100, 'Duration should reflect timeout execution');
+    });
+
+    it('Scenario D: REST terminal endpoint rejects empty and oversized commands with HTTP 400 Bad Request', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      try {
+        const tokens = generateTokens(testUser1);
+
+        // 1. Missing / Empty command
+        const resEmpty = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${suiteWs.id}/terminal/execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({ command: '   ' }),
+        });
+        assert.strictEqual(resEmpty.status, 400);
+        const jsonEmpty: any = await resEmpty.json();
+        assert.ok(jsonEmpty.error.includes('empty'));
+
+        // 2. Oversized command (> 4096 chars)
+        const resOversized = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${suiteWs.id}/terminal/execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({ command: 'echo ' + 'z'.repeat(5000) }),
+        });
+        assert.strictEqual(resOversized.status, 400);
+        const jsonOversized: any = await resOversized.json();
+        assert.ok(jsonOversized.error.includes('exceeds maximum permitted length'));
+
+        // 3. Valid command with clamped timeout
+        const resValid = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${suiteWs.id}/terminal/execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({
+            command: 'node -e "console.log(777 + 222)"',
+            timeoutMs: 5000,
+          }),
+        });
+        assert.strictEqual(resValid.status, 200);
+        const jsonValid: any = await resValid.json();
+        assert.strictEqual(jsonValid.success, true);
+        assert.ok(jsonValid.result.stdout.includes('999'));
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario E: ExecutionRunner respects abortSignal to promptly terminate process tree', async () => {
+      const wsRoot = workspaceManager.getWorkspaceRoot(suiteWs);
+      const controller = new AbortController();
+
+      // Trigger abort after 100ms
+      setTimeout(() => {
+        controller.abort();
+      }, 100);
+
+      const result = await executionRunner.executeCommand('node -e "setTimeout(() => {}, 10000)"', {
+        cwd: wsRoot,
+        timeoutMs: 30000,
+        abortSignal: controller.signal,
+      });
+
+      // Child process was terminated by abort signal before 30000ms
+      assert.ok(result.durationMs < 10000, 'Process should be terminated early via abort signal');
     });
   });
 

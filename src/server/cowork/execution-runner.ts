@@ -110,6 +110,49 @@ export function isSensitiveEnvKey(key: string): boolean {
   return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
 }
 
+
+export const MIN_EXECUTION_TIMEOUT_MS = 100;
+export const DEFAULT_EXECUTION_TIMEOUT_MS = 30000; // 30 seconds
+export const MAX_EXECUTION_TIMEOUT_MS = 120000; // 2 minutes
+export const MAX_COMMAND_LENGTH = 4096; // 4 KB
+export const MAX_BUFFER_BYTES = 2 * 1024 * 1024; // 2 MB
+
+/**
+ * Clamps an execution timeout in milliseconds to safe bounds [MIN_EXECUTION_TIMEOUT_MS, MAX_EXECUTION_TIMEOUT_MS].
+ */
+export function clampExecutionTimeout(
+  timeoutMs: unknown,
+  defaultMs: number = DEFAULT_EXECUTION_TIMEOUT_MS
+): number {
+  if (typeof timeoutMs !== 'number' || isNaN(timeoutMs) || !isFinite(timeoutMs) || timeoutMs <= 0) {
+    return defaultMs;
+  }
+  return Math.min(
+    Math.max(Math.floor(timeoutMs), MIN_EXECUTION_TIMEOUT_MS),
+    MAX_EXECUTION_TIMEOUT_MS
+  );
+}
+
+/**
+ * Validates that a terminal command is safe in terms of structure and length bounds.
+ */
+export function validateExecutionCommand(command: unknown): { valid: boolean; error?: string } {
+  if (typeof command !== 'string') {
+    return { valid: false, error: 'Command must be a string' };
+  }
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return { valid: false, error: 'Command must not be empty' };
+  }
+  if (command.length > MAX_COMMAND_LENGTH) {
+    return {
+      valid: false,
+      error: `Command exceeds maximum permitted length of ${MAX_COMMAND_LENGTH} characters (received ${command.length})`,
+    };
+  }
+  return { valid: true };
+}
+
 export interface ExecutionOptions {
   cwd: string;
   timeoutMs?: number;
@@ -165,14 +208,16 @@ export class ExecutionRunner {
   ): Promise<ExecutionCommandResult> {
     const {
       cwd,
-      timeoutMs = 30000,
-      maxBufferBytes = 1024 * 1024, // 1MB
+      timeoutMs: rawTimeoutMs,
+      maxBufferBytes = MAX_BUFFER_BYTES,
       customEnv,
       env,
       onStdout,
       onStderr,
       abortSignal,
     } = options;
+
+    const timeoutMs = clampExecutionTimeout(rawTimeoutMs);
 
     const mergedCustomEnv = { ...(customEnv || {}), ...(env || {}) };
     const sanitizedEnv = this.getSanitizedEnv(mergedCustomEnv);
