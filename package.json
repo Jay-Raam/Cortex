@@ -1,7 +1,7 @@
 {
   "name": "cortex",
   "description": "Cortex - Next-Gen Multi-Model AI Chat & Autonomous Co-Work Platform",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
