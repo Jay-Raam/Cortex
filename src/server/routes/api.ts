@@ -849,6 +849,7 @@ apiRouter.post('/cowork/workspaces/import-folder', async (req: Request, res: Res
     if (!file.path || typeof file.path !== 'string') continue;
     const normalizedFilePath = file.path.replace(/\\/g, '/');
     if (normalizedFilePath.includes('..') || normalizedFilePath.includes('\0')) continue;
+    if (workspaceManager.isSensitiveFile(normalizedFilePath)) continue;
     try {
       const safePath = workspaceManager.resolveSafePath(wsRoot, normalizedFilePath);
       fs.mkdirSync(path.dirname(safePath), { recursive: true });
@@ -1040,6 +1041,7 @@ apiRouter.post('/cowork/workspaces/:id/sync-files', async (req: Request, res: Re
     if (!file.path || typeof file.path !== 'string') continue;
     const normalizedFilePath = file.path.replace(/\\/g, '/');
     if (normalizedFilePath.includes('..') || normalizedFilePath.includes('\0')) continue;
+    if (workspaceManager.isSensitiveFile(normalizedFilePath)) continue;
     try {
       const safePath = workspaceManager.resolveSafePath(wsRoot, normalizedFilePath);
       fs.mkdirSync(path.dirname(safePath), { recursive: true });
@@ -1072,6 +1074,9 @@ apiRouter.get('/cowork/workspaces/:id/file', async (req: Request, res: Response)
     const fileData = await workspaceManager.readFile(wsRoot, filePath);
     res.json({ success: true, ...fileData });
   } catch (err: any) {
+    if (err.message && err.message.includes('Security Policy')) {
+      return res.status(403).json({ error: err.message });
+    }
     res.status(404).json({ error: err.message });
   }
 });
@@ -1096,6 +1101,9 @@ apiRouter.post('/cowork/workspaces/:id/file', async (req: Request, res: Response
     const result = await workspaceManager.createFile(wsRoot, filePath, content);
     res.json(result);
   } catch (err: any) {
+    if (err.message && err.message.includes('Security Policy')) {
+      return res.status(403).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message });
   }
 });

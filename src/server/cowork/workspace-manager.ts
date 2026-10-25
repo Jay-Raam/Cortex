@@ -9,14 +9,39 @@ const execAsync = promisify(exec);
 
 const SENSITIVE_FILE_PATTERNS = [
   /^\.env(\..+)?$/i,
-  /\.pem$/i,
-  /\.key$/i,
-  /^id_rsa/i,
-  /^id_ed25519/i,
-  /\.pfx$/i,
-  /credentials\.json$/i,
+  /\.(pem|key|pfx|p12|pkcs12|crt|cer|der|kdbx)$/i,
+  /^id_(rsa|dsa|ecdsa|ed25519)/i,
+  /credentials(\.json)?$/i,
+  /service[-_]account.*\.json$/i,
+  /client[-_]secret.*\.json$/i,
   /secret/i,
 ];
+
+const RESTRICTED_DIRECTORIES = new Set([
+  '.git',
+  '.ssh',
+  '.aws',
+  '.gnupg',
+  '.docker',
+]);
+
+const EXACT_RESTRICTED_FILES = new Set([
+  '.npmrc',
+  '.yarnrc',
+  '.yarnrc.yml',
+  '.dockercfg',
+  '.gitconfig',
+  '.gitmodules',
+  '.git-credentials',
+  '.bash_history',
+  '.zsh_history',
+  '.bashrc',
+  '.zshrc',
+  '.profile',
+  'passwd',
+  'shadow',
+  'htpasswd',
+]);
 
 const IGNORED_DIRECTORIES = new Set([
   'node_modules',
@@ -90,7 +115,24 @@ export class WorkspaceManager {
    * Checks if a file path is considered sensitive (e.g. .env, private keys).
    */
   isSensitiveFile(relativePath: string): boolean {
-    const base = path.basename(relativePath);
+    if (!relativePath || typeof relativePath !== 'string') return true;
+
+    const normalized = relativePath.replace(/\\/g, '/');
+    const segments = normalized.split('/').filter(Boolean);
+
+    // 1. Block access to internal metadata directories and hidden dot directories containing secrets/hooks
+    if (segments.some((seg) => RESTRICTED_DIRECTORIES.has(seg.toLowerCase()))) {
+      return true;
+    }
+
+    const base = path.basename(normalized).toLowerCase();
+
+    // 2. Exact match restricted configuration and credential files
+    if (EXACT_RESTRICTED_FILES.has(base)) {
+      return true;
+    }
+
+    // 3. Sensitive regex patterns
     return SENSITIVE_FILE_PATTERNS.some((pattern) => pattern.test(base));
   }
 
@@ -191,8 +233,13 @@ export class WorkspaceManager {
   async createFile(
     workspaceRoot: string,
     relativePath: string,
-    content: string
+    content: string,
+    allowSensitive = false
   ): Promise<{ success: boolean; path: string; size: number }> {
+    if (!allowSensitive && this.isSensitiveFile(relativePath)) {
+      throw new Error(`Security Policy: Writing to sensitive or restricted file "${relativePath}" is prohibited.`);
+    }
+
     const fullPath = this.resolveSafePath(workspaceRoot, relativePath);
     const parentDir = path.dirname(fullPath);
 
@@ -216,8 +263,13 @@ export class WorkspaceManager {
   async editFile(
     workspaceRoot: string,
     relativePath: string,
-    content: string
+    content: string,
+    allowSensitive = false
   ): Promise<{ success: boolean; path: string; size: number }> {
+    if (!allowSensitive && this.isSensitiveFile(relativePath)) {
+      throw new Error(`Security Policy: Modifying sensitive or restricted file "${relativePath}" is prohibited.`);
+    }
+
     const fullPath = this.resolveSafePath(workspaceRoot, relativePath);
     if (!fs.existsSync(fullPath)) {
       throw new Error(`Cannot edit file: "${relativePath}" does not exist.`);
@@ -238,8 +290,13 @@ export class WorkspaceManager {
    */
   async deleteFile(
     workspaceRoot: string,
-    relativePath: string
+    relativePath: string,
+    allowSensitive = false
   ): Promise<{ success: boolean; path: string }> {
+    if (!allowSensitive && this.isSensitiveFile(relativePath)) {
+      throw new Error(`Security Policy: Deleting sensitive or restricted file "${relativePath}" is prohibited.`);
+    }
+
     const fullPath = this.resolveSafePath(workspaceRoot, relativePath);
     if (!fs.existsSync(fullPath)) {
       throw new Error(`Cannot delete: "${relativePath}" does not exist.`);
@@ -257,8 +314,13 @@ export class WorkspaceManager {
    */
   async createDirectory(
     workspaceRoot: string,
-    relativePath: string
+    relativePath: string,
+    allowSensitive = false
   ): Promise<{ success: boolean; path: string }> {
+    if (!allowSensitive && this.isSensitiveFile(relativePath)) {
+      throw new Error(`Security Policy: Creating restricted directory "${relativePath}" is prohibited.`);
+    }
+
     const fullPath = this.resolveSafePath(workspaceRoot, relativePath);
     await fs.promises.mkdir(fullPath, { recursive: true });
     return {
@@ -275,9 +337,14 @@ export class WorkspaceManager {
     relativePath: string,
     patchContent: string,
     targetSnippet?: string,
-    replacementSnippet?: string
+    replacementSnippet?: string,
+    allowSensitive = false
   ): Promise<{ success: boolean; path: string; diff: string }> {
-    const { content: originalContent } = await this.readFile(workspaceRoot, relativePath);
+    if (!allowSensitive && this.isSensitiveFile(relativePath)) {
+      throw new Error(`Security Policy: Patching sensitive or restricted file "${relativePath}" is prohibited.`);
+    }
+
+    const { content: originalContent } = await this.readFile(workspaceRoot, relativePath, allowSensitive);
     let newContent = '';
 
     if (targetSnippet && replacementSnippet !== undefined) {
