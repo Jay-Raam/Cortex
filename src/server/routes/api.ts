@@ -14,6 +14,7 @@ import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
 import { getGitBranchGraph } from '../cowork/git-graph';
 import { secretsVault } from '../security/secrets-vault';
+import { collabWebSocketManager } from '../cowork/collab-ws';
 import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
@@ -2051,5 +2052,92 @@ apiRouter.post('/cowork/workspaces/:id/secrets/import-env', async (req: Request,
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Failed to import .env secrets' });
+  }
+});
+
+
+// --- Workspace Live Collaborative Pair-Programming Endpoints ---
+
+/**
+ * GET /api/cowork/workspaces/:id/collab/session
+ * Retrieves current active collaboration session state and peer count.
+ */
+apiRouter.get('/cowork/workspaces/:id/collab/session', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  try {
+    const peers = collabWebSocketManager.getRoomPeers(workspace.id);
+    res.json({
+      success: true,
+      workspaceId: workspace.id,
+      activePeersCount: peers.length,
+      peers,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to retrieve collaboration session' });
+  }
+});
+
+/**
+ * POST /api/cowork/workspaces/:id/collab/invite
+ * Generates a cryptographic shareable invitation link for real-time collaboration.
+ */
+apiRouter.post('/cowork/workspaces/:id/collab/invite', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  try {
+    const inviteToken = collabWebSocketManager.generateInviteToken(workspace.id);
+    const inviteUrl = `/cowork?ws=${encodeURIComponent(workspace.id)}&shareToken=${encodeURIComponent(inviteToken)}`;
+    res.json({ success: true, inviteToken, inviteUrl, shareableUrl: inviteUrl });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to generate invite token' });
+  }
+});
+
+/**
+ * GET /api/cowork/workspaces/:id/collab/peers
+ * Returns list of active collaborator presence in workspace.
+ */
+apiRouter.get('/cowork/workspaces/:id/collab/peers', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  try {
+    const peers = collabWebSocketManager.getRoomPeers(workspace.id);
+    res.json({ success: true, peers });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch collaboration peers' });
   }
 });

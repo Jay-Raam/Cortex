@@ -747,3 +747,52 @@ export async function importWorkspaceSecretsApi(
   if (!res.ok) throw new Error(json.error || 'Failed to import secrets');
   return json;
 }
+
+
+export async function fetchCollabSessionApi(workspaceId: string): Promise<any> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${encodeURIComponent(workspaceId)}/collab/session`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to fetch collaboration session');
+  return json;
+}
+
+export async function createCollabInviteApi(workspaceId: string): Promise<{ inviteToken: string; inviteUrl: string }> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${encodeURIComponent(workspaceId)}/collab/invite`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to create collaboration invite');
+  return json;
+}
+
+export async function fetchCollabPeersApi(workspaceId: string): Promise<any[]> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${encodeURIComponent(workspaceId)}/collab/peers`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to fetch collaboration peers');
+  return json.peers || [];
+}

@@ -19,6 +19,8 @@ import { schema } from './graphql/schema';
 import { apiRouter } from './routes/api';
 import { authenticateRequest } from './auth/auth';
 import { db } from './db/database';
+import { terminalWebSocketManager } from './cowork/terminal-ws';
+import { collabWebSocketManager } from './cowork/collab-ws';
 
 dotenv.config();
 
@@ -134,6 +136,8 @@ export async function startDesktopServer(options: DesktopServerOptions = {}): Pr
 
   return new Promise((resolve, reject) => {
     const server = app.listen(PORT, '127.0.0.1', () => {
+      terminalWebSocketManager.attachToServer(server);
+      collabWebSocketManager.attachToServer(server);
       const actualPort = (server.address() as net.AddressInfo).port;
       const url = `http://127.0.0.1:${actualPort}`;
       console.log(`[Cortex Desktop Server] Online at: ${url}`);
