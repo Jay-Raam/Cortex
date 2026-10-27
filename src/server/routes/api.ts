@@ -15,6 +15,7 @@ import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generat
 import { getGitBranchGraph } from '../cowork/git-graph';
 import { secretsVault } from '../security/secrets-vault';
 import { collabWebSocketManager } from '../cowork/collab-ws';
+import { webhookEngine } from '../cowork/webhook-engine';
 import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
@@ -2140,4 +2141,86 @@ apiRouter.get('/cowork/workspaces/:id/collab/peers', async (req: Request, res: R
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch collaboration peers' });
   }
+});
+
+// --- Webhook & CI/CD Pipeline Automation Endpoints ---
+
+/**
+ * POST /api/webhooks/github
+ * Ingress endpoint for GitHub webhooks (PR reviews, issue triage, pushes, pings).
+ */
+apiRouter.post('/webhooks/github', async (req: Request, res: Response) => {
+  const event = (req.headers['x-github-event'] as string) || 'ping';
+  const deliveryId = (req.headers['x-github-delivery'] as string) || `gh_del_${Date.now()}`;
+  const signature = req.headers['x-hub-signature-256'] as string | undefined;
+
+  const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+
+  const delivery = await webhookEngine.handleGitHubWebhook(event, deliveryId, req.body, {
+    rawBody,
+    signature,
+    secret: process.env.GITHUB_WEBHOOK_SECRET,
+  });
+
+  if (delivery.status === 'failed' && delivery.error === 'HMAC_VERIFICATION_FAILED') {
+    return res.status(401).json({ error: 'Invalid HMAC signature', delivery });
+  }
+
+  res.status(200).json({ success: true, delivery });
+});
+
+/**
+ * POST /api/webhooks/gitlab
+ * Ingress endpoint for GitLab webhooks.
+ */
+apiRouter.post('/webhooks/gitlab', async (req: Request, res: Response) => {
+  const event = (req.headers['x-gitlab-event'] as string) || 'Push Hook';
+  const tokenHeader = req.headers['x-gitlab-token'] as string | undefined;
+
+  const delivery = await webhookEngine.handleGitLabWebhook(event, req.body, {
+    tokenHeader,
+    secret: process.env.GITLAB_WEBHOOK_SECRET,
+  });
+
+  if (delivery.status === 'failed' && delivery.error === 'TOKEN_VERIFICATION_FAILED') {
+    return res.status(401).json({ error: 'Invalid GitLab token', delivery });
+  }
+
+  res.status(200).json({ success: true, delivery });
+});
+
+/**
+ * GET /api/webhooks/deliveries
+ * Returns recent webhook delivery history for authenticated users.
+ */
+apiRouter.get('/webhooks/deliveries', async (req: Request, res: Response) => {
+  try {
+    getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
+  const deliveries = webhookEngine.getDeliveries(limit);
+  res.json({ success: true, deliveries });
+});
+
+/**
+ * POST /api/webhooks/simulate
+ * Simulates a webhook delivery locally for developer testing and CI/CD validation.
+ */
+apiRouter.post('/webhooks/simulate', async (req: Request, res: Response) => {
+  try {
+    getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { provider = 'github', event = 'ping', payload = {} } = req.body;
+  if (!['github', 'gitlab'].includes(provider)) {
+    return res.status(400).json({ error: 'Provider must be "github" or "gitlab"' });
+  }
+
+  const delivery = await webhookEngine.simulateEvent(provider, event, payload);
+  res.json({ success: true, delivery });
 });
