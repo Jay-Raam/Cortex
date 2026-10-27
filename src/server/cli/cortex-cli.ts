@@ -6,12 +6,13 @@ import { modelCatalog } from '../providers/catalog';
 import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
+import { codebaseIndexer } from '../cowork/code-indexer';
 import { User, Workspace, PermissionMode } from '../types';
 
 export const CORTEX_VERSION = '1.2.0';
 
 export interface CliParsedArgs {
-  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'unknown';
+  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'unknown';
   subcommand?: string;
   positional: string[];
   flags: {
@@ -99,6 +100,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       command = 'chat';
     } else if (primary === 'cowork') {
       command = 'cowork';
+    } else if (primary === 'search') {
+      command = 'search';
     } else {
       command = 'unknown';
     }
@@ -123,6 +126,7 @@ Usage: cortex <command> [options]
 Commands:
   chat <prompt>                  Stream a conversational AI response to stdout
   cowork --goal "<task>"         Execute an autonomous multi-file task in a workspace
+  search <query>                 Semantic code search across workspace using BM25 RAG
   status                         Display platform health, model catalog, and environment info
   version                        Print the current Cortex version
   help                           Display this help manual
@@ -519,6 +523,66 @@ export async function runCortexCli(
         return { exitCode: 1, output: '', error: errMsg };
       }
     }
+
+case 'search': {
+      const query = parsed.positional.slice(1).join(' ');
+      if (!query || query.trim().length === 0) {
+        const err = 'Error: Missing query for search command.\nUsage: cortex search "<query>" [--workspace <path>]';
+        stderr(err);
+        return { exitCode: 1, output: '', error: err };
+      }
+
+      try {
+        const user = getOrCreateCliUser();
+        const wsRoot = parsed.flags.workspace ? path.resolve(parsed.flags.workspace) : process.cwd();
+        const workspace: Workspace = {
+          id: `ws_search_${Date.now()}`,
+          userId: user.id,
+          name: 'Search Workspace',
+          description: 'CLI Search',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          projectRoot: wsRoot,
+          isLocalBinding: true,
+        };
+
+        const results = await codebaseIndexer.search(workspace, query.trim());
+
+        if (parsed.flags.json) {
+          const jsonText = JSON.stringify(results, null, 2);
+          stdout(jsonText);
+          return { exitCode: 0, output: jsonText, data: results };
+        }
+
+        if (results.length === 0) {
+          const noMatches = `No matching code snippets found for "${query}".`;
+          stdout(noMatches);
+          return { exitCode: 0, output: noMatches, data: [] };
+        }
+
+        const lines = [
+          `🔍 Found ${results.length} code match(es) for "${query}":\n`,
+        ];
+
+        for (const [idx, r] of results.entries()) {
+          lines.push(`[${idx + 1}] ${r.filePath} (Lines ${r.lineStart}-${r.lineEnd}) [Score: ${r.score}, Confidence: ${Math.round(r.confidence * 100)}%]`);
+          if (r.symbolName) {
+            lines.push(`    Symbol: ${r.symbolName} (${r.symbolType || 'symbol'})`);
+          }
+          lines.push(`    Matched Tokens: ${r.matchedTokens.join(', ')}`);
+          lines.push('    ----------------------------------------');
+        }
+
+        const formatted = lines.join('\n');
+        stdout(formatted);
+        return { exitCode: 0, output: formatted, data: results };
+      } catch (err: any) {
+        const errMsg = `Search error: ${err.message || String(err)}`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+    }
+
 
     default: {
       const cmdName = parsed.positional[0] || 'unknown';

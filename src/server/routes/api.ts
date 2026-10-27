@@ -8,6 +8,7 @@ import { db, ArenaVote } from '../db/database';
 import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
+import { codebaseIndexer } from '../cowork/code-indexer';
 import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
@@ -1697,5 +1698,70 @@ apiRouter.post('/cowork/workspaces/:id/search-replace', async (req: Request, res
         err.message.includes('pattern'));
     const statusCode = isClientError ? 400 : 500;
     res.status(statusCode).json({ error: err.message || 'Failed to execute search and replace' });
+  }
+});
+/**
+ * POST /api/cowork/workspaces/:id/index
+ * Triggers full or incremental codebase indexing for semantic retrieval
+ */
+apiRouter.post('/cowork/workspaces/:id/index', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  try {
+    const summary = await codebaseIndexer.indexWorkspace(workspace);
+    res.json({ success: true, ...summary });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to index workspace codebase' });
+  }
+});
+
+/**
+ * POST /api/cowork/workspaces/:id/semantic-search
+ * Searches workspace codebase using BM25 semantic scoring and token vectors
+ */
+apiRouter.post('/cowork/workspaces/:id/semantic-search', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const { query, topK } = req.body;
+  if (!query || typeof query !== 'string' || query.trim().length === 0) {
+    return res.status(400).json({ error: 'Query parameter is required' });
+  }
+
+  if (query.length > 500) {
+    return res.status(400).json({ error: 'Query string exceeds maximum limit of 500 characters' });
+  }
+
+  try {
+    const results = await codebaseIndexer.search(workspace, query.trim(), typeof topK === 'number' ? topK : 10);
+    res.json({
+      success: true,
+      query: query.trim(),
+      totalResults: results.length,
+      results,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to execute semantic codebase search' });
   }
 });
