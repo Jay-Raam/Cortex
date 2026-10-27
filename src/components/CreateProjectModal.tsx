@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   HardDrive,
   Sparkles,
+  LayoutTemplate,
+  Code2,
 } from 'lucide-react';
 
 interface CreateProjectModalProps {
@@ -22,6 +24,7 @@ interface CreateProjectModalProps {
     originalPath?: string
   ) => Promise<void>;
   onBindLocalPath: (folderPath: string, name?: string) => Promise<void>;
+  onScaffoldTemplate?: (templateId: string, name?: string, description?: string) => Promise<void>;
 }
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
@@ -30,12 +33,18 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onCreateBlank,
   onImportLocalFolder,
   onBindLocalPath,
+  onScaffoldTemplate,
 }) => {
-  const [activeTab, setActiveTab] = useState<'local' | 'blank'>('local');
+  const [activeTab, setActiveTab] = useState<'local' | 'templates' | 'blank'>('local');
 
   // Blank project state
   const [blankName, setBlankName] = useState('');
   const [blankDescription, setBlankDescription] = useState('');
+
+
+  // Template scaffolding state
+  const [selectedTemplate, setSelectedTemplate] = useState('react-vite-tailwind');
+  const [templateProjectName, setTemplateProjectName] = useState('cortex-app');
 
   // Local folder binding state
   const [localFolderPath, setLocalFolderPath] = useState('');
@@ -148,7 +157,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      if (activeTab === 'local') {
+if (activeTab === 'templates' && onScaffoldTemplate) {
+        await onScaffoldTemplate(selectedTemplate, templateProjectName.trim() || undefined);
+      } else if (activeTab === 'local') {
+
         if (pickedFiles.length > 0) {
           await onImportLocalFolder(
             localProjectName.trim() || pickedFolderName || 'Local Project',
@@ -227,6 +239,100 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1 no-scrollbar">
+          
+          {activeTab === 'templates' && (
+            <div className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Project Name
+                </label>
+                <input
+                  type="text"
+                  value={templateProjectName}
+                  onChange={(e) => setTemplateProjectName(e.target.value)}
+                  placeholder="e.g. my-cortex-app"
+                  className="w-full px-3 py-2 text-xs border border-[#E5E0D8] rounded-xl focus:outline-none focus:border-indigo-500 bg-slate-50/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Select Starter Template
+                </label>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    {
+                      id: 'react-vite-tailwind',
+                      name: 'React 19 + Vite 6 + Tailwind',
+                      badge: 'TypeScript / Frontend',
+                      desc: 'Modern SPA with Vite 6, Tailwind CSS & Lucide icons',
+                      iconBg: 'bg-cyan-50 border-cyan-200 text-cyan-600',
+                    },
+                    {
+                      id: 'fastapi-python',
+                      name: 'Python FastAPI + Pydantic v2',
+                      badge: 'Python / API',
+                      desc: 'Async REST API with automatic Swagger docs & Pytest',
+                      iconBg: 'bg-emerald-50 border-emerald-200 text-emerald-600',
+                    },
+                    {
+                      id: 'express-node',
+                      name: 'Express 5 + TypeScript + Zod',
+                      badge: 'Node.js / Backend',
+                      desc: 'Type-safe REST API with Zod validation & Vitest',
+                      iconBg: 'bg-amber-50 border-amber-200 text-amber-600',
+                    },
+                    {
+                      id: 'go-gin',
+                      name: 'Go 1.23 + Gin Framework',
+                      badge: 'Go / Microservice',
+                      desc: 'Ultra-fast HTTP microservice with clean architecture',
+                      iconBg: 'bg-blue-50 border-blue-200 text-blue-600',
+                    },
+                    {
+                      id: 'rust-axum',
+                      name: 'Rust + Axum + Tokio',
+                      badge: 'Rust / Systems',
+                      desc: 'Memory-safe async service with Axum & Tokio runtime',
+                      iconBg: 'bg-orange-50 border-orange-200 text-orange-600',
+                    },
+                  ].map((tpl) => (
+                    <div
+                      key={tpl.id}
+                      onClick={() => setSelectedTemplate(tpl.id)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                        selectedTemplate === tpl.id
+                          ? 'border-indigo-500 bg-indigo-50/40 shadow-xs'
+                          : 'border-[#E5E0D8] hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 ${tpl.iconBg}`}>
+                          <Code2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                            <span>{tpl.name}</span>
+                            <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                              {tpl.badge}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500">{tpl.desc}</div>
+                        </div>
+                      </div>
+                      <input
+                        type="radio"
+                        checked={selectedTemplate === tpl.id}
+                        onChange={() => setSelectedTemplate(tpl.id)}
+                        className="accent-indigo-600 w-4 h-4"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'local' ? (
             <>
               {/* Option 1: Native Folder Picker */}
@@ -380,7 +486,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               ) : (
                 <>
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{activeTab === 'local' ? 'Open Local Project' : 'Create Blank Project'}</span>
+                  <span>{activeTab === 'templates' ? 'Scaffold Project' : activeTab === 'local' ? 'Open Local Project' : 'Create Blank Project'}</span>
                 </>
               )}
             </button>

@@ -619,3 +619,35 @@ export async function searchAndReplaceApi(
   if (!res.ok) throw new Error(json.error || 'Search and replace failed');
   return json;
 }
+
+export async function getScaffoldTemplatesApi(): Promise<any[]> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/cowork/templates', { headers, credentials: 'include' });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to fetch templates');
+  return json.templates || [];
+}
+
+export async function scaffoldWorkspaceTemplateApi(
+  templateId: string,
+  name?: string,
+  description?: string
+): Promise<any> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch('/api/cowork/workspaces/scaffold', {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify({ templateId, name, description }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to scaffold project template');
+  return json;
+}

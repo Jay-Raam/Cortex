@@ -10,6 +10,7 @@ import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
 import { codebaseIndexer } from '../cowork/code-indexer';
 import { prReviewer } from '../cowork/pr-reviewer';
+import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
@@ -1796,5 +1797,68 @@ apiRouter.post('/cowork/workspaces/:id/review-diff', async (req: Request, res: R
     res.json({ success: true, report, ...report });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to review pull request diff' });
+  }
+});
+
+/**
+ * GET /api/cowork/templates
+ * Returns list of available project scaffolding templates
+ */
+apiRouter.get('/cowork/templates', (_req: Request, res: Response) => {
+  const templates = scaffoldEngine.getTemplates();
+  res.json({ success: true, templates });
+});
+
+/**
+ * POST /api/cowork/workspaces/scaffold
+ * Scaffolds a full-stack project template into a new workspace
+ */
+apiRouter.post('/cowork/workspaces/scaffold', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { templateId, name, description } = req.body || {};
+  if (!templateId || typeof templateId !== 'string') {
+    return res.status(400).json({ error: 'templateId string is required' });
+  }
+
+  const template = scaffoldEngine.getTemplateById(templateId);
+  if (!template) {
+    return res.status(400).json({ error: `Unknown template: ${templateId}` });
+  }
+
+  const projectName = (name && typeof name === 'string' ? name : template.id)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '-');
+
+  const workspaceId = `ws_scaffold_${Date.now()}`;
+  const wsDir = path.resolve(process.cwd(), 'workspaces', workspaceId);
+
+  try {
+    const result = await scaffoldEngine.scaffoldProject(wsDir, template.id, projectName);
+
+    const workspace: Workspace = db.createWorkspace({
+      id: workspaceId,
+      userId: user.id,
+      name: name && typeof name === 'string' && name.trim() ? name.trim() : template.name,
+      description: description && typeof description === 'string' && description.trim() ? description.trim() : template.description,
+      projectRoot: wsDir,
+      isLocalBinding: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.status(201).json({
+      success: true,
+      workspace,
+      result,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to scaffold project template' });
   }
 });
