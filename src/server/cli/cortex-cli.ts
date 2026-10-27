@@ -7,12 +7,13 @@ import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
 import { codebaseIndexer } from '../cowork/code-indexer';
+import { prReviewer } from '../cowork/pr-reviewer';
 import { User, Workspace, PermissionMode } from '../types';
 
 export const CORTEX_VERSION = '1.2.0';
 
 export interface CliParsedArgs {
-  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'unknown';
+  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'unknown';
   subcommand?: string;
   positional: string[];
   flags: {
@@ -69,6 +70,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       flags.goal = argv[++i];
     } else if (arg === '--workspace' || arg === '-w') {
       flags.workspace = argv[++i];
+    } else if (arg === '--base' || arg === '-b') {
+      flags.base = argv[++i];
     } else if (arg === '--permission') {
       flags.permission = argv[++i] as 'A' | 'B' | 'C';
     } else if (arg.startsWith('--model=')) {
@@ -102,6 +105,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       command = 'cowork';
     } else if (primary === 'search') {
       command = 'search';
+    } else if (primary === 'review') {
+      command = 'review';
     } else {
       command = 'unknown';
     }
@@ -127,6 +132,7 @@ Commands:
   chat <prompt>                  Stream a conversational AI response to stdout
   cowork --goal "<task>"         Execute an autonomous multi-file task in a workspace
   search <query>                 Semantic code search across workspace using BM25 RAG
+  review [--workspace <path>]    Automated PR & Git diff code quality and security review
   status                         Display platform health, model catalog, and environment info
   version                        Print the current Cortex version
   help                           Display this help manual
@@ -578,6 +584,42 @@ case 'search': {
         return { exitCode: 0, output: formatted, data: results };
       } catch (err: any) {
         const errMsg = `Search error: ${err.message || String(err)}`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+    }
+
+
+case 'review': {
+      try {
+        const user = getOrCreateCliUser();
+        const wsRoot = parsed.flags.workspace ? path.resolve(parsed.flags.workspace) : process.cwd();
+        const workspace: Workspace = {
+          id: `ws_review_${Date.now()}`,
+          userId: user.id,
+          name: 'Review Workspace',
+          description: 'CLI PR Review',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          projectRoot: wsRoot,
+          isLocalBinding: true,
+        };
+
+        const report = await prReviewer.reviewWorkspaceDiff(workspace, {
+          baseBranch: parsed.flags.base,
+        });
+
+        if (parsed.flags.json) {
+          const jsonText = JSON.stringify(report, null, 2);
+          stdout(jsonText);
+          return { exitCode: 0, output: jsonText, data: report };
+        }
+
+        stdout(report.markdownReport);
+        const exitCode = report.status === 'needs_security_review' ? 1 : 0;
+        return { exitCode, output: report.markdownReport, data: report };
+      } catch (err: any) {
+        const errMsg = `Review error: ${err.message || String(err)}`;
         stderr(errMsg);
         return { exitCode: 1, output: '', error: errMsg };
       }
