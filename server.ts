@@ -16,6 +16,7 @@ import { schema } from './src/server/graphql/schema';
 import { apiRouter } from './src/server/routes/api';
 import { authenticateRequest } from './src/server/auth/auth';
 import { db } from './src/server/db/database';
+import { terminalWebSocketManager } from './src/server/cowork/terminal-ws';
 
 dotenv.config();
 
@@ -81,11 +82,14 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Cortex AI] Server listening on port ${PORT} (http://localhost:${PORT})`);
     console.log(`[Cortex AI] GraphQL Yoga endpoint: http://localhost:${PORT}/graphql`);
     console.log(`[Cortex AI] REST / SSE API: http://localhost:${PORT}/api`);
+    console.log(`[Cortex AI] Terminal WebSocket: ws://localhost:${PORT}/api/ws/terminal/:workspaceId`);
   });
+
+  terminalWebSocketManager.attachToServer(server);
 }
 
 startServer().catch((err) => {
