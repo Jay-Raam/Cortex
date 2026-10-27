@@ -9,12 +9,13 @@ import { workspaceManager } from '../cowork/workspace-manager';
 import { codebaseIndexer } from '../cowork/code-indexer';
 import { prReviewer } from '../cowork/pr-reviewer';
 import { scaffoldEngine } from '../cowork/scaffold-engine';
+import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
 import { User, Workspace, PermissionMode } from '../types';
 
 export const CORTEX_VERSION = '1.2.0';
 
 export interface CliParsedArgs {
-  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'unknown';
+  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'unknown';
   subcommand?: string;
   positional: string[];
   flags: {
@@ -77,6 +78,10 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       flags.name = argv[++i];
     } else if (arg === '--template' || arg === '-t') {
       flags.template = argv[++i];
+    } else if (arg === '--format' || arg === '-f') {
+      flags.format = argv[++i];
+    } else if (arg === '--output' || arg === '-o') {
+      flags.output = argv[++i];
     } else if (arg === '--permission') {
       flags.permission = argv[++i] as 'A' | 'B' | 'C';
     } else if (arg.startsWith('--model=')) {
@@ -116,6 +121,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       command = 'new';
     } else if (primary === 'templates') {
       command = 'templates';
+    } else if (primary === 'report') {
+      command = 'report';
     } else {
       command = 'unknown';
     }
@@ -144,6 +151,7 @@ Commands:
   review [--workspace <path>]    Automated PR & Git diff code quality and security review
   new <template> [--name <name>] Scaffold production project template (react, fastapi, express...)
   templates                      List all available project starter templates
+  report [--workspace <path>]    Generate workspace execution & compliance report (md, html, json)
   status                         Display platform health, model catalog, and environment info
   version                        Print the current Cortex version
   help                           Display this help manual
@@ -701,6 +709,42 @@ case 'templates': {
         return { exitCode: 0, output: out, data: result };
       } catch (err: any) {
         const errMsg = `Scaffolding error: ${err.message || String(err)}`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+    }
+
+
+case 'report': {
+      try {
+        const user = getOrCreateCliUser();
+        const wsRoot = parsed.flags.workspace ? path.resolve(parsed.flags.workspace) : process.cwd();
+        const workspace: Workspace = {
+          id: `ws_report_${Date.now()}`,
+          userId: user.id,
+          name: path.basename(wsRoot) || 'CLI Workspace',
+          description: 'CLI Workspace Execution & Compliance Report',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          projectRoot: wsRoot,
+          isLocalBinding: true,
+        };
+
+        const format = (parsed.flags.format || (parsed.flags.json ? 'json' : 'markdown')) as ReportFormat;
+        const report = await workspaceReportGenerator.exportReport(workspace, format);
+
+        if (parsed.flags.output) {
+          const outPath = path.resolve(parsed.flags.output);
+          fs.writeFileSync(outPath, report.content, 'utf8');
+          const msg = `Successfully exported workspace report to ${outPath} (${(report.content.length / 1024).toFixed(1)} KB)`;
+          stdout(msg);
+          return { exitCode: 0, output: msg, data: report.data };
+        }
+
+        stdout(report.content);
+        return { exitCode: 0, output: report.content, data: report.data };
+      } catch (err: any) {
+        const errMsg = `Report generation error: ${err.message || String(err)}`;
         stderr(errMsg);
         return { exitCode: 1, output: '', error: errMsg };
       }
