@@ -12,12 +12,13 @@ import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
 import { getGitBranchGraph, formatGitGraphCli } from '../cowork/git-graph';
 import { secretsVault } from '../security/secrets-vault';
+import { collabWebSocketManager } from '../cowork/collab-ws';
 import { User, Workspace, PermissionMode } from '../types';
 
 export const CORTEX_VERSION = '1.3.0';
 
 export interface CliParsedArgs {
-  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'graph' | 'secret' | 'unknown';
+  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'graph' | 'secret' | 'collab' | 'unknown';
   subcommand?: string;
   positional: string[];
   flags: {
@@ -135,6 +136,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       command = 'graph';
     } else if (primary === 'secret' || primary === 'secrets') {
       command = 'secret';
+    } else if (primary === 'collab' || primary === 'pair') {
+      command = 'collab';
     } else {
       command = 'unknown';
     }
@@ -166,6 +169,7 @@ Commands:
   report [--workspace <path>]    Generate workspace execution & compliance report (md, html, json)
   graph [--workspace <path>]     Display visual Git branch topology and commit graph
   secret <set|list|del|import>   Manage encrypted workspace secrets vault (AES-256-GCM)
+  collab [--invite|--peers]      Live collaborative pair-programming & session sharing
   status                         Display platform health, model catalog, and environment info
   version                        Print the current Cortex version
   help                           Display this help manual
@@ -871,6 +875,54 @@ case 'report': {
         }
       } catch (err: any) {
         const errMsg = `Secret management error: ${err.message || String(err)}`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+    }
+
+    case 'collab': {
+      try {
+        const wsId = parsed.flags.workspace ? String(parsed.flags.workspace) : 'default-workspace';
+        const isInvite = parsed.flags.invite || parsed.positional[1] === 'invite';
+
+        if (isInvite) {
+          const token = collabWebSocketManager.generateInviteToken(wsId);
+          const inviteUrl = `/cowork?ws=${encodeURIComponent(wsId)}&shareToken=${encodeURIComponent(token)}`;
+          if (parsed.flags.json) {
+            const jsonText = JSON.stringify({ workspaceId: wsId, inviteToken: token, inviteUrl }, null, 2);
+            stdout(jsonText);
+            return { exitCode: 0, output: jsonText, data: { inviteToken: token, inviteUrl } };
+          }
+          const msg = `Generated live collaboration invite for workspace "${wsId}":\n  Token: ${token}\n  Link:  ${inviteUrl}\nShare this token with peers to collaborate in real-time.`;
+          stdout(msg);
+          return { exitCode: 0, output: msg, data: { inviteToken: token, inviteUrl } };
+        }
+
+        const peers = collabWebSocketManager.getRoomPeers(wsId);
+        if (parsed.flags.json) {
+          const jsonText = JSON.stringify({ workspaceId: wsId, activePeers: peers }, null, 2);
+          stdout(jsonText);
+          return { exitCode: 0, output: jsonText, data: { workspaceId: wsId, activePeers: peers } };
+        }
+
+        if (peers.length === 0) {
+          const msg = `Workspace "${wsId}" has no active collaborators connected.\nGenerate an invite link with: "cortex collab --invite"`;
+          stdout(msg);
+          return { exitCode: 0, output: msg, data: { peers: [] } };
+        }
+
+        let out = `Active Collaborators (${peers.length} peers in "${wsId}"):\n`;
+        out += '─'.repeat(60) + '\n';
+        for (const p of peers) {
+          const file = p.activeFile ? ` [editing: ${p.activeFile}]` : '';
+          const pos = p.cursor ? ` (L${p.cursor.line}:C${p.cursor.column})` : '';
+          out += `  ● ${p.userName.padEnd(20)} ${p.color}${file}${pos}\n`;
+        }
+        out += '─'.repeat(60);
+        stdout(out);
+        return { exitCode: 0, output: out, data: { peers } };
+      } catch (err: any) {
+        const errMsg = `Collaboration error: ${err.message || String(err)}`;
         stderr(errMsg);
         return { exitCode: 1, output: '', error: errMsg };
       }

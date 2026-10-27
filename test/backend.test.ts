@@ -12,6 +12,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import http from 'node:http';
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../src/server/db/database';
@@ -45,6 +46,7 @@ import { terminalWebSocketManager } from '../src/server/cowork/terminal-ws';
 import { getGitBranchGraph, computeTopologicalLanes, parseRefDecorations, formatGitGraphCli } from '../src/server/cowork/git-graph';
 import { secretsVault, encryptSecret, decryptSecret, isValidSecretKey, maskSecretValue, parseDotEnv } from '../src/server/security/secrets-vault';
 import { WebSocket as WsClient } from 'ws';
+import { collabWebSocketManager } from '../src/server/cowork/collab-ws';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -6941,6 +6943,319 @@ new file mode 100644
       // 4. CLI secret delete
       const delRes = await runCortexCli(['secret', 'delete', 'MY_APP_SECRET', '--workspace', testWsId]);
       assert.strictEqual(delRes.exitCode, 0);
+    });
+  });
+
+  describe('54. Live Collaborative Multi-Cursor Pair-Programming (WebSocket Session & Cursor Sync)', () => {
+    it('Scenario A: Cryptographic invite token generation, validation, and room isolation', () => {
+      const wsA = `ws_collab_alpha_${Date.now()}`;
+      const wsB = `ws_collab_beta_${Date.now()}`;
+
+      const token1 = collabWebSocketManager.generateInviteToken(wsA);
+      const token2 = collabWebSocketManager.generateInviteToken(wsA);
+
+      assert.ok(token1.startsWith('inv_'));
+      assert.ok(token2.startsWith('inv_'));
+      assert.notStrictEqual(token1, token2);
+
+      // Validation
+      assert.strictEqual(collabWebSocketManager.validateInviteToken(wsA, token1), true);
+      assert.strictEqual(collabWebSocketManager.validateInviteToken(wsA, token2), true);
+      // Room isolation: token from wsA should NOT validate for wsB
+      assert.strictEqual(collabWebSocketManager.validateInviteToken(wsB, token1), false);
+      // Non-existent token
+      assert.strictEqual(collabWebSocketManager.validateInviteToken(wsA, 'invalid_token_xyz'), false);
+    });
+
+    it('Scenario B: WebSocket connection upgrade, authentication, and room join events', async () => {
+      const app = express();
+      const server = http.createServer(app);
+      collabWebSocketManager.attachToServer(server);
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const port = (server.address() as any).port;
+
+      const wsId = `ws_collab_test_${Date.now()}`;
+      // Register workspace for testUser1
+      db.createWorkspace({
+        id: wsId,
+        userId: testUser1.id,
+        name: 'Collab Test Workspace',
+        description: '',
+        projectRoot: process.cwd(),
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        // 1. Connection without authentication should be rejected
+        const unauthWs = new WsClient(`ws://127.0.0.1:${port}/api/ws/collab/${wsId}`);
+        const unauthError = await new Promise<boolean>((resolve) => {
+          unauthWs.on('error', () => resolve(true));
+          unauthWs.on('open', () => resolve(false));
+        });
+        assert.strictEqual(unauthError, true, 'Unauthenticated connection must be rejected');
+
+        // 2. Connection with valid access token query parameter
+        const client1 = new WsClient(`ws://127.0.0.1:${port}/api/ws/collab/${wsId}?token=${accessToken}`);
+        const joinMsg1 = await new Promise<any>((resolve, reject) => {
+          client1.on('message', (data) => {
+            try {
+              resolve(JSON.parse(data.toString()));
+            } catch (e) {
+              reject(e);
+            }
+          });
+          client1.on('error', reject);
+        });
+
+        assert.strictEqual(joinMsg1.type, 'joined');
+        assert.ok(joinMsg1.peerId);
+        assert.strictEqual(joinMsg1.peer.userId, testUser1.id);
+        assert.ok(Array.isArray(joinMsg1.peers));
+        assert.strictEqual(joinMsg1.peers.length, 0);
+
+        // 3. Second peer joins via invite token
+        const inviteToken = collabWebSocketManager.generateInviteToken(wsId);
+        const client2 = new WsClient(`ws://127.0.0.1:${port}/api/ws/collab/${wsId}?shareToken=${inviteToken}`);
+
+        const [peerJoinOnClient1, joinMsg2] = await Promise.all([
+          new Promise<any>((resolve) => {
+            client1.once('message', (data) => resolve(JSON.parse(data.toString())));
+          }),
+          new Promise<any>((resolve) => {
+            client2.once('message', (data) => resolve(JSON.parse(data.toString())));
+          }),
+        ]);
+
+        assert.strictEqual(peerJoinOnClient1.type, 'peer_join');
+        assert.strictEqual(peerJoinOnClient1.peer.id, joinMsg2.peerId);
+        assert.strictEqual(joinMsg2.type, 'joined');
+        assert.strictEqual(joinMsg2.peers.length, 1);
+        assert.strictEqual(joinMsg2.peers[0].id, joinMsg1.peerId);
+
+        client1.close();
+        client2.close();
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario C: Real-time presence broadcasting (file focus, cursor move, ping/pong)', async () => {
+      const app = express();
+      const server = http.createServer(app);
+      collabWebSocketManager.attachToServer(server);
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const port = (server.address() as any).port;
+
+      const wsId = `ws_collab_presence_${Date.now()}`;
+      db.createWorkspace({
+        id: wsId,
+        userId: testUser1.id,
+        name: 'Collab Presence WS',
+        description: '',
+        projectRoot: process.cwd(),
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const { accessToken } = generateTokens(testUser1);
+      const inviteToken = collabWebSocketManager.generateInviteToken(wsId);
+
+      const client1 = new WsClient(`ws://127.0.0.1:${port}/api/ws/collab/${wsId}?token=${accessToken}`);
+      const client2 = new WsClient(`ws://127.0.0.1:${port}/api/ws/collab/${wsId}?shareToken=${inviteToken}`);
+
+      await Promise.all([
+        new Promise<void>((resolve) => client1.once('open', () => resolve())),
+        new Promise<void>((resolve) => client2.once('open', () => resolve())),
+      ]);
+
+      // Drain initial join messages
+      await new Promise((r) => setTimeout(r, 60));
+
+      try {
+        // 1. Client 1 sends file_focus
+        const presencePromise1 = new Promise<any>((resolve) => {
+          client2.once('message', (data) => resolve(JSON.parse(data.toString())));
+        });
+
+        client1.send(JSON.stringify({
+          type: 'file_focus',
+          activeFile: 'src/main.ts',
+        }));
+
+        const presenceEvent1 = await presencePromise1;
+        assert.strictEqual(presenceEvent1.type, 'presence');
+        assert.strictEqual(presenceEvent1.activeFile, 'src/main.ts');
+
+        // 2. Client 1 sends cursor_move
+        const presencePromise2 = new Promise<any>((resolve) => {
+          client2.once('message', (data) => resolve(JSON.parse(data.toString())));
+        });
+
+        client1.send(JSON.stringify({
+          type: 'cursor_move',
+          cursor: { line: 10, column: 25 },
+        }));
+
+        const presenceEvent2 = await presencePromise2;
+        assert.strictEqual(presenceEvent2.type, 'presence');
+        assert.strictEqual(presenceEvent2.cursor.line, 10);
+        assert.strictEqual(presenceEvent2.cursor.column, 25);
+
+        // 3. Ping / Pong
+        const pongPromise = new Promise<any>((resolve) => {
+          client1.once('message', (data) => resolve(JSON.parse(data.toString())));
+        });
+        client1.send(JSON.stringify({ type: 'ping' }));
+        const pongEvent = await pongPromise;
+        assert.strictEqual(pongEvent.type, 'pong');
+      } finally {
+        client1.close();
+        client2.close();
+        server.close();
+      }
+    });
+
+    it('Scenario D: Peer disconnect event handling and room cleanup', async () => {
+      const app = express();
+      const server = http.createServer(app);
+      collabWebSocketManager.attachToServer(server);
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const port = (server.address() as any).port;
+
+      const wsId = `ws_collab_cleanup_${Date.now()}`;
+      db.createWorkspace({
+        id: wsId,
+        userId: testUser1.id,
+        name: 'Collab Cleanup WS',
+        description: '',
+        projectRoot: process.cwd(),
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const { accessToken } = generateTokens(testUser1);
+      const inviteToken = collabWebSocketManager.generateInviteToken(wsId);
+
+      const client1 = new WsClient(`ws://127.0.0.1:${port}/api/ws/collab/${wsId}?token=${accessToken}`);
+      const client2 = new WsClient(`ws://127.0.0.1:${port}/api/ws/collab/${wsId}?shareToken=${inviteToken}`);
+
+      await Promise.all([
+        new Promise<void>((resolve) => client1.once('open', () => resolve())),
+        new Promise<void>((resolve) => client2.once('open', () => resolve())),
+      ]);
+
+      await new Promise((r) => setTimeout(r, 60));
+
+      try {
+        const leavePromise = new Promise<any>((resolve) => {
+          client1.once('message', (data) => resolve(JSON.parse(data.toString())));
+        });
+
+        client2.close();
+
+        const leaveEvent = await leavePromise;
+        assert.strictEqual(leaveEvent.type, 'peer_leave');
+        assert.ok(leaveEvent.peerId);
+      } finally {
+        client1.close();
+        server.close();
+      }
+    });
+
+    it('Scenario E: REST endpoints and CLI cortex collab commands', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      const wsId = `ws_collab_api_${Date.now()}`;
+      db.createWorkspace({
+        id: wsId,
+        userId: testUser1.id,
+        name: 'Collab API Workspace',
+        description: '',
+        projectRoot: process.cwd(),
+        isLocalBinding: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const ownerTokens = generateTokens(testUser1);
+      const foreignTokens = generateTokens(testUser2);
+
+      try {
+        // 1. Unauthenticated -> 401
+        const unauthRes = await fetch(`${baseUrl}/api/cowork/workspaces/${wsId}/collab/session`);
+        assert.strictEqual(unauthRes.status, 401);
+
+        // 2. Foreign user -> 404 (IDOR defense)
+        const foreignRes = await fetch(`${baseUrl}/api/cowork/workspaces/${wsId}/collab/session`, {
+          headers: { Authorization: `Bearer ${foreignTokens.accessToken}` },
+        });
+        assert.strictEqual(foreignRes.status, 404);
+
+        // 3. Authorized get session
+        const sessionRes = await fetch(`${baseUrl}/api/cowork/workspaces/${wsId}/collab/session`, {
+          headers: { Authorization: `Bearer ${ownerTokens.accessToken}` },
+        });
+        assert.strictEqual(sessionRes.status, 200);
+        const sessionData = await sessionRes.json();
+        assert.strictEqual(sessionData.workspaceId, wsId);
+
+        // 4. Create invite token
+        const inviteRes = await fetch(`${baseUrl}/api/cowork/workspaces/${wsId}/collab/invite`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${ownerTokens.accessToken}` },
+        });
+        assert.strictEqual(inviteRes.status, 200);
+        const inviteData = await inviteRes.json();
+        assert.ok(inviteData.inviteToken.startsWith('inv_'));
+        assert.ok(inviteData.shareableUrl.includes(inviteData.inviteToken));
+
+        // 5. Get active peers (initially 0)
+        const peersRes = await fetch(`${baseUrl}/api/cowork/workspaces/${wsId}/collab/peers`, {
+          headers: { Authorization: `Bearer ${ownerTokens.accessToken}` },
+        });
+        assert.strictEqual(peersRes.status, 200);
+        const peersData = await peersRes.json();
+        assert.strictEqual(peersData.peers.length, 0);
+
+        // 6. CLI cortex collab --invite --json
+        let inviteJsonBuf = '';
+        const cliInviteRes = await runCortexCli(['collab', '--workspace', wsId, '--invite', '--json'], {
+          stdout: (msg) => { inviteJsonBuf += msg; },
+          stderr: () => {},
+        });
+        assert.strictEqual(cliInviteRes.exitCode, 0);
+        const parsedCliInvite = JSON.parse(inviteJsonBuf);
+        assert.ok(parsedCliInvite.inviteToken.startsWith('inv_'));
+
+        // 7. CLI cortex collab --peers --json
+        let peersJsonBuf = '';
+        const cliPeersRes = await runCortexCli(['collab', '--workspace', wsId, '--peers', '--json'], {
+          stdout: (msg) => { peersJsonBuf += msg; },
+          stderr: () => {},
+        });
+        assert.strictEqual(cliPeersRes.exitCode, 0);
+        const parsedCliPeers = JSON.parse(peersJsonBuf);
+        assert.ok(Array.isArray(parsedCliPeers.activePeers || parsedCliPeers));
+      } finally {
+        server.close();
+      }
     });
   });
 

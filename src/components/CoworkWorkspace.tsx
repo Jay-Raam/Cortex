@@ -18,6 +18,7 @@ import {
   File,
   Folder,
   Lock,
+  Users,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact, WorkspaceFileNode, ExecutionCommandResult } from '../server/types';
 import { fetchGraphQL, advanceTaskApi, approveStepApi, importGitHubRepoApi, createGitHubPrApi, executeSwarmTaskApi } from '../lib/api';
@@ -28,6 +29,7 @@ import { CoworkCanvas } from './cowork/CoworkCanvas';
 import { CoworkSidecar } from './cowork/CoworkSidecar';
 import { FolderBindingModal } from './cowork/FolderBindingModal';
 import { WorkspaceSecretsModal } from './cowork/WorkspaceSecretsModal';
+import { CollabInviteModal } from './cowork/CollabInviteModal';
 
 export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   workspace,
@@ -41,6 +43,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
   const [isSecretsModalOpen, setIsSecretsModalOpen] = useState(false);
+  const [isCollabModalOpen, setIsCollabModalOpen] = useState(false);
   // Tasks state
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -955,6 +958,15 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
           </button>
           <button
             type="button"
+            onClick={() => setIsCollabModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#E5E0D8] hover:border-slate-300 text-slate-700 rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            title="Live Collaborative Multi-Cursor Pair-Programming"
+          >
+            <Users className="w-3.5 h-3.5 text-sky-600" />
+            <span className="hidden sm:inline">Pair</span>
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setSelectedTaskId(null);
             }}
@@ -1160,6 +1172,11 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
       <WorkspaceSecretsModal
         isOpen={isSecretsModalOpen}
         onClose={() => setIsSecretsModalOpen(false)}
+        workspace={workspace}
+      />
+      <CollabInviteModal
+        isOpen={isCollabModalOpen}
+        onClose={() => setIsCollabModalOpen(false)}
         workspace={workspace}
       />
     </div>
