@@ -38,6 +38,7 @@ import {
   CORTEX_VERSION,
 } from '../src/server/cli/cortex-cli';
 import { codebaseIndexer, tokenizeCode } from '../src/server/cowork/code-indexer';
+import { prReviewer, parseUnifiedDiff } from '../src/server/cowork/pr-reviewer';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -5835,6 +5836,189 @@ describe('Test Suite 47: Semantic Codebase Indexing & Vector Search (Workspace R
       });
       assert.strictEqual(resEmpty.exitCode, 0);
       assert.ok(emptyOutput.includes('No matching code snippets found'));
+    });
+  });
+
+
+  describe('Test Suite 48: Automated AI Pull Request Reviewer & Security Auditing Agent', () => {
+    const reviewWsRoot = path.resolve(process.cwd(), 'workspaces', `ws_review_test_${Date.now()}`);
+    let reviewWorkspace: Workspace;
+
+    before(() => {
+      fs.mkdirSync(reviewWsRoot, { recursive: true });
+      fs.mkdirSync(path.join(reviewWsRoot, 'src'), { recursive: true });
+      fs.writeFileSync(
+        path.join(reviewWsRoot, 'src', 'calculator.ts'),
+        'export function add(a: number, b: number): number {\n  return a + b;\n}\n',
+        'utf8'
+      );
+
+      reviewWorkspace = db.createWorkspace({
+        id: `ws_review_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'PR Review Test Workspace',
+        description: 'Testing automated PR review and security audit',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        projectRoot: reviewWsRoot,
+        isLocalBinding: true,
+      });
+    });
+
+    it('Scenario A: parseUnifiedDiff accurately parses hunks, line changes, and file paths', () => {
+      const sampleDiff = `diff --git a/src/math.ts b/src/math.ts
+index 1234567..89abcdef 100644
+--- a/src/math.ts
++++ b/src/math.ts
+@@ -1,5 +1,7 @@
+ export function multiply(a: number, b: number): number {
+-  return a * b;
++  const res = a * b;
++  return res;
+ }
++export function divide(a: number, b: number): number { return a / b; }
+`;
+      const parsed = parseUnifiedDiff(sampleDiff);
+      assert.strictEqual(parsed.length, 1);
+      assert.strictEqual(parsed[0].oldPath, 'src/math.ts');
+      assert.strictEqual(parsed[0].newPath, 'src/math.ts');
+      assert.strictEqual(parsed[0].addedLinesCount, 3);
+      assert.strictEqual(parsed[0].deletedLinesCount, 1);
+      assert.strictEqual(parsed[0].hunks.length, 1);
+      assert.strictEqual(parsed[0].hunks[0].newStart, 1);
+    });
+
+    it('Scenario B: Security Audit Pass detects critical OWASP/CWE vulnerabilities in code diff', () => {
+      const vulnerableDiff = `diff --git a/src/dangerous.ts b/src/dangerous.ts
+new file mode 100644
+--- /dev/null
++++ b/src/dangerous.ts
+@@ -0,0 +1,15 @@
++import { exec } from 'child_process';
++
++export function executeUserInput(cmd: string) {
++  exec(cmd); // CWE-78 command injection
++}
++
++export function renderHtml(userString: string) {
++  document.getElementById('root')!.innerHTML = userString; // CWE-79 XSS
++}
++
++export const apiKey = "sk-live-1234567890abcdef1234567890abcdef"; // CWE-798 secret
++
++export function runCode(code: string) {
++  eval(code); // CWE-94 code injection
++}
+`;
+      const report = prReviewer.evaluateDiff(vulnerableDiff);
+      assert.strictEqual(report.status, 'needs_security_review');
+      assert.ok(report.overallScore < 50, `Expected low score due to critical vulnerabilities, got ${report.overallScore}`);
+      assert.ok(report.findingsCountBySeverity.critical >= 3, 'Must detect multiple critical security flaws');
+
+      const cwes = report.findings.map(f => f.cwe?.split(':')[0].trim());
+      assert.ok(cwes.includes('CWE-78'), 'Must identify CWE-78 command injection');
+      assert.ok(cwes.includes('CWE-79'), 'Must identify CWE-79 cross-site scripting');
+      assert.ok(cwes.includes('CWE-798'), 'Must identify CWE-798 hardcoded credentials');
+      assert.ok(cwes.includes('CWE-94'), 'Must identify CWE-94 code injection');
+    });
+
+    it('Scenario C: Clean code diff receives high score (> 90) and approved status', () => {
+      const cleanDiff = `diff --git a/src/utils/formatter.ts b/src/utils/formatter.ts
+new file mode 100644
+--- /dev/null
++++ b/src/utils/formatter.ts
+@@ -0,0 +1,10 @@
++/**
++ * Format currency amount with ISO symbol.
++ */
++export function formatCurrency(amount: number, currency: string = 'USD'): string {
++  return new Intl.NumberFormat('en-US', {
++    style: 'currency',
++    currency,
++  }).format(amount);
++}
+`;
+      const report = prReviewer.evaluateDiff(cleanDiff);
+      assert.strictEqual(report.status, 'approved');
+      assert.ok(report.overallScore >= 90, `Score should be >= 90 for clean code, got ${report.overallScore}`);
+      assert.strictEqual(report.findingsCountBySeverity.critical, 0);
+      assert.strictEqual(report.findingsCountBySeverity.high, 0);
+      assert.ok(report.markdownReport.includes('APPROVED'));
+    });
+
+    it('Scenario D: REST POST /api/cowork/workspaces/:id/review-diff validates auth, tenant isolation, and reviews diff', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      try {
+        const tokens = generateTokens(testUser1);
+        const foreignTokens = generateTokens(testUser2);
+
+        // 1. Unauthenticated request rejected with 401
+        const unauthRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${reviewWorkspace.id}/review-diff`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rawDiff: '' }),
+        });
+        assert.strictEqual(unauthRes.status, 401);
+
+        // 2. Foreign user rejected (IDOR check) with 404
+        const foreignRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${reviewWorkspace.id}/review-diff`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${foreignTokens.accessToken}`,
+          },
+          body: JSON.stringify({ rawDiff: '' }),
+        });
+        assert.strictEqual(foreignRes.status, 404);
+
+        // 3. Workspace owner reviews custom diff
+        const reviewDiff = `diff --git a/src/auth.ts b/src/auth.ts
+@@ -1,3 +1,3 @@
+-const token = req.headers['auth'];
++const token = req.headers.authorization;
+`;
+        const reviewRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${reviewWorkspace.id}/review-diff`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({ rawDiff: reviewDiff }),
+        });
+        assert.strictEqual(reviewRes.status, 200);
+        const json = await reviewRes.json();
+        assert.strictEqual(json.success, true);
+        assert.ok(json.report);
+        assert.strictEqual(json.report.status, 'approved');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario E: CLI cortex review outputs markdown report and JSON format', async () => {
+      // 1. Review with JSON flag
+      let jsonOutput = '';
+      const resJson = await runCortexCli(['review', '--workspace', reviewWsRoot, '--json'], {
+        stdout: (msg) => { jsonOutput += msg + '\n'; },
+      });
+      assert.strictEqual(resJson.exitCode, 0);
+      const parsedJson = JSON.parse(jsonOutput.trim());
+      assert.ok(parsedJson.status);
+      assert.strictEqual(typeof parsedJson.overallScore, 'number');
+
+      // 2. Review standard markdown output
+      let mdOutput = '';
+      const resMd = await runCortexCli(['review', '--workspace', reviewWsRoot], {
+        stdout: (msg) => { mdOutput += msg + '\n'; },
+      });
+      assert.strictEqual(resMd.exitCode, 0);
+      assert.ok(mdOutput.includes('Pull Request Quality & Security Audit'));
     });
   });
 

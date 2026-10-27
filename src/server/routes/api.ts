@@ -9,6 +9,7 @@ import { modelRouter } from '../providers/router';
 import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
 import { codebaseIndexer } from '../cowork/code-indexer';
+import { prReviewer } from '../cowork/pr-reviewer';
 import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
@@ -1763,5 +1764,37 @@ apiRouter.post('/cowork/workspaces/:id/semantic-search', async (req: Request, re
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to execute semantic codebase search' });
+  }
+});
+/**
+ * POST /api/cowork/workspaces/:id/review-diff
+ * Runs automated quality evaluation and OWASP/CWE security audit on Git diff
+ */
+apiRouter.post('/cowork/workspaces/:id/review-diff', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const { rawDiff, baseBranch, targetBranch } = req.body || {};
+
+  try {
+    const report = await prReviewer.reviewWorkspaceDiff(workspace, {
+      rawDiff: typeof rawDiff === 'string' ? rawDiff : undefined,
+      baseBranch: typeof baseBranch === 'string' ? baseBranch : undefined,
+      targetBranch: typeof targetBranch === 'string' ? targetBranch : undefined,
+    });
+
+    res.json({ success: true, report, ...report });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to review pull request diff' });
   }
 });
