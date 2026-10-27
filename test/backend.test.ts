@@ -41,6 +41,8 @@ import { codebaseIndexer, tokenizeCode } from '../src/server/cowork/code-indexer
 import { prReviewer, parseUnifiedDiff } from '../src/server/cowork/pr-reviewer';
 import { scaffoldEngine } from '../src/server/cowork/scaffold-engine';
 import { workspaceReportGenerator } from '../src/server/cowork/report-generator';
+import { terminalWebSocketManager } from '../src/server/cowork/terminal-ws';
+import { WebSocket as WsClient } from 'ws';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -6387,6 +6389,153 @@ new file mode 100644
       assert.ok(fs.existsSync(exportFile));
       const htmlContent = fs.readFileSync(exportFile, 'utf8');
       assert.ok(htmlContent.includes('<!DOCTYPE html>'));
+    });
+  });
+
+
+  describe('Test Suite 51: Real-Time WebSocket Terminal & Command Streaming Engine', () => {
+    let wsServerHttp: any;
+    let wsPort: number;
+    let wsWorkspace: Workspace;
+    let wsRoot: string;
+
+    before(async () => {
+      wsRoot = path.resolve(process.cwd(), 'workspaces', `ws_term_unit_${Date.now()}`);
+      fs.mkdirSync(wsRoot, { recursive: true });
+
+      wsWorkspace = db.createWorkspace({
+        id: `ws_term_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Terminal WS Test Workspace',
+        description: 'Testing live WebSocket terminal streaming',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        projectRoot: wsRoot,
+        isLocalBinding: true,
+      });
+
+      const app = express();
+      wsServerHttp = app.listen(0);
+      wsPort = (wsServerHttp.address() as any).port;
+      terminalWebSocketManager.attachToServer(wsServerHttp);
+    });
+
+    after(() => {
+      terminalWebSocketManager.closeAll();
+      if (wsServerHttp) {
+        wsServerHttp.close();
+      }
+    });
+
+    it('Scenario A: Rejects unauthenticated upgrade requests without valid JWT token with HTTP 401', async () => {
+      await new Promise<void>((resolve) => {
+        const client = new WsClient(`ws://127.0.0.1:${wsPort}/api/ws/terminal/${wsWorkspace.id}`);
+        client.on('unexpected-response', (_req, res) => {
+          assert.strictEqual(res.statusCode, 401);
+          resolve();
+        });
+        client.on('open', () => {
+          assert.fail('Should not establish connection without token');
+        });
+      });
+    });
+
+    it('Scenario B: Rejects unauthorized cross-tenant requests (IDOR defense) with HTTP 404', async () => {
+      const foreignTokens = generateTokens(testUser2);
+      await new Promise<void>((resolve) => {
+        const client = new WsClient(
+          `ws://127.0.0.1:${wsPort}/api/ws/terminal/${wsWorkspace.id}?token=${foreignTokens.accessToken}`
+        );
+        client.on('unexpected-response', (_req, res) => {
+          assert.strictEqual(res.statusCode, 404);
+          resolve();
+        });
+        client.on('open', () => {
+          assert.fail('Should not connect to unauthorized workspace');
+        });
+      });
+    });
+
+    it('Scenario C: Connects successfully with valid credentials, receives connected event and answers ping', async () => {
+      const tokens = generateTokens(testUser1);
+      await new Promise<void>((resolve) => {
+        const client = new WsClient(
+          `ws://127.0.0.1:${wsPort}/api/ws/terminal/${wsWorkspace.id}?token=${tokens.accessToken}`
+        );
+
+        let receivedGreeting = false;
+
+        client.on('message', (raw) => {
+          const msg = JSON.parse(raw.toString('utf8'));
+          if (msg.type === 'connected') {
+            receivedGreeting = true;
+            assert.strictEqual(msg.workspaceId, wsWorkspace.id);
+            assert.ok(msg.sessionId);
+            // Send ping
+            client.send(JSON.stringify({ type: 'ping' }));
+          } else if (msg.type === 'pong') {
+            assert.ok(receivedGreeting);
+            client.close();
+            resolve();
+          }
+        });
+      });
+    });
+
+    it('Scenario D: Real-time command streaming sends stdout chunks and emits exit event', async () => {
+      const tokens = generateTokens(testUser1);
+      await new Promise<void>((resolve) => {
+        const client = new WsClient(
+          `ws://127.0.0.1:${wsPort}/api/ws/terminal/${wsWorkspace.id}?token=${tokens.accessToken}`
+        );
+
+        let stdoutOutput = '';
+
+        client.on('message', (raw) => {
+          const msg = JSON.parse(raw.toString('utf8'));
+          if (msg.type === 'connected') {
+            // Execute command
+            client.send(JSON.stringify({ type: 'exec', command: 'echo c0rt3x-strea-m-test' }));
+          } else if (msg.type === 'stdout') {
+            stdoutOutput += msg.data;
+          } else if (msg.type === 'exit') {
+            assert.ok(stdoutOutput.includes('c0rt3x-strea-m-test'));
+            assert.strictEqual(msg.exitCode, 0);
+            client.close();
+            resolve();
+          }
+        });
+      });
+    });
+
+    it('Scenario E: Interactive process termination via signal stops child process and cleans up session', async () => {
+      const tokens = generateTokens(testUser1);
+      await new Promise<void>((resolve, reject) => {
+        const client = new WsClient(
+          `ws://127.0.0.1:${wsPort}/api/ws/terminal/${wsWorkspace.id}?token=${tokens.accessToken}`
+        );
+
+        const safetyTimer = setTimeout(() => {
+          client.close();
+          reject(new Error('Scenario E timed out waiting for process exit'));
+        }, 8000);
+
+        client.on('message', (raw) => {
+          const msg = JSON.parse(raw.toString('utf8'));
+          if (msg.type === 'connected') {
+            // Spawn long-running background command
+            client.send(JSON.stringify({ type: 'exec', command: 'node -e "setInterval(()=>{}, 1000)"' }));
+            // Shortly after, send SIGTERM signal to terminate
+            setTimeout(() => {
+              client.send(JSON.stringify({ type: 'signal', signal: 'SIGTERM' }));
+            }, 300);
+          } else if (msg.type === 'exit') {
+            clearTimeout(safetyTimer);
+            client.close();
+            resolve();
+          }
+        });
+      });
     });
   });
 

@@ -23,5 +23,11 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "workspaces",
+    "dist",
+    "node_modules",
+    "release"
+  ]
 }
