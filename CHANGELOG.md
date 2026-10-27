@@ -5,6 +5,55 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [1.4.0] - 2026-10-28
+
+### Milestone Summary
+- **Sprint 5 ("Real-Time Streaming, Collaboration & Autonomous Automation") Complete**: 5 major developer and security capabilities merged through the strict PR pipeline.
+- **44 Total Merged Pull Requests** across core features, security hardening, enterprise tools, and real-time streaming engines.
+- **55 Automated Test Suites** with **239 passing tests** maintaining a 100% test pass rate.
+- Real-time terminal streaming, visual Git branch graph, encrypted secrets vault, multi-cursor pair programming, and autonomous webhook CI/CD engine.
+
+---
+
+### 🚀 Sprint 5 Features & Developer Tools (PRs #92 - #100)
+
+- **Real-Time WebSocket Terminal & Command Streaming Engine** ([#92](https://github.com/Jay-Raam/Cortex/pull/92)):
+  - Low-latency bi-directional WebSocket terminal server (`terminalWebSocketManager`) mounted on `/api/ws/terminal/:workspaceId`.
+  - Real-time stdout/stderr chunk streaming, interactive SIGINT/SIGTERM process termination, and automatic session cleanup.
+  - Interactive terminal component (`CoworkTerminal.tsx`) with ANSI color parsing, keyboard history navigation, and live execution telemetry.
+  - Multi-tenant JWT authentication and strict IDOR boundary verification on WebSocket upgrade.
+
+- **Interactive Visual Git Branch Graph & Merge Visualizer** ([#94](https://github.com/Jay-Raam/Cortex/pull/94)):
+  - Visual DAG branch graph engine (`git-graph.ts`) computing topological commit lanes, merge junctions, and ref decorations (HEAD, tags, remote tracking branches).
+  - High-contrast 10-color harmonic palette with interactive commit inspection and parent commit linking.
+  - REST endpoint `GET /api/cowork/workspaces/:id/git/graph` and headless CLI command `cortex graph [--workspace <dir>] [--max <n>] [--json]`.
+  - Frontend visualizer component (`GitBranchGraphViewer.tsx`) integrated directly into Co-Work right canvas.
+
+- **Workspace Secrets Vault & Encrypted Environment Manager** ([#96](https://github.com/Jay-Raam/Cortex/pull/96)):
+  - Authenticated AES-256-GCM encryption (`secrets-vault.ts`) with master key derivation via `scrypt`, unique 12-byte IVs, 16-byte authentication tags, and 16-byte cryptographic salts.
+  - Fail-closed tamper detection rejecting modified ciphertexts and corrupted authentication tags.
+  - POSIX environment variable validation, value masking (`••••••••`), and bulk `.env` file import parser.
+  - REST endpoints `GET /api/cowork/workspaces/:id/secrets`, `POST /api/cowork/workspaces/:id/secrets`, `DELETE /api/cowork/workspaces/:id/secrets/:key`, and `POST /api/cowork/workspaces/:id/secrets/import-env`.
+  - CLI commands `cortex secret set|list|delete|import` and secure runtime injection into `ExecutionRunner` without leaking secrets to disk or logs.
+  - Workspace Secrets Modal (`WorkspaceSecretsModal.tsx`) in Co-Work workspace header.
+
+- **Live Collaborative Multi-Cursor Pair-Programming** ([#98](https://github.com/Jay-Raam/Cortex/pull/98)):
+  - Real-time collaborative workspace hub (`collab-ws.ts`) mounted on `/api/ws/collab/:workspaceId`.
+  - Synchronized cursor tracking (`{ line, column, selection }`), active file viewport, and 8-color peer palette.
+  - Cryptographic shareable invite token generation with room isolation and automatic peer cleanup on disconnect.
+  - REST endpoints `GET /collab/session`, `POST /collab/invite`, and `GET /collab/peers`.
+  - CLI command `cortex collab [--invite] [--peers] [--workspace <id>] [--json]`.
+  - Frontend UI `CollabInviteModal.tsx` and live peer indicator badges in `CoworkWorkspace.tsx`.
+
+- **Autonomous Webhook & CI/CD Pipeline Automation Engine** ([#100](https://github.com/Jay-Raam/Cortex/pull/100)):
+  - Autonomous event routing and verification engine (`webhook-engine.ts`) with constant-time HMAC signature verification (`crypto.timingSafeEqual`) for GitHub (`X-Hub-Signature-256`) and GitLab (`X-Gitlab-Token`).
+  - Automated PR code review dispatching on `pull_request` (`opened`, `synchronize`) triggering `prReviewer.evaluateDiff()`.
+  - Automated issue triage on `issues` (`opened`, `labeled`) and commit tracking on `push`.
+  - REST ingress endpoints `POST /api/webhooks/github`, `POST /api/webhooks/gitlab`, `GET /api/webhooks/deliveries`, and `POST /api/webhooks/simulate`.
+  - Headless CLI command `cortex webhook list [--limit <n>] [--json]` and `cortex webhook simulate [--event <e>] [--json]`.
+
+---
+
 ## [1.3.0] - 2026-10-27
 
 ### Milestone Summary
