@@ -5,6 +5,45 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [1.3.0] - 2026-10-27
+
+### Milestone Summary
+- **Sprint 4 ("Enterprise Intelligence & Autonomous Developer Tools") Complete**: 5 enterprise developer capabilities merged through the PR pipeline.
+- **38 Total Merged Pull Requests** across core features, security remediations, and enterprise tooling.
+- **50 Automated Test Suites** with **214 passing tests** maintaining a 100% test pass rate.
+- Headless terminal CLI, BM25 codebase RAG, automated PR security auditor, full-stack scaffolding, and multi-format compliance reporting.
+
+---
+
+### 🚀 Sprint 4 Features & Developer Tools (PRs #80 - #88)
+
+- **Headless Cortex CLI & Terminal Workspace Agent** ([#80](https://github.com/Jay-Raam/Cortex/pull/80)):
+  - Executable `bin/cortex.cjs` providing direct terminal access to Cortex AI without launching the GUI.
+  - Streaming conversational chat (`cortex chat`), autonomous workspace agent execution (`cortex cowork`), model catalog inspection, and system status telemetry (`cortex status`).
+  - Supports `--json` flags for CI/CD automation, permission flags (`-p A|B|C`), and headless multi-agent swarm loops.
+
+- **Semantic Codebase Indexing & Vector Search (Workspace RAG)** ([#82](https://github.com/Jay-Raam/Cortex/pull/82)):
+  - AST-aware lexical-semantic code indexer (`codebaseIndexer`) using BM25 ranking algorithm, function/class symbol boosting, and disk mtime caching.
+  - REST endpoints `POST /api/cowork/workspaces/:id/index` and `POST /api/cowork/workspaces/:id/semantic-search`.
+  - Terminal CLI integration via `cortex search <query> [--workspace <path>]` returning ranked code snippets with confidence scores and line numbers.
+
+- **Automated AI Pull Request Reviewer & Security Auditing Agent** ([#84](https://github.com/Jay-Raam/Cortex/pull/84)):
+  - Static code quality and OWASP/CWE security auditing engine (`prReviewer`) analyzing unified Git working tree and branch diffs.
+  - Detects critical vulnerabilities including OS Command Injection (CWE-78), Cross-Site Scripting (CWE-79), Hardcoded Credentials & Tokens (CWE-798), Dynamic Code Evaluation (CWE-94), Path Traversal (CWE-22), and ReDoS (CWE-1333).
+  - REST endpoint `POST /api/cowork/workspaces/:id/review-diff` and CLI command `cortex review [--base <branch>]`.
+
+- **Full-Stack Project Template Scaffolding Engine** ([#86](https://github.com/Jay-Raam/Cortex/pull/86)):
+  - 1-click full-stack starter template scaffolding engine (`scaffoldEngine`) with strict path traversal boundary verification.
+  - 5 production boilerplates: React 19 + Vite 6 + Tailwind CSS, Python FastAPI + Pydantic v2, Express 5 + TypeScript + Zod, Go 1.23 Gin, and Rust Axum + Tokio.
+  - Frontend Template Selector tab integrated into `CreateProjectModal.tsx` and terminal command `cortex new <template> [--name <name>]`.
+
+- **Multi-Format Workspace Audit & Execution Report Generator** ([#88](https://github.com/Jay-Raam/Cortex/pull/88)):
+  - Comprehensive telemetry compiler (`workspaceReportGenerator`) summarizing workspace metadata, task execution histories, file counts, and OWASP audit results.
+  - Triple-format rendering engine: GitHub-flavored Markdown (`.md`), responsive standalone HTML (`.html`) with XSS sanitization, and structured JSON (`.json` schema v1.0).
+  - REST endpoint `GET /api/cowork/workspaces/:id/export-report` and CLI command `cortex report [--format <fmt>] [--output <file>]`.
+
+---
+
 ## [1.2.0] - 2026-10-25
 
 ### Milestone Summary

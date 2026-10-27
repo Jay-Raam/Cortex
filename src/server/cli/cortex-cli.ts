@@ -12,7 +12,7 @@ import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
 import { User, Workspace, PermissionMode } from '../types';
 
-export const CORTEX_VERSION = '1.2.0';
+export const CORTEX_VERSION = '1.3.0';
 
 export interface CliParsedArgs {
   command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'unknown';
