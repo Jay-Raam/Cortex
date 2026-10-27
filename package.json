@@ -15,7 +15,8 @@
     "electron": "cross-env NODE_ENV=development electron electron/main.cjs",
     "build:server": "esbuild src/server/desktop-server.ts --bundle --platform=node --target=node20 --format=cjs --outfile=electron/embedded-server.cjs --external:vite --external:electron",
     "build:electron": "vite build && npm run build:server && electron-builder --win --dir",
-    "dist:win": "vite build && npm run build:server && electron-builder --win nsis"
+    "dist:win": "vite build && npm run build:server && electron-builder --win nsis",
+    "cli": "tsx bin/cortex.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -91,5 +92,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Cortex"
     }
+  },
+  "bin": {
+    "cortex": "bin/cortex.cjs"
   }
 }
