@@ -16,7 +16,7 @@ import { collabWebSocketManager } from '../cowork/collab-ws';
 import { webhookEngine } from '../cowork/webhook-engine';
 import { User, Workspace, PermissionMode } from '../types';
 
-export const CORTEX_VERSION = '1.3.0';
+export const CORTEX_VERSION = '1.4.0';
 
 export interface CliParsedArgs {
   command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'graph' | 'secret' | 'collab' | 'webhook' | 'unknown';
