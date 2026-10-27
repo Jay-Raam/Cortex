@@ -10,12 +10,13 @@ import { codebaseIndexer } from '../cowork/code-indexer';
 import { prReviewer } from '../cowork/pr-reviewer';
 import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
+import { getGitBranchGraph, formatGitGraphCli } from '../cowork/git-graph';
 import { User, Workspace, PermissionMode } from '../types';
 
 export const CORTEX_VERSION = '1.3.0';
 
 export interface CliParsedArgs {
-  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'unknown';
+  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'graph' | 'unknown';
   subcommand?: string;
   positional: string[];
   flags: {
@@ -84,6 +85,10 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       flags.output = argv[++i];
     } else if (arg === '--permission') {
       flags.permission = argv[++i] as 'A' | 'B' | 'C';
+    } else if (arg === '--max' || arg === '--limit') {
+      flags.max = parseInt(argv[++i], 10);
+    } else if (arg.startsWith('--max=')) {
+      flags.max = parseInt(arg.split('=')[1], 10);
     } else if (arg.startsWith('--model=')) {
       flags.model = arg.split('=')[1];
     } else if (arg.startsWith('--goal=')) {
@@ -123,6 +128,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       command = 'templates';
     } else if (primary === 'report') {
       command = 'report';
+    } else if (primary === 'graph') {
+      command = 'graph';
     } else {
       command = 'unknown';
     }
@@ -152,6 +159,7 @@ Commands:
   new <template> [--name <name>] Scaffold production project template (react, fastapi, express...)
   templates                      List all available project starter templates
   report [--workspace <path>]    Generate workspace execution & compliance report (md, html, json)
+  graph [--workspace <path>]     Display visual Git branch topology and commit graph
   status                         Display platform health, model catalog, and environment info
   version                        Print the current Cortex version
   help                           Display this help manual
@@ -164,6 +172,7 @@ Options:
   --free                         Enforce zero-cost model prioritization
   --swarm                        Enable multi-agent swarm mode (Architect, Coder, QA)
   --permission <A|B|C>           Permission gate mode (A: Auto, B: Review file changes, C: Full gate)
+  --max <n>                      Maximum commits to display in Git graph (default: 50)
   --json                         Output result in machine-readable JSON format
   -v, --version                  Display version
   -h, --help                     Display help
@@ -750,6 +759,28 @@ case 'report': {
       }
     }
 
+
+    case 'graph': {
+      try {
+        const wsRoot = parsed.flags.workspace ? path.resolve(parsed.flags.workspace) : process.cwd();
+        const maxCount = parsed.flags.max || (parsed.flags.name && !isNaN(Number(parsed.flags.name)) ? Number(parsed.flags.name) : 50);
+        const graph = await getGitBranchGraph(wsRoot, { maxCount });
+
+        if (parsed.flags.json) {
+          const jsonText = JSON.stringify(graph, null, 2);
+          stdout(jsonText);
+          return { exitCode: 0, output: jsonText, data: graph };
+        }
+
+        const formatted = formatGitGraphCli(graph);
+        stdout(formatted);
+        return { exitCode: 0, output: formatted, data: graph };
+      } catch (err: any) {
+        const errMsg = `Git graph error: ${err.message || String(err)}`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+    }
 
     default: {
       const cmdName = parsed.positional[0] || 'unknown';

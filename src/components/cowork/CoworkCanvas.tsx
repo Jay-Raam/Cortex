@@ -35,6 +35,7 @@ import {
   Download,
   GitPullRequest,
   GitCommit,
+  GitBranch,
 } from 'lucide-react';
 import { CoworkCanvasProps } from './types';
 import { UnifiedDiffViewer } from './UnifiedDiffViewer';
@@ -44,6 +45,7 @@ import { parseAnsiToHtml } from './ansi';
 import { CodeEditor } from './CodeEditor';
 import { GitReleaseModal } from './GitReleaseModal';
 import { SearchReplaceModal } from './SearchReplaceModal';
+import { GitBranchGraphViewer } from './GitBranchGraphViewer';
 
 function pathBasename(p: string): string {
   const parts = p.split(/[\/\\]/);
@@ -798,6 +800,16 @@ const [openTabs, setOpenTabs] = useState<string[]>([]);
                 >
                   <span>Diff</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setRightViewMode('graph')}
+                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md transition-colors cursor-pointer ${
+                    rightViewMode === 'graph' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'hover:text-slate-900'
+                  }`}
+                >
+                  <GitBranch className="w-3.5 h-3.5 text-[#EA580C]" />
+                  <span>Graph</span>
+                </button>
               </div>
             </div>
 
@@ -1187,6 +1199,8 @@ const [openTabs, setOpenTabs] = useState<string[]>([]);
 
               ) : rightViewMode === 'diff' ? (
                 <UnifiedDiffViewer gitStatus={gitStatus} onSelectFile={onSelectFile} />
+              ) : rightViewMode === 'graph' ? (
+                <GitBranchGraphViewer workspace={workspace} />
               ) : (
                 <div className="h-full overflow-y-auto p-4 space-y-3">
                   <h3 className="text-xs font-bold text-slate-900 mb-2">Workspace Deliverables ({artifacts.length})</h3>

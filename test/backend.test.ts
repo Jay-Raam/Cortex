@@ -42,6 +42,7 @@ import { prReviewer, parseUnifiedDiff } from '../src/server/cowork/pr-reviewer';
 import { scaffoldEngine } from '../src/server/cowork/scaffold-engine';
 import { workspaceReportGenerator } from '../src/server/cowork/report-generator';
 import { terminalWebSocketManager } from '../src/server/cowork/terminal-ws';
+import { getGitBranchGraph, computeTopologicalLanes, parseRefDecorations, formatGitGraphCli } from '../src/server/cowork/git-graph';
 import { WebSocket as WsClient } from 'ws';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
@@ -6539,6 +6540,187 @@ new file mode 100644
     });
   });
 
+
+  describe('Test Suite 52: Interactive Visual Git Branch Graph & Merge Visualizer', () => {
+    it('Scenario A: Git graph parser accurately extracts commit hashes, lanes, parent relationships, and merge commits', async () => {
+      const graph = await getGitBranchGraph(process.cwd(), { maxCount: 10 });
+      assert.strictEqual(graph.isGit, true);
+      assert.ok(graph.totalCommits > 0);
+      assert.ok(graph.commits.length > 0);
+      assert.ok(graph.lanesCount >= 1);
+      assert.ok(typeof graph.asciiTree === 'string' && graph.asciiTree.length > 0);
+
+      // Verify commit structure
+      const headCommit = graph.commits[0];
+      assert.ok(headCommit.hash && headCommit.hash.length === 40);
+      assert.ok(headCommit.shortHash && headCommit.shortHash.length === 7);
+      assert.ok(headCommit.subject && headCommit.subject.length > 0);
+      assert.ok(headCommit.authorName && headCommit.authorName.length > 0);
+      assert.ok(headCommit.authorEmail && headCommit.authorEmail.includes('@'));
+      assert.ok(headCommit.relativeDate && headCommit.relativeDate.length > 0);
+      assert.ok(Array.isArray(headCommit.parents));
+      assert.ok(Array.isArray(headCommit.branches));
+      assert.ok(Array.isArray(headCommit.tags));
+      assert.ok(typeof headCommit.lane === 'number');
+      assert.ok(headCommit.color && headCommit.color.startsWith('#'));
+      assert.ok(Array.isArray(headCommit.routes));
+
+      // Verify at least one merge commit is identified (our repository has merge commits)
+      const mergeCommit = graph.commits.find((c) => c.parents.length > 1);
+      if (mergeCommit) {
+        assert.ok(mergeCommit.parents.length >= 2);
+        assert.ok(mergeCommit.routes.length > 0);
+      }
+    });
+
+    it('Scenario B: Branch decoration parsing correctly maps branch names, tags, and HEAD', () => {
+      const dec1 = parseRefDecorations('HEAD -> main, origin/main, origin/HEAD, tag: v1.3.0, feature/test');
+      assert.strictEqual(dec1.isHead, true);
+      assert.strictEqual(dec1.headBranch, 'main');
+      assert.ok(dec1.branches.includes('main'));
+      assert.ok(dec1.branches.includes('origin/main'));
+      assert.ok(dec1.branches.includes('feature/test'));
+      assert.ok(!dec1.branches.includes('origin/HEAD'));
+      assert.deepStrictEqual(dec1.tags, ['v1.3.0']);
+
+      const dec2 = parseRefDecorations('HEAD, tag: release-candidate, my-branch');
+      assert.strictEqual(dec2.isHead, true);
+      assert.strictEqual(dec2.headBranch, undefined);
+      assert.ok(dec2.branches.includes('my-branch'));
+      assert.deepStrictEqual(dec2.tags, ['release-candidate']);
+
+      const decEmpty = parseRefDecorations('');
+      assert.strictEqual(decEmpty.isHead, false);
+      assert.deepStrictEqual(decEmpty.branches, []);
+      assert.deepStrictEqual(decEmpty.tags, []);
+    });
+
+    it('Scenario C: Handles non-git directory, detached HEAD, and empty repos gracefully without throwing', async () => {
+      const nonGitDir = path.resolve(process.cwd(), 'node_modules');
+      const nonGitGraph = await getGitBranchGraph(nonGitDir);
+      assert.strictEqual(nonGitGraph.isGit, false);
+      assert.strictEqual(nonGitGraph.totalCommits, 0);
+      assert.strictEqual(nonGitGraph.commits.length, 0);
+      assert.strictEqual(nonGitGraph.asciiTree, 'Not a git repository.');
+
+      const nonExistentDir = path.resolve(process.cwd(), 'does_not_exist_' + Date.now());
+      const nonExistentGraph = await getGitBranchGraph(nonExistentDir);
+      assert.strictEqual(nonExistentGraph.isGit, false);
+      assert.strictEqual(nonExistentGraph.totalCommits, 0);
+
+      // Verify formatGitGraphCli handles non-git and empty graphs
+      const cliNonGit = formatGitGraphCli(nonGitGraph);
+      assert.strictEqual(cliNonGit, 'Not a git repository.');
+
+      const emptyGraph = {
+        isGit: true,
+        workspaceDir: '/tmp/empty',
+        currentBranch: 'main',
+        totalCommits: 0,
+        lanesCount: 0,
+        commits: [],
+        branches: [],
+        tags: [],
+        asciiTree: 'No commits in repository.',
+      };
+      const cliEmpty = formatGitGraphCli(emptyGraph);
+      assert.strictEqual(cliEmpty, 'No commits in repository.');
+    });
+
+    it('Scenario D: REST GET /api/cowork/workspaces/:id/git/graph enforces authentication and tenant isolation', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const owner = db.createUser({
+        id: `git_graph_owner_${Date.now()}`,
+        email: `git_graph_owner_${Date.now()}@test.com`,
+        name: 'Git Owner',
+        passwordHash: bcrypt.hashSync('password123', 4),
+        role: 'user',
+        createdAt: new Date().toISOString(),
+      });
+      const foreign = db.createUser({
+        id: `git_graph_foreign_${Date.now()}`,
+        email: `git_graph_foreign_${Date.now()}@test.com`,
+        name: 'Foreign User',
+        passwordHash: bcrypt.hashSync('password123', 4),
+        role: 'user',
+        createdAt: new Date().toISOString(),
+      });
+      const ws = db.createWorkspace({
+        id: `ws_git_graph_${Date.now()}`,
+        userId: owner.id,
+        name: 'Git Graph Test WS',
+        description: 'Test WS for git graph',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        projectRoot: process.cwd(),
+        isLocalBinding: true,
+      });
+
+      const ownerTokens = generateTokens(owner);
+      const foreignTokens = generateTokens(foreign);
+
+      // 1. Unauthenticated request -> 401
+      const server = app.listen(0);
+      const address = server.address() as any;
+      const baseUrl = 'http://127.0.0.1:' + address.port;
+
+      try {
+        const unauthRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/git/graph');
+        assert.strictEqual(unauthRes.status, 401);
+
+        // 2. Foreign user request -> 404 (multi-tenant workspace isolation)
+        const foreignRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/git/graph', {
+          headers: { Authorization: 'Bearer ' + foreignTokens.accessToken },
+        });
+        assert.strictEqual(foreignRes.status, 404);
+
+        // 3. Authorized owner request -> 200 with structured graph
+        const authRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/git/graph?maxCount=5', {
+          headers: { Authorization: 'Bearer ' + ownerTokens.accessToken },
+        });
+        assert.strictEqual(authRes.status, 200);
+        const data = await authRes.json();
+        assert.strictEqual(data.success, true);
+        assert.ok(data.graph);
+        assert.strictEqual(data.graph.isGit, true);
+        assert.ok(data.graph.commits.length <= 5);
+        assert.ok(data.graph.totalCommits > 0);
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario E: Headless CLI cortex graph outputs Unicode branch tree and JSON telemetry', async () => {
+      // 1. Unicode formatted graph to stdout
+      let stdoutBuf = '';
+      const cliRes = await runCortexCli(['graph', '--max', '4'], {
+        stdout: (msg) => { stdoutBuf += msg; },
+        stderr: () => {},
+      });
+      assert.strictEqual(cliRes.exitCode, 0);
+      assert.ok(stdoutBuf.includes('Git Branch Topology'));
+      assert.ok(stdoutBuf.includes('Current Branch:'));
+      assert.ok(cliRes.data);
+      assert.strictEqual(cliRes.data.isGit, true);
+
+      // 2. Structured JSON export
+      let jsonBuf = '';
+      const jsonRes = await runCortexCli(['graph', '--json', '--max', '2'], {
+        stdout: (msg) => { jsonBuf += msg; },
+        stderr: () => {},
+      });
+      assert.strictEqual(jsonRes.exitCode, 0);
+      const parsed = JSON.parse(jsonBuf);
+      assert.strictEqual(parsed.isGit, true);
+      assert.ok(Array.isArray(parsed.commits));
+      assert.strictEqual(parsed.commits.length, 2);
+      assert.ok(parsed.commits[0].shortHash);
+      assert.ok(parsed.commits[0].lane !== undefined);
+    });
+  });
 
   after(() => {
     // Purge temporary test workspaces from disk

@@ -651,3 +651,23 @@ export async function scaffoldWorkspaceTemplateApi(
   if (!res.ok) throw new Error(json.error || 'Failed to scaffold project template');
   return json;
 }
+
+
+export async function fetchGitGraphApi(
+  workspaceId: string,
+  maxCount: number = 50
+): Promise<any> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${encodeURIComponent(workspaceId)}/git/graph?maxCount=${maxCount}`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to fetch Git branch graph');
+  return json.graph;
+}
