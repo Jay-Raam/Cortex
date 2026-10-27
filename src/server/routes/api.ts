@@ -13,6 +13,7 @@ import { prReviewer } from '../cowork/pr-reviewer';
 import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
 import { getGitBranchGraph } from '../cowork/git-graph';
+import { secretsVault } from '../security/secrets-vault';
 import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
@@ -1930,5 +1931,125 @@ apiRouter.get('/cowork/workspaces/:id/export-report', async (req: Request, res: 
     }
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to generate workspace report' });
+  }
+});
+
+
+// --- Workspace Secrets Vault Endpoints ---
+
+/**
+ * GET /api/cowork/workspaces/:id/secrets
+ * Retrieves all masked secrets in the workspace vault.
+ */
+apiRouter.get('/cowork/workspaces/:id/secrets', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  try {
+    const secrets = secretsVault.listSecrets(workspace.id);
+    res.json({ success: true, secrets });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to list workspace secrets' });
+  }
+});
+
+/**
+ * POST /api/cowork/workspaces/:id/secrets
+ * Encrypts and persists a secret key-value in the workspace vault.
+ */
+apiRouter.post('/cowork/workspaces/:id/secrets', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const { key, value, description } = req.body;
+  if (!key || typeof key !== 'string' || !key.trim()) {
+    return res.status(400).json({ error: 'Key is required and must be a non-empty string' });
+  }
+  if (value === undefined || value === null || typeof value !== 'string') {
+    return res.status(400).json({ error: 'Value is required and must be a string' });
+  }
+
+  try {
+    const saved = secretsVault.setSecret(workspace.id, key, value, description);
+    res.json({ success: true, secret: saved });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to save secret' });
+  }
+});
+
+/**
+ * DELETE /api/cowork/workspaces/:id/secrets/:key
+ * Deletes a secret from the workspace vault.
+ */
+apiRouter.delete('/cowork/workspaces/:id/secrets/:key', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id, key } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  try {
+    const deleted = secretsVault.deleteSecret(workspace.id, key);
+    res.json({ success: true, deleted });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete secret' });
+  }
+});
+
+/**
+ * POST /api/cowork/workspaces/:id/secrets/import-env
+ * Bulk imports .env file key-values into the workspace secrets vault.
+ */
+apiRouter.post('/cowork/workspaces/:id/secrets/import-env', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const { dotEnvContent } = req.body;
+  if (!dotEnvContent || typeof dotEnvContent !== 'string') {
+    return res.status(400).json({ error: 'dotEnvContent string is required' });
+  }
+
+  try {
+    const result = secretsVault.importDotEnv(workspace.id, dotEnvContent);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to import .env secrets' });
   }
 });

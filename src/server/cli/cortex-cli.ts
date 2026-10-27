@@ -11,12 +11,13 @@ import { prReviewer } from '../cowork/pr-reviewer';
 import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
 import { getGitBranchGraph, formatGitGraphCli } from '../cowork/git-graph';
+import { secretsVault } from '../security/secrets-vault';
 import { User, Workspace, PermissionMode } from '../types';
 
 export const CORTEX_VERSION = '1.3.0';
 
 export interface CliParsedArgs {
-  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'graph' | 'unknown';
+  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'graph' | 'secret' | 'unknown';
   subcommand?: string;
   positional: string[];
   flags: {
@@ -83,6 +84,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       flags.format = argv[++i];
     } else if (arg === '--output' || arg === '-o') {
       flags.output = argv[++i];
+    } else if (arg === '--description' || arg === '-d') {
+      flags.description = argv[++i];
     } else if (arg === '--permission') {
       flags.permission = argv[++i] as 'A' | 'B' | 'C';
     } else if (arg === '--max' || arg === '--limit') {
@@ -130,6 +133,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       command = 'report';
     } else if (primary === 'graph') {
       command = 'graph';
+    } else if (primary === 'secret' || primary === 'secrets') {
+      command = 'secret';
     } else {
       command = 'unknown';
     }
@@ -160,6 +165,7 @@ Commands:
   templates                      List all available project starter templates
   report [--workspace <path>]    Generate workspace execution & compliance report (md, html, json)
   graph [--workspace <path>]     Display visual Git branch topology and commit graph
+  secret <set|list|del|import>   Manage encrypted workspace secrets vault (AES-256-GCM)
   status                         Display platform health, model catalog, and environment info
   version                        Print the current Cortex version
   help                           Display this help manual
@@ -777,6 +783,94 @@ case 'report': {
         return { exitCode: 0, output: formatted, data: graph };
       } catch (err: any) {
         const errMsg = `Git graph error: ${err.message || String(err)}`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+    }
+
+    case 'secret': {
+      try {
+        const sub = (parsed.subcommand || parsed.positional[1] || 'list').toLowerCase();
+        const wsId = parsed.flags.workspace
+          ? String(parsed.flags.workspace)
+          : 'default-workspace';
+
+        if (sub === 'set') {
+          const key = parsed.positional[2];
+          const val = parsed.positional[3];
+          if (!key || val === undefined) {
+            const err = 'Usage: cortex secret set <KEY> <VALUE> [--description <desc>]';
+            stderr(err);
+            return { exitCode: 1, output: '', error: err };
+          }
+          const saved = secretsVault.setSecret(wsId, key, val, parsed.flags.description);
+          db.persistSync();
+          const msg = `Successfully encrypted and stored secret "${saved.key}" (${saved.maskedValue}) in workspace "${wsId}".`;
+          stdout(msg);
+          return { exitCode: 0, output: msg, data: saved };
+        } else if (sub === 'list') {
+          const secrets = secretsVault.listSecrets(wsId);
+          if (parsed.flags.json) {
+            const jsonText = JSON.stringify(secrets, null, 2);
+            stdout(jsonText);
+            return { exitCode: 0, output: jsonText, data: secrets };
+          }
+
+          if (secrets.length === 0) {
+            const msg = `No secrets found in workspace "${wsId}". Use "cortex secret set <KEY> <VALUE>" to add one.`;
+            stdout(msg);
+            return { exitCode: 0, output: msg, data: [] };
+          }
+
+          let out = `Workspace Secrets Vault (${secrets.length} secrets in "${wsId}"):\n`;
+          out += '─'.repeat(60) + '\n';
+          for (const s of secrets) {
+            const desc = s.description ? ` - ${s.description}` : '';
+            out += `  ${s.key.padEnd(24)} ${s.maskedValue}${desc}\n`;
+          }
+          out += '─'.repeat(60);
+          stdout(out);
+          return { exitCode: 0, output: out, data: secrets };
+        } else if (sub === 'delete' || sub === 'del' || sub === 'remove' || sub === 'rm') {
+          const key = parsed.positional[2];
+          if (!key) {
+            const err = 'Usage: cortex secret delete <KEY>';
+            stderr(err);
+            return { exitCode: 1, output: '', error: err };
+          }
+          const deleted = secretsVault.deleteSecret(wsId, key);
+          db.persistSync();
+          const msg = deleted
+            ? `Successfully deleted secret "${key}" from workspace "${wsId}".`
+            : `Secret "${key}" not found in workspace "${wsId}".`;
+          stdout(msg);
+          return { exitCode: deleted ? 0 : 1, output: msg, data: { deleted } };
+        } else if (sub === 'import') {
+          const filePath = parsed.positional[2];
+          if (!filePath) {
+            const err = 'Usage: cortex secret import <path-to-.env>';
+            stderr(err);
+            return { exitCode: 1, output: '', error: err };
+          }
+          const resolved = path.resolve(filePath);
+          if (!fs.existsSync(resolved)) {
+            const err = `Error: file not found at ${resolved}`;
+            stderr(err);
+            return { exitCode: 1, output: '', error: err };
+          }
+          const content = fs.readFileSync(resolved, 'utf8');
+          const result = secretsVault.importDotEnv(wsId, content);
+          db.persistSync();
+          const msg = `Successfully imported ${result.importedCount} secrets (${result.keys.join(', ')}) into workspace "${wsId}".`;
+          stdout(msg);
+          return { exitCode: 0, output: msg, data: result };
+        } else {
+          const err = `Unknown secret subcommand "${sub}". Valid commands: set, list, delete, import`;
+          stderr(err);
+          return { exitCode: 1, output: '', error: err };
+        }
+      } catch (err: any) {
+        const errMsg = `Secret management error: ${err.message || String(err)}`;
         stderr(errMsg);
         return { exitCode: 1, output: '', error: errMsg };
       }

@@ -47,6 +47,21 @@ interface DatabaseSchema {
   arenaVotes?: ArenaVote[];
   customEndpoints?: CustomModelEndpoint[];
   promptTemplates?: PromptTemplateEntity[];
+  workspaceSecrets?: EncryptedSecretRecord[];
+}
+
+export interface EncryptedSecretRecord {
+  id: string;
+  workspaceId: string;
+  key: string;
+  ciphertext: string;
+  iv: string;
+  tag: string;
+  salt: string;
+  maskedValue: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const DATA_DIR = process.env.CORTEX_DATA_DIR || path.resolve(process.cwd(), 'data');
@@ -279,6 +294,7 @@ class Database {
           preferences: parsed.preferences || [],
           customEndpoints: parsed.customEndpoints || [],
           promptTemplates: parsed.promptTemplates || [],
+          workspaceSecrets: parsed.workspaceSecrets || [],
         };
       }
     } catch (err) {
@@ -297,6 +313,7 @@ class Database {
       checkpoints: [],
       notifications: [],
       preferences: [],
+      workspaceSecrets: [],
     };
   }
 
@@ -334,6 +351,23 @@ class Database {
     if (!this.data.skills || this.data.skills.length === 0) {
       this.data.skills = [...INITIAL_SKILLS];
       this.persist();
+    }
+  }
+
+  persistSync() {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      const tempFile = `${DATA_FILE}.tmp`;
+      fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2), 'utf-8');
+      fs.renameSync(tempFile, DATA_FILE);
+    } catch (err) {
+      console.error('Failed to write database file synchronously:', err);
     }
   }
 
@@ -757,6 +791,48 @@ class Database {
     const initialLen = this.data.promptTemplates.length;
     this.data.promptTemplates = this.data.promptTemplates.filter((t) => !(t.id === id && t.userId === userId && !t.isBuiltin));
     const deleted = this.data.promptTemplates.length < initialLen;
+    if (deleted) this.persist();
+    return deleted;
+  }
+
+  // --- Workspace Secrets Vault ---
+  getWorkspaceSecrets(workspaceId: string): EncryptedSecretRecord[] {
+    return (this.data.workspaceSecrets || []).filter((s) => s.workspaceId === workspaceId);
+  }
+
+  getWorkspaceSecret(workspaceId: string, key: string): EncryptedSecretRecord | undefined {
+    return (this.data.workspaceSecrets || []).find(
+      (s) => s.workspaceId === workspaceId && s.key.toUpperCase() === key.toUpperCase()
+    );
+  }
+
+  saveWorkspaceSecret(record: EncryptedSecretRecord): EncryptedSecretRecord {
+    if (!this.data.workspaceSecrets) this.data.workspaceSecrets = [];
+    const idx = this.data.workspaceSecrets.findIndex(
+      (s) => s.workspaceId === record.workspaceId && s.key.toUpperCase() === record.key.toUpperCase()
+    );
+    if (idx >= 0) {
+      this.data.workspaceSecrets[idx] = {
+        ...this.data.workspaceSecrets[idx],
+        ...record,
+        updatedAt: new Date().toISOString(),
+      };
+      this.persist();
+      return this.data.workspaceSecrets[idx];
+    } else {
+      this.data.workspaceSecrets.push(record);
+      this.persist();
+      return record;
+    }
+  }
+
+  deleteWorkspaceSecret(workspaceId: string, key: string): boolean {
+    if (!this.data.workspaceSecrets) return false;
+    const initialLen = this.data.workspaceSecrets.length;
+    this.data.workspaceSecrets = this.data.workspaceSecrets.filter(
+      (s) => !(s.workspaceId === workspaceId && s.key.toUpperCase() === key.toUpperCase())
+    );
+    const deleted = this.data.workspaceSecrets.length < initialLen;
     if (deleted) this.persist();
     return deleted;
   }

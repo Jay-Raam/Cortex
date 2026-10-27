@@ -671,3 +671,79 @@ export async function fetchGitGraphApi(
   if (!res.ok) throw new Error(json.error || 'Failed to fetch Git branch graph');
   return json.graph;
 }
+
+
+export async function fetchWorkspaceSecretsApi(workspaceId: string): Promise<any[]> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${encodeURIComponent(workspaceId)}/secrets`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to fetch workspace secrets');
+  return json.secrets || [];
+}
+
+export async function saveWorkspaceSecretApi(
+  workspaceId: string,
+  secret: { key: string; value: string; description?: string }
+): Promise<any> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${encodeURIComponent(workspaceId)}/secrets`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(secret),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to save secret');
+  return json.secret;
+}
+
+export async function deleteWorkspaceSecretApi(workspaceId: string, key: string): Promise<boolean> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(
+    `/api/cowork/workspaces/${encodeURIComponent(workspaceId)}/secrets/${encodeURIComponent(key)}`,
+    {
+      method: 'DELETE',
+      headers,
+      credentials: 'include',
+    }
+  );
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to delete secret');
+  return json.deleted;
+}
+
+export async function importWorkspaceSecretsApi(
+  workspaceId: string,
+  dotEnvContent: string
+): Promise<{ importedCount: number; keys: string[] }> {
+  const token = localStorage.getItem('nexa_auth_token') || localStorage.getItem('cortex_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(`/api/cowork/workspaces/${encodeURIComponent(workspaceId)}/secrets/import-env`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify({ dotEnvContent }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to import secrets');
+  return json;
+}

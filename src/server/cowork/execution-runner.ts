@@ -158,6 +158,7 @@ export interface ExecutionOptions {
   timeoutMs?: number;
   maxBufferBytes?: number;
   customEnv?: Record<string, string>;
+  workspaceSecrets?: Record<string, string>;
   env?: Record<string, string>;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
@@ -169,7 +170,7 @@ export class ExecutionRunner {
    * Sanitizes the environment variables by constructing an allowlist of essential system keys
    * and strictly filtering out any key that matches sensitive secret patterns.
    */
-  getSanitizedEnv(customEnv?: Record<string, string>): NodeJS.ProcessEnv {
+  getSanitizedEnv(customEnv?: Record<string, string>, workspaceSecrets?: Record<string, string>): NodeJS.ProcessEnv {
     const cleanEnv: NodeJS.ProcessEnv = {};
 
     // 1. Inherit ONLY allowed system environment variables from process.env
@@ -191,7 +192,16 @@ export class ExecutionRunner {
       }
     }
 
-    // 3. Explicitly configure execution flags
+    // 3. Merge authorized workspace secrets vault values
+    if (workspaceSecrets) {
+      for (const [key, val] of Object.entries(workspaceSecrets)) {
+        if (typeof val === 'string') {
+          cleanEnv[key] = val;
+        }
+      }
+    }
+
+    // 4. Explicitly configure execution flags
     cleanEnv.CI = 'true';
     cleanEnv.NODE_ENV = cleanEnv.NODE_ENV || 'test';
     cleanEnv.FORCE_COLOR = '1';
@@ -211,6 +221,7 @@ export class ExecutionRunner {
       timeoutMs: rawTimeoutMs,
       maxBufferBytes = MAX_BUFFER_BYTES,
       customEnv,
+      workspaceSecrets,
       env,
       onStdout,
       onStderr,
@@ -220,7 +231,7 @@ export class ExecutionRunner {
     const timeoutMs = clampExecutionTimeout(rawTimeoutMs);
 
     const mergedCustomEnv = { ...(customEnv || {}), ...(env || {}) };
-    const sanitizedEnv = this.getSanitizedEnv(mergedCustomEnv);
+    const sanitizedEnv = this.getSanitizedEnv(mergedCustomEnv, workspaceSecrets);
 
     const startTime = Date.now();
     let stdoutAcc = '';

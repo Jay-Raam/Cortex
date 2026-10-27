@@ -43,6 +43,7 @@ import { scaffoldEngine } from '../src/server/cowork/scaffold-engine';
 import { workspaceReportGenerator } from '../src/server/cowork/report-generator';
 import { terminalWebSocketManager } from '../src/server/cowork/terminal-ws';
 import { getGitBranchGraph, computeTopologicalLanes, parseRefDecorations, formatGitGraphCli } from '../src/server/cowork/git-graph';
+import { secretsVault, encryptSecret, decryptSecret, isValidSecretKey, maskSecretValue, parseDotEnv } from '../src/server/security/secrets-vault';
 import { WebSocket as WsClient } from 'ws';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
@@ -6719,6 +6720,227 @@ new file mode 100644
       assert.strictEqual(parsed.commits.length, 2);
       assert.ok(parsed.commits[0].shortHash);
       assert.ok(parsed.commits[0].lane !== undefined);
+    });
+  });
+
+  describe('Test Suite 53: Workspace Secrets Vault & Encrypted Environment Manager', () => {
+    it('Scenario A: Authenticated AES-256-GCM encryption, decryption, and probabilistic salt/IV generation', () => {
+      const plaintext = 'sk-prod-live-9876543210-secure-cortex-token';
+      const enc1 = encryptSecret(plaintext);
+
+      assert.ok(enc1.ciphertext && enc1.ciphertext.length > 0);
+      assert.strictEqual(enc1.iv.length, 24);
+      assert.strictEqual(enc1.tag.length, 32);
+      assert.strictEqual(enc1.salt.length, 32);
+
+      const decrypted = decryptSecret(enc1);
+      assert.strictEqual(decrypted, plaintext);
+
+      // Verify probabilistic encryption: same plaintext produces different salt, iv, and ciphertext
+      const enc2 = encryptSecret(plaintext);
+      assert.notStrictEqual(enc1.iv, enc2.iv);
+      assert.notStrictEqual(enc1.salt, enc2.salt);
+      assert.notStrictEqual(enc1.ciphertext, enc2.ciphertext);
+      assert.strictEqual(decryptSecret(enc2), plaintext);
+    });
+
+    it('Scenario B: Tamper detection & fail-closed authenticated integrity enforcement', () => {
+      const plaintext = 'database_super_secret_credentials_123';
+      const enc = encryptSecret(plaintext);
+
+      // 1. Corrupted ciphertext
+      const corruptedCipher = 'f' + enc.ciphertext.slice(1);
+      assert.throws(
+        () => decryptSecret({ ...enc, ciphertext: corruptedCipher }),
+        /Vault decryption error/
+      );
+
+      // 2. Corrupted auth tag
+      const corruptedTag = '00' + enc.tag.slice(2);
+      assert.throws(
+        () => decryptSecret({ ...enc, tag: corruptedTag }),
+        /Vault decryption error/
+      );
+
+      // 3. Corrupted IV
+      const corruptedIv = 'aa' + enc.iv.slice(2);
+      assert.throws(
+        () => decryptSecret({ ...enc, iv: corruptedIv }),
+        /Vault decryption error/
+      );
+    });
+
+    it('Scenario C: Key syntax validation, secret value masking, and .env parsing', () => {
+      // Valid keys
+      assert.strictEqual(isValidSecretKey('STRIPE_KEY').valid, true);
+      assert.strictEqual(isValidSecretKey('_MY_SECRET_1').valid, true);
+      assert.strictEqual(isValidSecretKey('DATABASE_URL').valid, true);
+
+      // Invalid keys
+      assert.strictEqual(isValidSecretKey('').valid, false);
+      assert.strictEqual(isValidSecretKey('123_INVALID').valid, false);
+      assert.strictEqual(isValidSecretKey('STRIPE-KEY').valid, false);
+      assert.strictEqual(isValidSecretKey('KEY WITH SPACES').valid, false);
+      assert.strictEqual(isValidSecretKey('FOO$BAR').valid, false);
+
+      // Masking
+      assert.strictEqual(maskSecretValue('short'), '••••••••');
+      assert.strictEqual(maskSecretValue('12345678'), '••••••••');
+      assert.strictEqual(maskSecretValue('sk-live-1234567890abcdef'), 'sk-••••••••def');
+
+      // .env parsing
+      const envText = `
+        # Database config
+        PORT=8080
+        DB_HOST="postgres.internal.net"
+        API_KEY='sk-test-secret-key'
+        # Ignored comment
+        INVALID-KEY=should_be_skipped
+      `;
+      const parsed = parseDotEnv(envText);
+      assert.strictEqual(parsed.length, 3);
+      assert.strictEqual(parsed[0].key, 'PORT');
+      assert.strictEqual(parsed[0].value, '8080');
+      assert.strictEqual(parsed[1].key, 'DB_HOST');
+      assert.strictEqual(parsed[1].value, 'postgres.internal.net');
+      assert.strictEqual(parsed[2].key, 'API_KEY');
+      assert.strictEqual(parsed[2].value, 'sk-test-secret-key');
+    });
+
+    it('Scenario D: REST API endpoints enforce authentication, IDOR tenant isolation, and secret masking', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const owner = db.createUser({
+        id: `sec_owner_${Date.now()}`,
+        email: `sec_owner_${Date.now()}@test.com`,
+        name: 'Secrets Owner',
+        passwordHash: bcrypt.hashSync('password123', 4),
+        role: 'user',
+        createdAt: new Date().toISOString(),
+      });
+      const foreign = db.createUser({
+        id: `sec_foreign_${Date.now()}`,
+        email: `sec_foreign_${Date.now()}@test.com`,
+        name: 'Foreign User',
+        passwordHash: bcrypt.hashSync('password123', 4),
+        role: 'user',
+        createdAt: new Date().toISOString(),
+      });
+      const ws = db.createWorkspace({
+        id: `ws_vault_${Date.now()}`,
+        userId: owner.id,
+        name: 'Vault Workspace',
+        description: 'Test space for secrets vault',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const ownerTokens = generateTokens(owner);
+      const foreignTokens = generateTokens(foreign);
+
+      const server = app.listen(0);
+      const address = server.address() as any;
+      const baseUrl = 'http://127.0.0.1:' + address.port;
+
+      try {
+        // 1. Unauthenticated request -> 401
+        const unauthRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/secrets');
+        assert.strictEqual(unauthRes.status, 401);
+
+        // 2. Foreign user request -> 404 (IDOR defense)
+        const foreignRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/secrets', {
+          headers: { Authorization: 'Bearer ' + foreignTokens.accessToken },
+        });
+        assert.strictEqual(foreignRes.status, 404);
+
+        // 3. Save secret as authorized owner -> 200 with masked value (never raw secret)
+        const saveRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/secrets', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + ownerTokens.accessToken,
+          },
+          body: JSON.stringify({
+            key: 'AWS_ACCESS_KEY',
+            value: 'AKIAIOSFODNN7EXAMPLE',
+            description: 'Production AWS access key',
+          }),
+        });
+        assert.strictEqual(saveRes.status, 200);
+        const saveData = await saveRes.json();
+        assert.strictEqual(saveData.success, true);
+        assert.strictEqual(saveData.secret.key, 'AWS_ACCESS_KEY');
+        assert.ok(!JSON.stringify(saveData).includes('AKIAIOSFODNN7EXAMPLE'));
+        assert.ok(saveData.secret.maskedValue.includes('••••••••'));
+
+        // 4. List secrets -> 200 with list of masked items
+        const listRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/secrets', {
+          headers: { Authorization: 'Bearer ' + ownerTokens.accessToken },
+        });
+        assert.strictEqual(listRes.status, 200);
+        const listData = await listRes.json();
+        assert.strictEqual(listData.secrets.length, 1);
+        assert.strictEqual(listData.secrets[0].key, 'AWS_ACCESS_KEY');
+
+        // 5. Bulk import .env content
+        const importRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/secrets/import-env', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + ownerTokens.accessToken,
+          },
+          body: JSON.stringify({
+            dotEnvContent: 'PORT=3000\nREDIS_URL=redis://cluster.internal:6379',
+          }),
+        });
+        assert.strictEqual(importRes.status, 200);
+        const importData = await importRes.json();
+        assert.strictEqual(importData.importedCount, 2);
+
+        // 6. Delete secret
+        const delRes = await fetch(baseUrl + '/api/cowork/workspaces/' + ws.id + '/secrets/PORT', {
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer ' + ownerTokens.accessToken },
+        });
+        assert.strictEqual(delRes.status, 200);
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario E: CLI cortex secret execution and execution runner environment injection', async () => {
+      const testWsId = `ws_cli_vault_${Date.now()}`;
+
+      // 1. CLI secret set
+      const setRes = await runCortexCli(['secret', 'set', 'MY_APP_SECRET', 'super_secret_token_123', '--workspace', testWsId]);
+      assert.strictEqual(setRes.exitCode, 0);
+
+      // 2. CLI secret list --json
+      let jsonBuf = '';
+      const listRes = await runCortexCli(['secret', 'list', '--workspace', testWsId, '--json'], {
+        stdout: (msg) => { jsonBuf += msg; },
+        stderr: () => {},
+      });
+      assert.strictEqual(listRes.exitCode, 0);
+      const parsedList = JSON.parse(jsonBuf);
+      assert.strictEqual(parsedList.length, 1);
+      assert.strictEqual(parsedList[0].key, 'MY_APP_SECRET');
+      assert.ok(parsedList[0].maskedValue.includes('••••••••'));
+
+      // 3. ExecutionRunner environment injection
+      const decryptedEnv = secretsVault.getDecryptedEnv(testWsId);
+      assert.strictEqual(decryptedEnv.MY_APP_SECRET, 'super_secret_token_123');
+
+      const sanitized = executionRunner.getSanitizedEnv({}, decryptedEnv);
+      assert.strictEqual(sanitized.MY_APP_SECRET, 'super_secret_token_123');
+      assert.strictEqual(sanitized.GEMINI_API_KEY, undefined);
+      assert.strictEqual(sanitized.OPENROUTER_API_KEY, undefined);
+
+      // 4. CLI secret delete
+      const delRes = await runCortexCli(['secret', 'delete', 'MY_APP_SECRET', '--workspace', testWsId]);
+      assert.strictEqual(delRes.exitCode, 0);
     });
   });
 
