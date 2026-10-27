@@ -12,6 +12,7 @@ import { codebaseIndexer } from '../cowork/code-indexer';
 import { prReviewer } from '../cowork/pr-reviewer';
 import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
+import { getGitBranchGraph } from '../cowork/git-graph';
 import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
@@ -1666,6 +1667,35 @@ apiRouter.post('/cowork/workspaces/:id/git/release-notes', async (req: Request, 
  * POST /api/cowork/workspaces/:id/search-replace
  * Multi-file search and replace across workspace files with regex and match previews
  */
+/**
+ * GET /api/cowork/workspaces/:id/git/graph
+ * Retrieve visual topological Git commit graph, branches, tags, and ASCII tree
+ */
+apiRouter.get('/cowork/workspaces/:id/git/graph', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const maxCount = req.query.maxCount ? parseInt(req.query.maxCount as string, 10) : 50;
+  const wsRoot = workspaceManager.getWorkspaceRoot(workspace);
+
+  try {
+    const graph = await getGitBranchGraph(wsRoot, { maxCount });
+    res.json({ success: true, graph });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to retrieve git branch graph' });
+  }
+});
+
 apiRouter.post('/cowork/workspaces/:id/search-replace', async (req: Request, res: Response) => {
   let user: User;
   try {

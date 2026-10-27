@@ -9,7 +9,7 @@ export interface CoworkWorkspaceProps {
   onNewWorkspace?: () => void;
 }
 
-export type RightViewMode = 'editor' | 'preview' | 'diff' | 'artifacts';
+export type RightViewMode = 'editor' | 'preview' | 'diff' | 'artifacts' | 'graph';
 
 export interface CoworkTaskListProps {
   tasks: AgentTask[];
