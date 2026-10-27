@@ -13,12 +13,13 @@ import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generat
 import { getGitBranchGraph, formatGitGraphCli } from '../cowork/git-graph';
 import { secretsVault } from '../security/secrets-vault';
 import { collabWebSocketManager } from '../cowork/collab-ws';
+import { webhookEngine } from '../cowork/webhook-engine';
 import { User, Workspace, PermissionMode } from '../types';
 
 export const CORTEX_VERSION = '1.3.0';
 
 export interface CliParsedArgs {
-  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'graph' | 'secret' | 'collab' | 'unknown';
+  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'report' | 'graph' | 'secret' | 'collab' | 'webhook' | 'unknown';
   subcommand?: string;
   positional: string[];
   flags: {
@@ -87,6 +88,12 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       flags.output = argv[++i];
     } else if (arg === '--description' || arg === '-d') {
       flags.description = argv[++i];
+    } else if (arg === '--event' || arg === '-e') {
+      flags.event = argv[++i];
+    } else if (arg === '--payload') {
+      flags.payload = argv[++i];
+    } else if (arg === '--provider') {
+      flags.provider = argv[++i];
     } else if (arg === '--permission') {
       flags.permission = argv[++i] as 'A' | 'B' | 'C';
     } else if (arg === '--max' || arg === '--limit') {
@@ -138,6 +145,8 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       command = 'secret';
     } else if (primary === 'collab' || primary === 'pair') {
       command = 'collab';
+    } else if (primary === 'webhook' || primary === 'webhooks') {
+      command = 'webhook';
     } else {
       command = 'unknown';
     }
@@ -170,6 +179,7 @@ Commands:
   graph [--workspace <path>]     Display visual Git branch topology and commit graph
   secret <set|list|del|import>   Manage encrypted workspace secrets vault (AES-256-GCM)
   collab [--invite|--peers]      Live collaborative pair-programming & session sharing
+  webhook <list|simulate>        Inspect and simulate CI/CD webhook events
   status                         Display platform health, model catalog, and environment info
   version                        Print the current Cortex version
   help                           Display this help manual
@@ -923,6 +933,86 @@ case 'report': {
         return { exitCode: 0, output: out, data: { peers } };
       } catch (err: any) {
         const errMsg = `Collaboration error: ${err.message || String(err)}`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+    }
+
+    case 'webhook': {
+      try {
+        const sub = parsed.subcommand?.toLowerCase() || 'list';
+
+        if (sub === 'simulate') {
+          const provider = (parsed.flags.provider as 'github' | 'gitlab') || 'github';
+          const event = parsed.flags.event || 'pull_request';
+          let payload: any = {
+            action: 'opened',
+            number: 42,
+            pull_request: {
+              number: 42,
+              title: 'feat: simulated automation change',
+              user: { login: 'cortex-bot' },
+              head: { ref: 'feature/bot' },
+              base: { ref: 'main' },
+            },
+          };
+
+          if (parsed.flags.payload) {
+            try {
+              payload = JSON.parse(parsed.flags.payload);
+            } catch {
+              if (fs.existsSync(parsed.flags.payload)) {
+                payload = JSON.parse(fs.readFileSync(parsed.flags.payload, 'utf8'));
+              }
+            }
+          }
+
+          const delivery = await webhookEngine.simulateEvent(provider, event, payload);
+
+          if (parsed.flags.json) {
+            const jsonText = JSON.stringify(delivery, null, 2);
+            stdout(jsonText);
+            return { exitCode: 0, output: jsonText, data: delivery };
+          }
+
+          const out = `Simulated webhook event dispatched successfully:
+  ID:       ${delivery.id}
+  Provider: ${delivery.provider}
+  Event:    ${delivery.event}
+  Status:   ${delivery.status}
+  Summary:  ${delivery.summary}
+  Latency:  ${delivery.latencyMs}ms`;
+          stdout(out);
+          return { exitCode: 0, output: out, data: delivery };
+        }
+
+        // Default or 'list'
+        const limit = parsed.flags.max || parsed.flags.limit || 10;
+        const deliveries = webhookEngine.getDeliveries(limit);
+
+        if (parsed.flags.json) {
+          const jsonText = JSON.stringify(deliveries, null, 2);
+          stdout(jsonText);
+          return { exitCode: 0, output: jsonText, data: deliveries };
+        }
+
+        if (deliveries.length === 0) {
+          const msg = 'No webhook deliveries recorded yet. Run "cortex webhook simulate" to trigger a simulated event.';
+          stdout(msg);
+          return { exitCode: 0, output: msg, data: [] };
+        }
+
+        let out = `Recent Webhook Deliveries (${deliveries.length} items):\n`;
+        out += '─'.repeat(75) + '\n';
+        for (const d of deliveries) {
+          const statusIcon = d.status === 'success' ? '✔' : d.status === 'ignored' ? '○' : '✖';
+          out += `  ${statusIcon} [${d.provider.toUpperCase()}] ${d.event.padEnd(16)} | ${d.summary} (${d.latencyMs}ms)\n`;
+        }
+        out += '─'.repeat(75);
+        stdout(out);
+        return { exitCode: 0, output: out, data: deliveries };
+      } catch (err: any) {
+        const errMsg = `Webhook command error: ${err.message || String(err)}`;
         stderr(errMsg);
         return { exitCode: 1, output: '', error: errMsg };
       }

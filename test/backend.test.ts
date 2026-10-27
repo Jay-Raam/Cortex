@@ -13,6 +13,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import crypto from 'node:crypto';
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../src/server/db/database';
@@ -47,6 +48,7 @@ import { getGitBranchGraph, computeTopologicalLanes, parseRefDecorations, format
 import { secretsVault, encryptSecret, decryptSecret, isValidSecretKey, maskSecretValue, parseDotEnv } from '../src/server/security/secrets-vault';
 import { WebSocket as WsClient } from 'ws';
 import { collabWebSocketManager } from '../src/server/cowork/collab-ws';
+import { webhookEngine, verifyGitHubSignature, verifyGitLabToken } from '../src/server/cowork/webhook-engine';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -7253,6 +7255,227 @@ new file mode 100644
         assert.strictEqual(cliPeersRes.exitCode, 0);
         const parsedCliPeers = JSON.parse(peersJsonBuf);
         assert.ok(Array.isArray(parsedCliPeers.activePeers || parsedCliPeers));
+      } finally {
+        server.close();
+      }
+    });
+  });
+
+  describe('55. Autonomous Webhook & CI/CD Pipeline Automation Engine', () => {
+    before(() => {
+      webhookEngine.clearDeliveries();
+    });
+
+    it('Scenario A: Cryptographic HMAC signature verification & fail-closed tampering detection', () => {
+      const secret = 'ci_webhook_secret_key_super_secure_123';
+      const body = JSON.stringify({ action: 'opened', repository: { full_name: 'owner/repo' } });
+
+      const hmac = crypto.createHmac('sha256', secret).update(body).digest('hex');
+      const validSig = `sha256=${hmac}`;
+
+      // 1. Valid signature
+      assert.strictEqual(verifyGitHubSignature(body, validSig, secret), true);
+
+      // 2. Tampered body
+      assert.strictEqual(verifyGitHubSignature(body + ' ', validSig, secret), false);
+
+      // 3. Wrong secret
+      assert.strictEqual(verifyGitHubSignature(body, validSig, 'wrong_secret'), false);
+
+      // 4. Malformed signature header
+      assert.strictEqual(verifyGitHubSignature(body, hmac, secret), false);
+      assert.strictEqual(verifyGitHubSignature(body, 'sha1=' + hmac, secret), false);
+      assert.strictEqual(verifyGitHubSignature(body, '', secret), false);
+
+      // 5. GitLab token verification
+      assert.strictEqual(verifyGitLabToken('gitlab_token_123', 'gitlab_token_123'), true);
+      assert.strictEqual(verifyGitLabToken('wrong_token', 'gitlab_token_123'), false);
+      assert.strictEqual(verifyGitLabToken('', 'gitlab_token_123'), false);
+    });
+
+    it('Scenario B: GitHub pull_request event processing and autonomous PR review triggering', async () => {
+      const prPayload = {
+        action: 'opened',
+        number: 88,
+        pull_request: {
+          number: 88,
+          title: 'feat: add streaming websocket gateway',
+          user: { login: 'developer-alice' },
+          base: { ref: 'main' },
+          head: { ref: 'feature/stream-gateway' },
+          diff: 'diff --git a/src/gateway.ts b/src/gateway.ts\nindex 0000000..1111111 100644\n--- a/src/gateway.ts\n+++ b/src/gateway.ts\n@@ -1,3 +1,3 @@\n-export function gateway() {}\n+export function gateway() { return true; }\n',
+        },
+        repository: { full_name: 'test-org/core-service' },
+      };
+
+      const record = await webhookEngine.handleGitHubWebhook('pull_request', 'del_test_pr_1', prPayload);
+
+      assert.strictEqual(record.status, 'success');
+      assert.strictEqual(record.provider, 'github');
+      assert.strictEqual(record.event, 'pull_request');
+      assert.strictEqual(record.details?.prNumber, 88);
+      assert.strictEqual(record.details?.author, 'developer-alice');
+      assert.ok(record.details?.reviewReport);
+      assert.ok(record.summary.includes('Autonomous review completed for PR #88'));
+
+      // Unactionable PR event (closed)
+      const ignoredRecord = await webhookEngine.handleGitHubWebhook('pull_request', 'del_test_pr_2', {
+        action: 'closed',
+        number: 88,
+      });
+      assert.strictEqual(ignoredRecord.status, 'ignored');
+    });
+
+    it('Scenario C: GitHub issues & push event processing and automated triage', async () => {
+      // 1. Issue event
+      const issuePayload = {
+        action: 'opened',
+        number: 45,
+        issue: {
+          number: 45,
+          title: 'Bug: WebSocket connection disconnects intermittently on network drop',
+          user: { login: 'reporter-bob' },
+          labels: [{ name: 'bug' }, { name: 'backend' }],
+        },
+        repository: { full_name: 'test-org/core-service' },
+      };
+
+      const issueRecord = await webhookEngine.handleGitHubWebhook('issues', 'del_test_iss_1', issuePayload);
+      assert.strictEqual(issueRecord.status, 'success');
+      assert.strictEqual(issueRecord.details?.issueNumber, 45);
+      assert.ok(issueRecord.summary.includes('Autonomous triage registered for Issue #45'));
+
+      // 2. Push event
+      const pushPayload = {
+        ref: 'refs/heads/feature/autonomous',
+        commits: [{ id: 'a1b2c3d' }, { id: 'e4f5g6h' }],
+        pusher: { name: 'committer-charlie' },
+        repository: { full_name: 'test-org/core-service' },
+      };
+
+      const pushRecord = await webhookEngine.handleGitHubWebhook('push', 'del_test_push_1', pushPayload);
+      assert.strictEqual(pushRecord.status, 'success');
+      assert.strictEqual(pushRecord.details?.commitCount, 2);
+      assert.ok(pushRecord.summary.includes('with 2 commits'));
+    });
+
+    it('Scenario D: GitLab webhook processing (Merge Request Hook, Issue Hook, Push Hook)', async () => {
+      // 1. GitLab MR Hook
+      const mrPayload = {
+        object_attributes: {
+          iid: 19,
+          title: 'Resolve Redis connection timeout in cluster mode',
+          action: 'open',
+        },
+        project: { path_with_namespace: 'gitlab-org/project-backend' },
+        user: { username: 'gitlab-dev' },
+      };
+
+      const mrRecord = await webhookEngine.handleGitLabWebhook('Merge Request Hook', mrPayload);
+      assert.strictEqual(mrRecord.status, 'success');
+      assert.strictEqual(mrRecord.provider, 'gitlab');
+      assert.strictEqual(mrRecord.details?.prNumber, 19);
+      assert.ok(mrRecord.summary.includes('Autonomous review completed for GitLab MR !19'));
+
+      // 2. GitLab Issue Hook
+      const issuePayload = {
+        object_attributes: {
+          iid: 33,
+          title: 'Documentation: add API migration instructions',
+          action: 'open',
+        },
+        project: { path_with_namespace: 'gitlab-org/project-backend' },
+      };
+
+      const issueRecord = await webhookEngine.handleGitLabWebhook('Issue Hook', issuePayload);
+      assert.strictEqual(issueRecord.status, 'success');
+      assert.strictEqual(issueRecord.details?.issueNumber, 33);
+      assert.ok(issueRecord.summary.includes('Triage registered for GitLab Issue #33'));
+    });
+
+    it('Scenario E: REST endpoints, event simulation, delivery querying, and CLI cortex webhook', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = await new Promise<any>((resolve) => {
+        const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      });
+      const port = (server.address() as any).port;
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      const { accessToken } = generateTokens(testUser1);
+
+      try {
+        // 1. REST POST /api/webhooks/github ping
+        const pingRes = await fetch(`${baseUrl}/api/webhooks/github`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-github-event': 'ping',
+            'x-github-delivery': 'gh_ping_123',
+          },
+          body: JSON.stringify({ hook_id: 999, zen: 'Design for failure.' }),
+        });
+        assert.strictEqual(pingRes.status, 200);
+        const pingData = await pingRes.json();
+        assert.strictEqual(pingData.success, true);
+        assert.strictEqual(pingData.delivery.status, 'success');
+
+        // 2. REST GET /api/webhooks/deliveries - unauthenticated -> 401
+        const unauthRes = await fetch(`${baseUrl}/api/webhooks/deliveries`);
+        assert.strictEqual(unauthRes.status, 401);
+
+        // 3. REST GET /api/webhooks/deliveries - authenticated -> 200
+        const authRes = await fetch(`${baseUrl}/api/webhooks/deliveries`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        assert.strictEqual(authRes.status, 200);
+        const authData = await authRes.json();
+        assert.ok(Array.isArray(authData.deliveries));
+        assert.ok(authData.deliveries.length > 0);
+
+        // 4. REST POST /api/webhooks/simulate
+        const simRes = await fetch(`${baseUrl}/api/webhooks/simulate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            provider: 'github',
+            event: 'issues',
+            payload: {
+              action: 'opened',
+              issue: { number: 77, title: 'Simulated issue for test', user: { login: 'tester' } },
+            },
+          }),
+        });
+        assert.strictEqual(simRes.status, 200);
+        const simData = await simRes.json();
+        assert.strictEqual(simData.delivery.status, 'success');
+
+        // 5. CLI cortex webhook simulate --json
+        let simCliJson = '';
+        const simCliRes = await runCortexCli(['webhook', 'simulate', '--json'], {
+          stdout: (msg) => { simCliJson += msg; },
+          stderr: () => {},
+        });
+        assert.strictEqual(simCliRes.exitCode, 0);
+        const parsedSim = JSON.parse(simCliJson);
+        assert.ok(parsedSim.id.startsWith('del_gh_'));
+        assert.strictEqual(parsedSim.status, 'success');
+
+        // 6. CLI cortex webhook list --json
+        let listCliJson = '';
+        const listCliRes = await runCortexCli(['webhook', 'list', '--json'], {
+          stdout: (msg) => { listCliJson += msg; },
+          stderr: () => {},
+        });
+        assert.strictEqual(listCliRes.exitCode, 0);
+        const parsedList = JSON.parse(listCliJson);
+        assert.ok(Array.isArray(parsedList));
+        assert.ok(parsedList.length >= 2);
       } finally {
         server.close();
       }
