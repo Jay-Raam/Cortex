@@ -46,7 +46,7 @@ function ViewLoadingFallback() {
 
 
 
-import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser, renameConversationApi } from './lib/api';
+import { fetchGraphQL, streamChat, checkAuth, loginUser, registerUser, logoutUser, renameConversationApi, scaffoldWorkspaceTemplateApi } from './lib/api';
 import {
   Conversation,
   Message,
@@ -392,6 +392,21 @@ export default function App() {
       console.error('Failed to delete conversation', err);
     }
   };
+
+const handleScaffoldTemplate = async (templateId: string, name?: string, description?: string) => {
+    try {
+      const res = await scaffoldWorkspaceTemplateApi(templateId, name, description);
+      if (res?.workspace) {
+        setWorkspaces((prev) => [res.workspace, ...prev]);
+        setActiveWorkspace(res.workspace);
+        setCurrentView('cowork');
+      }
+    } catch (err: any) {
+      console.error('Failed to scaffold template:', err);
+      alert(err.message || 'Failed to scaffold template');
+    }
+  };
+
 
   const handleCreateBlankProject = async (name: string, description: string) => {
     try {
@@ -1048,6 +1063,7 @@ export default function App() {
         isOpen={isCreateProjectModalOpen}
         onClose={() => setIsCreateProjectModalOpen(false)}
         onCreateBlank={handleCreateBlankProject}
+        onScaffoldTemplate={handleScaffoldTemplate}
         onImportLocalFolder={handleImportLocalProject}
         onBindLocalPath={handleBindLocalProjectPath}
       />

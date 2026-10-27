@@ -39,6 +39,7 @@ import {
 } from '../src/server/cli/cortex-cli';
 import { codebaseIndexer, tokenizeCode } from '../src/server/cowork/code-indexer';
 import { prReviewer, parseUnifiedDiff } from '../src/server/cowork/pr-reviewer';
+import { scaffoldEngine } from '../src/server/cowork/scaffold-engine';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -6019,6 +6020,179 @@ new file mode 100644
       });
       assert.strictEqual(resMd.exitCode, 0);
       assert.ok(mdOutput.includes('Pull Request Quality & Security Audit'));
+    });
+  });
+
+
+  describe('Test Suite 49: Full-Stack Project Template Scaffolding Engine', () => {
+    const scaffoldTestDir = path.resolve(process.cwd(), 'workspaces', `ws_scaffold_unit_${Date.now()}`);
+
+    before(() => {
+      fs.mkdirSync(scaffoldTestDir, { recursive: true });
+    });
+
+    it('Scenario A: getTemplates exposes comprehensive catalog of full-stack starter templates', () => {
+      const templates = scaffoldEngine.getTemplates();
+      assert.ok(templates.length >= 5, 'Must provide at least 5 standard production templates');
+
+      const ids = templates.map((t) => t.id);
+      assert.ok(ids.includes('react-vite-tailwind'));
+      assert.ok(ids.includes('fastapi-python'));
+      assert.ok(ids.includes('express-node'));
+      assert.ok(ids.includes('go-gin'));
+      assert.ok(ids.includes('rust-axum'));
+
+      for (const t of templates) {
+        assert.ok(t.name.length > 0);
+        assert.ok(t.description.length > 0);
+        assert.ok(Array.isArray(t.tags) && t.tags.length > 0);
+        assert.ok(typeof t.entryFile === 'string' && t.entryFile.length > 0);
+      }
+    });
+
+    it('Scenario B: scaffoldProject generates complete file structures for React, FastAPI, and Rust', async () => {
+      // 1. React Vite Tailwind
+      const reactTarget = path.join(scaffoldTestDir, 'my-react-app');
+      const reactRes = await scaffoldEngine.scaffoldProject(reactTarget, 'react-vite-tailwind', 'my-react-app');
+      assert.strictEqual(reactRes.success, true);
+      assert.ok(fs.existsSync(path.join(reactTarget, 'package.json')));
+      assert.ok(fs.existsSync(path.join(reactTarget, 'src', 'App.tsx')));
+      assert.ok(fs.existsSync(path.join(reactTarget, 'vite.config.ts')));
+      assert.ok(fs.existsSync(path.join(reactTarget, 'tailwind.config.js')));
+      assert.ok(reactRes.filesCreated.includes('src/App.tsx'));
+      assert.ok(reactRes.instructions.some((inst) => inst.includes('npm run dev')));
+
+      // 2. FastAPI Python
+      const fastapiTarget = path.join(scaffoldTestDir, 'my-fastapi-service');
+      const fastapiRes = await scaffoldEngine.scaffoldProject(fastapiTarget, 'fastapi-python', 'my-fastapi-service');
+      assert.strictEqual(fastapiRes.success, true);
+      assert.ok(fs.existsSync(path.join(fastapiTarget, 'requirements.txt')));
+      assert.ok(fs.existsSync(path.join(fastapiTarget, 'main.py')));
+      assert.ok(fs.existsSync(path.join(fastapiTarget, 'models.py')));
+      assert.ok(fs.existsSync(path.join(fastapiTarget, 'test_main.py')));
+
+      // 3. Rust Axum
+      const rustTarget = path.join(scaffoldTestDir, 'my-rust-service');
+      const rustRes = await scaffoldEngine.scaffoldProject(rustTarget, 'rust-axum', 'my-rust-service');
+      assert.strictEqual(rustRes.success, true);
+      assert.ok(fs.existsSync(path.join(rustTarget, 'Cargo.toml')));
+      assert.ok(fs.existsSync(path.join(rustTarget, 'src', 'main.rs')));
+    });
+
+    it('Scenario C: Rejects invalid template IDs and defends against path traversal attempts', async () => {
+      // 1. Unknown template ID rejected
+      await assert.rejects(
+        () => scaffoldEngine.scaffoldProject(scaffoldTestDir, 'non-existent-template-xyz'),
+        /Unknown project template/i
+      );
+
+      // 2. Path normalization
+      const normalRes = await scaffoldEngine.scaffoldProject(
+        path.join(scaffoldTestDir, 'clean-go-app'),
+        'go-gin',
+        'Clean Go Service'
+      );
+      assert.strictEqual(normalRes.projectName, 'clean-go-service');
+      assert.ok(fs.existsSync(path.join(scaffoldTestDir, 'clean-go-app', 'main.go')));
+    });
+
+    it('Scenario D: REST /api/cowork/templates and /api/cowork/workspaces/scaffold enforce auth and create workspaces', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      try {
+        const tokens = generateTokens(testUser1);
+
+        // 1. GET /api/cowork/templates
+        const templatesRes = await fetch(`http://127.0.0.1:${port}/api/cowork/templates`);
+        assert.strictEqual(templatesRes.status, 200);
+        const templatesJson: any = await templatesRes.json();
+        assert.strictEqual(templatesJson.success, true);
+        assert.ok(templatesJson.templates.length >= 5);
+
+        // 2. POST unauthenticated rejected with 401
+        const unauthRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/scaffold`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateId: 'express-node' }),
+        });
+        assert.strictEqual(unauthRes.status, 401);
+
+        // 3. POST missing templateId rejected with 400
+        const badReqRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/scaffold`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({ templateId: '' }),
+        });
+        assert.strictEqual(badReqRes.status, 400);
+
+        // 4. Authenticated scaffold creates workspace with files
+        const scaffoldRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/scaffold`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({
+            templateId: 'express-node',
+            name: 'Scaffolded Express App',
+            description: 'Test scaffold workspace',
+          }),
+        });
+        assert.strictEqual(scaffoldRes.status, 201);
+        const scaffoldJson: any = await scaffoldRes.json();
+        assert.strictEqual(scaffoldJson.success, true);
+        assert.ok(scaffoldJson.workspace.id);
+        assert.ok(fs.existsSync(path.join(scaffoldJson.workspace.projectRoot, 'src', 'server.ts')));
+        assert.ok(fs.existsSync(path.join(scaffoldJson.workspace.projectRoot, 'package.json')));
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario E: CLI cortex templates and cortex new scaffold projects from terminal', async () => {
+      // 1. List templates via CLI
+      let listOutput = '';
+      const listRes = await runCortexCli(['templates'], {
+        stdout: (msg) => { listOutput += msg + '\n'; },
+      });
+      assert.strictEqual(listRes.exitCode, 0);
+      assert.ok(listOutput.includes('react-vite-tailwind'));
+      assert.ok(listOutput.includes('fastapi-python'));
+
+      // 2. List templates with --json
+      let jsonListOutput = '';
+      const jsonListRes = await runCortexCli(['templates', '--json'], {
+        stdout: (msg) => { jsonListOutput += msg + '\n'; },
+      });
+      assert.strictEqual(jsonListRes.exitCode, 0);
+      const parsedList = JSON.parse(jsonListOutput.trim());
+      assert.ok(Array.isArray(parsedList) && parsedList.length >= 5);
+
+      // 3. Scaffold new project via CLI
+      const cliTarget = path.join(scaffoldTestDir, 'cli-scaffolded-react');
+      let newOutput = '';
+      const newRes = await runCortexCli(['new', 'react-vite-tailwind', '--name', 'cli-react', '--workspace', cliTarget], {
+        stdout: (msg) => { newOutput += msg + '\n'; },
+      });
+      assert.strictEqual(newRes.exitCode, 0);
+      assert.ok(newOutput.includes('Successfully scaffolded'));
+      assert.ok(fs.existsSync(path.join(cliTarget, 'src', 'App.tsx')));
+
+      // 4. Missing template ID rejected with exit code 1
+      let errOutput = '';
+      const errRes = await runCortexCli(['new'], {
+        stderr: (msg) => { errOutput += msg + '\n'; },
+      });
+      assert.strictEqual(errRes.exitCode, 1);
+      assert.ok(errOutput.includes('Missing template ID'));
     });
   });
 

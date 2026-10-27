@@ -8,12 +8,13 @@ import { coworkEngine } from '../cowork/engine';
 import { workspaceManager } from '../cowork/workspace-manager';
 import { codebaseIndexer } from '../cowork/code-indexer';
 import { prReviewer } from '../cowork/pr-reviewer';
+import { scaffoldEngine } from '../cowork/scaffold-engine';
 import { User, Workspace, PermissionMode } from '../types';
 
 export const CORTEX_VERSION = '1.2.0';
 
 export interface CliParsedArgs {
-  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'unknown';
+  command: 'help' | 'version' | 'status' | 'chat' | 'cowork' | 'search' | 'review' | 'new' | 'templates' | 'unknown';
   subcommand?: string;
   positional: string[];
   flags: {
@@ -72,6 +73,10 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       flags.workspace = argv[++i];
     } else if (arg === '--base' || arg === '-b') {
       flags.base = argv[++i];
+    } else if (arg === '--name' || arg === '-n') {
+      flags.name = argv[++i];
+    } else if (arg === '--template' || arg === '-t') {
+      flags.template = argv[++i];
     } else if (arg === '--permission') {
       flags.permission = argv[++i] as 'A' | 'B' | 'C';
     } else if (arg.startsWith('--model=')) {
@@ -107,6 +112,10 @@ export function parseCliArgs(argv: string[]): CliParsedArgs {
       command = 'search';
     } else if (primary === 'review') {
       command = 'review';
+    } else if (primary === 'new' || primary === 'scaffold') {
+      command = 'new';
+    } else if (primary === 'templates') {
+      command = 'templates';
     } else {
       command = 'unknown';
     }
@@ -133,6 +142,8 @@ Commands:
   cowork --goal "<task>"         Execute an autonomous multi-file task in a workspace
   search <query>                 Semantic code search across workspace using BM25 RAG
   review [--workspace <path>]    Automated PR & Git diff code quality and security review
+  new <template> [--name <name>] Scaffold production project template (react, fastapi, express...)
+  templates                      List all available project starter templates
   status                         Display platform health, model catalog, and environment info
   version                        Print the current Cortex version
   help                           Display this help manual
@@ -620,6 +631,76 @@ case 'review': {
         return { exitCode, output: report.markdownReport, data: report };
       } catch (err: any) {
         const errMsg = `Review error: ${err.message || String(err)}`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+    }
+
+
+case 'templates': {
+      const templates = scaffoldEngine.getTemplates();
+      if (parsed.flags.json) {
+        const jsonText = JSON.stringify(templates, null, 2);
+        stdout(jsonText);
+        return { exitCode: 0, output: jsonText, data: templates };
+      }
+
+      let out = 'Available Project Starter Templates:\n\n';
+      for (const t of templates) {
+        out += `  • ${t.id.padEnd(22)} [${t.framework}] - ${t.description}\n`;
+      }
+      out += '\nRun "cortex new <template> [--name <project-name>]" to scaffold a project.';
+      stdout(out);
+      return { exitCode: 0, output: out, data: templates };
+    }
+
+    case 'new': {
+      const templateId = parsed.positional[1] || parsed.flags.template;
+      if (!templateId) {
+        const errMsg = 'Missing template ID. Usage: cortex new <template> [--name <name>]\nRun "cortex templates" to list available templates.';
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+
+      const template = scaffoldEngine.getTemplateById(templateId);
+      if (!template) {
+        const errMsg = `Error: Unknown template "${templateId}". Run "cortex templates" to view available templates.`;
+        stderr(errMsg);
+        return { exitCode: 1, output: '', error: errMsg };
+      }
+
+      const projectName = (parsed.flags.name || parsed.positional[2] || template.id)
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '-');
+
+      const targetDir = parsed.flags.workspace
+        ? path.resolve(parsed.flags.workspace)
+        : path.resolve(process.cwd(), projectName);
+
+      try {
+        const result = await scaffoldEngine.scaffoldProject(targetDir, template.id, projectName);
+
+        if (parsed.flags.json) {
+          const jsonText = JSON.stringify(result, null, 2);
+          stdout(jsonText);
+          return { exitCode: 0, output: jsonText, data: result };
+        }
+
+        let out = `Successfully scaffolded ${template.name} into ${targetDir}\n\n`;
+        out += `Files created (${result.filesCreated.length}):\n`;
+        for (const file of result.filesCreated) {
+          out += `  + ${file}\n`;
+        }
+        out += '\nNext steps:\n';
+        for (const step of result.instructions) {
+          out += `  $ ${step}\n`;
+        }
+
+        stdout(out);
+        return { exitCode: 0, output: out, data: result };
+      } catch (err: any) {
+        const errMsg = `Scaffolding error: ${err.message || String(err)}`;
         stderr(errMsg);
         return { exitCode: 1, output: '', error: errMsg };
       }
