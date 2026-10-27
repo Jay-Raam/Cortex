@@ -28,6 +28,15 @@ import { detectWebDomain, generateDynamicWebHtml } from '../src/server/cowork/la
 import { apiRouter } from '../src/server/routes/api';
 import { generateTokens, verifyAccessToken, extractToken, authenticateRequest, authMiddleware, getJwtSecret, generateSecureRandomToken } from '../src/server/auth/auth';
 import { validateDesktopCommand, executeSafeDesktopCommand, escapeHtml, isAllowedNavigationUrl } from '../src/server/security/desktop-security';
+import {
+  runCortexCli,
+  parseCliArgs,
+  getHelpText,
+  getStatusReport,
+  executeCliChat,
+  executeCliCowork,
+  CORTEX_VERSION,
+} from '../src/server/cli/cortex-cli';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -5541,6 +5550,131 @@ describe('Test Suite 45: Electron In-Window Navigation Guards & Site Isolation',
       assert.strictEqual(isAllowedNavigationUrl({}), false);
       assert.strictEqual(isAllowedNavigationUrl('not-a-valid-url'), false);
       assert.strictEqual(isAllowedNavigationUrl('://bad-url'), false);
+    });
+  });
+
+
+describe('Test Suite 46: Headless Cortex CLI & Terminal Workspace Agent', () => {
+    it('Scenario A: parseCliArgs accurately parses commands, options, and shorthand flags', () => {
+      const helpRes = parseCliArgs(['--help']);
+      assert.strictEqual(helpRes.command, 'help');
+      assert.strictEqual(helpRes.flags.help, true);
+
+      const versionRes = parseCliArgs(['-v']);
+      assert.strictEqual(versionRes.command, 'version');
+      assert.strictEqual(versionRes.flags.version, true);
+
+      const chatRes = parseCliArgs(['chat', '--model', 'gemini-3.8-flash', '--free', 'Hello', 'World']);
+      assert.strictEqual(chatRes.command, 'chat');
+      assert.strictEqual(chatRes.flags.model, 'gemini-3.8-flash');
+      assert.strictEqual(chatRes.flags.free, true);
+      assert.strictEqual(chatRes.positional[1], 'Hello');
+
+      const coworkRes = parseCliArgs(['cowork', '--goal', 'Build landing page', '--workspace', './test_ws', '--swarm']);
+      assert.strictEqual(coworkRes.command, 'cowork');
+      assert.strictEqual(coworkRes.flags.goal, 'Build landing page');
+      assert.strictEqual(coworkRes.flags.workspace, './test_ws');
+      assert.strictEqual(coworkRes.flags.swarm, true);
+    });
+
+    it('Scenario B: runCortexCli outputs formatted help and version with exit code 0', async () => {
+      let stdoutOutput = '';
+      const resHelp = await runCortexCli(['--help'], {
+        stdout: (msg) => { stdoutOutput += msg + '\n'; },
+      });
+      assert.strictEqual(resHelp.exitCode, 0);
+      assert.ok(stdoutOutput.includes('Cortex AI — Command Line Interface'));
+      assert.ok(stdoutOutput.includes('cortex cowork --goal'));
+
+      let versionOutput = '';
+      const resVer = await runCortexCli(['version'], {
+        stdout: (msg) => { versionOutput += msg + '\n'; },
+      });
+      assert.strictEqual(resVer.exitCode, 0);
+      assert.strictEqual(versionOutput.trim(), `cortex v${CORTEX_VERSION}`);
+    });
+
+    it('Scenario C: runCortexCli status returns platform telemetry in text and JSON formats', async () => {
+      let statusText = '';
+      const resText = await runCortexCli(['status'], {
+        stdout: (msg) => { statusText += msg + '\n'; },
+      });
+      assert.strictEqual(resText.exitCode, 0);
+      assert.ok(statusText.includes('OPERATIONAL'));
+      assert.ok(statusText.includes('Total Models:'));
+
+      let statusJson = '';
+      const resJson = await runCortexCli(['status', '--json'], {
+        stdout: (msg) => { statusJson += msg + '\n'; },
+      });
+      assert.strictEqual(resJson.exitCode, 0);
+      const parsed = JSON.parse(statusJson);
+      assert.strictEqual(parsed.status, 'operational');
+      assert.strictEqual(parsed.version, CORTEX_VERSION);
+      assert.ok(parsed.models.total > 0);
+      assert.ok(Array.isArray(parsed.models.providers));
+    });
+
+    it('Scenario D: runCortexCli chat streams response to stdout and supports --json', async () => {
+      const chunks = [];
+      const resChat = await runCortexCli(['chat', 'Summarize cloud architecture in 2 lines'], {
+        stdout: (msg) => { chunks.push(msg); },
+      });
+      assert.strictEqual(resChat.exitCode, 0);
+      assert.ok(chunks.length > 0);
+      assert.ok(resChat.output.includes('Summarize cloud architecture in 2 lines'));
+
+      let jsonOutput = '';
+      const resJson = await runCortexCli(['chat', '--json', 'Quick prompt'], {
+        stdout: (msg) => { jsonOutput += msg + '\n'; },
+      });
+      assert.strictEqual(resJson.exitCode, 0);
+      const jsonRes = JSON.parse(jsonOutput);
+      assert.ok(jsonRes.text.includes('Quick prompt'));
+      assert.ok(typeof jsonRes.modelUsed === 'string');
+    });
+
+    it('Scenario E: runCortexCli cowork autonomously plans and executes multi-file task', async () => {
+      const wsPath = path.resolve(process.cwd(), 'workspaces', `ws_cli_suite_${Date.now()}`);
+      try {
+        const progressLogs = [];
+        const res = await runCortexCli(['cowork', '--goal', 'Write landing page for food shop', '--workspace', wsPath], {
+          stdout: (msg) => { progressLogs.push(msg); },
+        });
+
+        assert.strictEqual(res.exitCode, 0);
+        assert.ok(res.output.includes('Co-Work Task Complete'));
+        assert.ok(fs.existsSync(path.join(wsPath, 'index.html')), 'index.html must exist');
+        assert.ok(fs.existsSync(path.join(wsPath, 'styles.css')), 'styles.css must exist');
+        assert.ok(fs.existsSync(path.join(wsPath, 'script.js')), 'script.js must exist');
+      } finally {
+        if (fs.existsSync(wsPath)) {
+          fs.rmSync(wsPath, { recursive: true, force: true });
+        }
+      }
+    });
+
+    it('Scenario F: runCortexCli rejects missing prompts, missing goals, and invalid commands with exit code 1', async () => {
+      let stderrChat = '';
+      const resChat = await runCortexCli(['chat'], {
+        stderr: (msg) => { stderrChat += msg + '\n'; },
+      });
+      assert.strictEqual(resChat.exitCode, 1);
+      assert.ok(stderrChat.includes('Missing prompt'));
+
+      let stderrCowork = '';
+      const resCowork = await runCortexCli(['cowork'], {
+        stderr: (msg) => { stderrCowork += msg + '\n'; },
+      });
+      assert.strictEqual(resCowork.exitCode, 1);
+      assert.ok(stderrCowork.includes('Missing goal'));
+
+      let stderrUnknown = '';
+      const resUnknown = await runCortexCli(['unsupported-cmd'], {
+        stderr: (msg) => { stderrUnknown += msg + '\n'; },
+      });
+      assert.strictEqual(resUnknown.exitCode, 1);
+      assert.ok(stderrUnknown.includes('Unknown command'));
     });
   });
 
