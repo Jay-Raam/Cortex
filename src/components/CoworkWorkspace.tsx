@@ -17,6 +17,7 @@ import {
   Layers,
   File,
   Folder,
+  Lock,
 } from 'lucide-react';
 import { AgentTask, Workspace, WorkspaceArtifact, WorkspaceFileNode, ExecutionCommandResult } from '../server/types';
 import { fetchGraphQL, advanceTaskApi, approveStepApi, importGitHubRepoApi, createGitHubPrApi, executeSwarmTaskApi } from '../lib/api';
@@ -26,6 +27,7 @@ import { CoworkHeroView } from './cowork/CoworkHeroView';
 import { CoworkCanvas } from './cowork/CoworkCanvas';
 import { CoworkSidecar } from './cowork/CoworkSidecar';
 import { FolderBindingModal } from './cowork/FolderBindingModal';
+import { WorkspaceSecretsModal } from './cowork/WorkspaceSecretsModal';
 
 export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   workspace,
@@ -38,6 +40,7 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
   // Projects Hub state
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
+  const [isSecretsModalOpen, setIsSecretsModalOpen] = useState(false);
   // Tasks state
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -943,6 +946,15 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
+            onClick={() => setIsSecretsModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#E5E0D8] hover:border-slate-300 text-slate-700 rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            title="Workspace Secrets Vault (AES-256-GCM)"
+          >
+            <Lock className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">Secrets</span>
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setSelectedTaskId(null);
             }}
@@ -1143,6 +1155,13 @@ export const CoworkWorkspace: React.FC<CoworkWorkspaceProps> = ({
           </div>
         </div>
       )}
+
+      {/* Workspace Secrets Vault Modal */}
+      <WorkspaceSecretsModal
+        isOpen={isSecretsModalOpen}
+        onClose={() => setIsSecretsModalOpen(false)}
+        workspace={workspace}
+      />
     </div>
   );
 };
