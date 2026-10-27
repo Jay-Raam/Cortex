@@ -40,6 +40,7 @@ import {
 import { codebaseIndexer, tokenizeCode } from '../src/server/cowork/code-indexer';
 import { prReviewer, parseUnifiedDiff } from '../src/server/cowork/pr-reviewer';
 import { scaffoldEngine } from '../src/server/cowork/scaffold-engine';
+import { workspaceReportGenerator } from '../src/server/cowork/report-generator';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -6193,6 +6194,199 @@ new file mode 100644
       });
       assert.strictEqual(errRes.exitCode, 1);
       assert.ok(errOutput.includes('Missing template ID'));
+    });
+  });
+
+
+  describe('Test Suite 50: Multi-Format Workspace Audit & Execution Report Generator', () => {
+    const reportWsRoot = path.resolve(process.cwd(), 'workspaces', `ws_report_unit_${Date.now()}`);
+    let reportWorkspace: Workspace;
+
+    before(() => {
+      fs.mkdirSync(reportWsRoot, { recursive: true });
+      fs.mkdirSync(path.join(reportWsRoot, 'src', 'core'), { recursive: true });
+      fs.writeFileSync(
+        path.join(reportWsRoot, 'src', 'core', 'index.ts'),
+        'export const appVersion = "1.2.0";\nexport function run() { return true; }\n',
+        'utf8'
+      );
+      fs.writeFileSync(
+        path.join(reportWsRoot, 'README.md'),
+        '# Audit Test Project\nTest documentation.\n',
+        'utf8'
+      );
+
+      reportWorkspace = db.createWorkspace({
+        id: `ws_rep_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'Report Test Workspace <script>alert("xss")</script>',
+        description: 'Testing audit report generation',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        projectRoot: reportWsRoot,
+        isLocalBinding: true,
+      });
+
+      // Seed task history
+      db.createTask({
+        id: `task_rep_1_${Date.now()}`,
+        workspaceId: reportWorkspace.id,
+        userId: testUser1.id,
+        title: 'Core Architecture Setup',
+        goal: 'Initialize module exports and testing framework',
+        status: 'completed',
+        modelId: 'gemini-2.5-flash',
+        steps: [
+          {
+            id: 'step_1',
+            title: 'Scaffold core structure',
+            description: 'Scaffold core structure',
+            status: 'completed',
+            operation: 'create',
+            targetPath: 'src/core/index.ts',
+            createdAt: new Date().toISOString(),
+          },
+        ],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      db.createTask({
+        id: `task_rep_2_${Date.now()}`,
+        workspaceId: reportWorkspace.id,
+        userId: testUser1.id,
+        title: 'Multi-Agent Swarm Feature',
+        goal: 'Coordinate architect and reviewer swarm agents',
+        status: 'completed',
+        modelId: 'claude-3.7-sonnet',
+        isSwarmMode: true,
+        steps: [
+          {
+            id: 'step_2',
+            title: 'Swarm implementation',
+            description: 'Swarm implementation',
+            status: 'completed',
+            operation: 'edit',
+            targetPath: 'README.md',
+            createdAt: new Date().toISOString(),
+          },
+        ],
+        artifactIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    it('Scenario A: compileReportData aggregates workspace telemetry, file stats, and task history', async () => {
+      const data = await workspaceReportGenerator.compileReportData(reportWorkspace, { runSecurityAudit: false });
+      assert.strictEqual(data.workspace.id, reportWorkspace.id);
+      assert.ok(data.metrics.totalFiles >= 2);
+      assert.ok(data.metrics.totalSizeBytes > 0);
+      assert.strictEqual(data.metrics.totalTasks, 2);
+      assert.strictEqual(data.metrics.completedTasks, 2);
+      assert.strictEqual(data.metrics.failedTasks, 0);
+      assert.strictEqual(data.metrics.swarmTasks, 1);
+      assert.strictEqual(data.metrics.totalStepsExecuted, 2);
+      assert.ok(data.files.some((f) => f.path === 'src/core/index.ts'));
+    });
+
+    it('Scenario B: generateMarkdown produces structured GitHub-ready audit report with tables and badges', async () => {
+      const data = await workspaceReportGenerator.compileReportData(reportWorkspace, { runSecurityAudit: false });
+      const md = workspaceReportGenerator.generateMarkdown(data);
+
+      assert.ok(md.includes('# Cortex AI — Workspace Execution & Compliance Report'));
+      assert.ok(md.includes('Workspace Overview'));
+      assert.ok(md.includes(reportWorkspace.id));
+      assert.ok(md.includes('Core Architecture Setup'));
+      assert.ok(md.includes('⚡ Swarm'));
+      assert.ok(md.includes('src/core/index.ts'));
+    });
+
+    it('Scenario C: generateHtml produces self-contained HTML document with XSS protection', async () => {
+      const data = await workspaceReportGenerator.compileReportData(reportWorkspace, { runSecurityAudit: false });
+      const html = workspaceReportGenerator.generateHtml(data);
+
+      assert.ok(html.includes('<!DOCTYPE html>'));
+      assert.ok(html.includes('<style>'));
+      assert.ok(html.includes('Cortex Enterprise Audit'));
+      // XSS test: user-supplied <script>alert("xss")</script> must be escaped
+      assert.ok(!html.includes('<script>alert("xss")</script>'));
+      assert.ok(html.includes('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'));
+    });
+
+    it('Scenario D: REST GET /api/cowork/workspaces/:id/export-report handles auth, IDOR, and format negotiation', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      try {
+        const tokens = generateTokens(testUser1);
+        const foreignTokens = generateTokens(testUser2);
+
+        // 1. Unauthenticated request rejected with 401
+        const unauthRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${reportWorkspace.id}/export-report`);
+        assert.strictEqual(unauthRes.status, 401);
+
+        // 2. Foreign tenant rejected with 404
+        const foreignRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${reportWorkspace.id}/export-report`, {
+          headers: { Authorization: `Bearer ${foreignTokens.accessToken}` },
+        });
+        assert.strictEqual(foreignRes.status, 404);
+
+        // 3. Default markdown export
+        const mdRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${reportWorkspace.id}/export-report`, {
+          headers: { Authorization: `Bearer ${tokens.accessToken}` },
+        });
+        assert.strictEqual(mdRes.status, 200);
+        assert.ok(mdRes.headers.get('content-type')?.includes('text/markdown'));
+        const mdText = await mdRes.text();
+        assert.ok(mdText.includes('Workspace Execution & Compliance Report'));
+
+        // 4. HTML export with download header
+        const htmlRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${reportWorkspace.id}/export-report?format=html&download=true`, {
+          headers: { Authorization: `Bearer ${tokens.accessToken}` },
+        });
+        assert.strictEqual(htmlRes.status, 200);
+        assert.ok(htmlRes.headers.get('content-type')?.includes('text/html'));
+        assert.ok(htmlRes.headers.get('content-disposition')?.includes('attachment; filename='));
+
+        // 5. JSON export
+        const jsonRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${reportWorkspace.id}/export-report?format=json`, {
+          headers: { Authorization: `Bearer ${tokens.accessToken}` },
+        });
+        assert.strictEqual(jsonRes.status, 200);
+        const parsedJson: any = await jsonRes.json();
+        assert.strictEqual(parsedJson.schemaVersion, '1.0');
+        assert.strictEqual(parsedJson.workspace.id, reportWorkspace.id);
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario E: CLI cortex report outputs markdown and exports files with --output flag', async () => {
+      // 1. Standard markdown stdout
+      let mdOutput = '';
+      const resMd = await runCortexCli(['report', '--workspace', reportWsRoot], {
+        stdout: (msg) => { mdOutput += msg + '\n'; },
+      });
+      assert.strictEqual(resMd.exitCode, 0);
+      assert.ok(mdOutput.includes('Workspace Execution & Compliance Report'));
+
+      // 2. Export HTML report to disk via --output
+      const exportFile = path.join(reportWsRoot, 'audit-export.html');
+      let outMsg = '';
+      const resFile = await runCortexCli(['report', '--workspace', reportWsRoot, '--format', 'html', '--output', exportFile], {
+        stdout: (msg) => { outMsg += msg + '\n'; },
+      });
+      assert.strictEqual(resFile.exitCode, 0);
+      assert.ok(outMsg.includes('Successfully exported'));
+      assert.ok(fs.existsSync(exportFile));
+      const htmlContent = fs.readFileSync(exportFile, 'utf8');
+      assert.ok(htmlContent.includes('<!DOCTYPE html>'));
     });
   });
 

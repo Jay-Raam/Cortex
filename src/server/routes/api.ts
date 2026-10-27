@@ -11,6 +11,7 @@ import { workspaceManager } from '../cowork/workspace-manager';
 import { codebaseIndexer } from '../cowork/code-indexer';
 import { prReviewer } from '../cowork/pr-reviewer';
 import { scaffoldEngine } from '../cowork/scaffold-engine';
+import { workspaceReportGenerator, ReportFormat } from '../cowork/report-generator';
 import { executionRunner, clampExecutionTimeout, validateExecutionCommand } from '../cowork/execution-runner';
 import { authenticateRequest, generateTokens, generateSecureRandomToken } from '../auth/auth';
 import { Message, User, Workspace, CustomModelEndpoint, PromptTemplateEntity } from '../types';
@@ -1860,5 +1861,44 @@ apiRouter.post('/cowork/workspaces/scaffold', async (req: Request, res: Response
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to scaffold project template' });
+  }
+});
+
+/**
+ * GET /api/cowork/workspaces/:id/export-report
+ * Generates an enterprise-grade execution, compliance, and audit report in Markdown, HTML, or JSON.
+ */
+apiRouter.get('/cowork/workspaces/:id/export-report', async (req: Request, res: Response) => {
+  let user: User;
+  try {
+    user = getReqUser(req);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const workspace = db.getWorkspaceById(id, user.id);
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' });
+  }
+
+  const format = (req.query.format as string || 'markdown').toLowerCase() as ReportFormat;
+  const shouldDownload = req.query.download === 'true' || req.query.download === '1';
+
+  try {
+    const report = await workspaceReportGenerator.exportReport(workspace, format);
+
+    res.setHeader('Content-Type', report.contentType);
+    if (shouldDownload) {
+      res.setHeader('Content-Disposition', `attachment; filename="${report.filename}"`);
+    }
+
+    if (format === 'json') {
+      res.send(report.content);
+    } else {
+      res.send(report.content);
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to generate workspace report' });
   }
 });
