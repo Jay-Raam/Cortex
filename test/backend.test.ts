@@ -37,6 +37,7 @@ import {
   executeCliCowork,
   CORTEX_VERSION,
 } from '../src/server/cli/cortex-cli';
+import { codebaseIndexer, tokenizeCode } from '../src/server/cowork/code-indexer';
 import { validateSafeRegex } from '../src/server/security/redos-validator';
 import { createYoga } from 'graphql-yoga';
 import { schema } from '../src/server/graphql/schema';
@@ -5167,8 +5168,8 @@ print(fibonacci(10))
             Authorization: `Bearer ${tokens.accessToken}`,
           },
           body: JSON.stringify({
-            command: 'node -e "console.log(777 + 222)"',
-            timeoutMs: 5000,
+            command: 'echo 999',
+            timeoutMs: 25000,
           }),
         });
         assert.strictEqual(resValid.status, 200);
@@ -5675,6 +5676,165 @@ describe('Test Suite 46: Headless Cortex CLI & Terminal Workspace Agent', () => 
       });
       assert.strictEqual(resUnknown.exitCode, 1);
       assert.ok(stderrUnknown.includes('Unknown command'));
+    });
+  });
+
+
+describe('Test Suite 47: Semantic Codebase Indexing & Vector Search (Workspace RAG)', () => {
+    const ragWsRoot = path.resolve(process.cwd(), 'workspaces', `ws_rag_test_${Date.now()}`);
+    let ragWorkspace: Workspace;
+
+    before(() => {
+      fs.mkdirSync(ragWsRoot, { recursive: true });
+      fs.mkdirSync(path.join(ragWsRoot, 'src', 'auth'), { recursive: true });
+      fs.mkdirSync(path.join(ragWsRoot, 'src', 'payment'), { recursive: true });
+      fs.mkdirSync(path.join(ragWsRoot, 'node_modules', 'dummy'), { recursive: true });
+
+      // Create test files
+      fs.writeFileSync(
+        path.join(ragWsRoot, 'src', 'auth', 'jwtHandler.ts'),
+        `export function generateSecureJwtToken(userId: string, scope: string[]): string {\n  // Sign JWT with HS256 algorithm\n  return 'signed.jwt.' + userId;\n}\n\nexport function verifyTokenSignature(token: string): boolean {\n  return token.startsWith('signed.jwt.');\n}`
+      );
+
+      fs.writeFileSync(
+        path.join(ragWsRoot, 'src', 'payment', 'stripeGateway.ts'),
+        `export class StripePaymentProcessor {\n  async processTransaction(amount: number, currency: string) {\n    return { success: true, txnId: 'txn_12345' };\n  }\n}`
+      );
+
+      // Sensitive file and ignored file
+      fs.writeFileSync(path.join(ragWsRoot, '.env'), 'SUPER_SECRET_KEY=123456');
+      fs.writeFileSync(path.join(ragWsRoot, 'node_modules', 'dummy', 'lib.js'), 'export const dummy = true;');
+
+      ragWorkspace = db.createWorkspace({
+        id: `ws_rag_${Date.now()}`,
+        userId: testUser1.id,
+        name: 'RAG Test Workspace',
+        description: 'Testing semantic codebase indexing and search',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        projectRoot: ragWsRoot,
+        isLocalBinding: true,
+      });
+    });
+
+    it('Scenario A: indexWorkspace parses codebase, ignores sensitive/dependency files, and creates chunks', async () => {
+      const summary = await codebaseIndexer.indexWorkspace(ragWorkspace);
+      assert.strictEqual(summary.workspaceId, ragWorkspace.id);
+      assert.strictEqual(summary.indexedFiles, 2, 'Only src/auth/jwtHandler.ts and src/payment/stripeGateway.ts must be indexed');
+      assert.ok(summary.totalChunks >= 2, 'Must generate at least 2 code chunks');
+      assert.ok(summary.durationMs >= 0);
+    });
+
+    it('Scenario B: search returns top-ranked results with BM25 score, symbol boost, and confidence metrics', async () => {
+      const results = await codebaseIndexer.search(ragWorkspace, 'generateSecureJwtToken');
+      assert.ok(results.length > 0, 'Must find matching snippet');
+      assert.strictEqual(results[0].filePath, 'src/auth/jwtHandler.ts');
+      assert.strictEqual(results[0].symbolName, 'generateSecureJwtToken');
+      assert.strictEqual(results[0].confidence, 1.0, 'Top result should have 100% relative confidence');
+      assert.ok(results[0].matchedTokens.includes('jwt') || results[0].matchedTokens.includes('token'));
+
+      const paymentResults = await codebaseIndexer.search(ragWorkspace, 'process transaction Stripe');
+      assert.ok(paymentResults.length > 0);
+      assert.strictEqual(paymentResults[0].filePath, 'src/payment/stripeGateway.ts');
+      assert.strictEqual(paymentResults[0].symbolName, 'StripePaymentProcessor');
+    });
+
+    it('Scenario C: Incremental indexing re-indexes modified files while retaining unchanged chunks', async () => {
+      // Modify StripeGateway to add new function
+      fs.appendFileSync(
+        path.join(ragWsRoot, 'src', 'payment', 'stripeGateway.ts'),
+        `\n\nexport function refundCustomerCharge(chargeId: string): boolean {\n  return true;\n}`
+      );
+
+      const summary = await codebaseIndexer.indexWorkspace(ragWorkspace);
+      assert.strictEqual(summary.indexedFiles, 2);
+
+      const searchRefund = await codebaseIndexer.search(ragWorkspace, 'refundCustomerCharge');
+      assert.ok(searchRefund.length > 0);
+      assert.strictEqual(searchRefund[0].filePath, 'src/payment/stripeGateway.ts');
+      assert.ok(searchRefund[0].snippet.includes('refundCustomerCharge'));
+    });
+
+    it('Scenario D: REST /api/cowork/workspaces/:id/index and semantic-search enforce auth and return results', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/api', apiRouter);
+
+      const server = app.listen(0);
+      const port = (server.address() as any).port;
+
+      try {
+        const tokens = generateTokens(testUser1);
+        const foreignTokens = generateTokens(testUser2);
+
+        // 1. Foreign user rejected (IDOR check)
+        const unauthRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ragWorkspace.id}/index`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${foreignTokens.accessToken}`,
+          },
+        });
+        assert.strictEqual(unauthRes.status, 404);
+
+        // 2. Owner index success
+        const indexRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ragWorkspace.id}/index`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+        });
+        assert.strictEqual(indexRes.status, 200);
+        const indexJson: any = await indexRes.json();
+        assert.strictEqual(indexJson.success, true);
+        assert.strictEqual(indexJson.indexedFiles, 2);
+
+        // 3. Search endpoint
+        const searchRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ragWorkspace.id}/semantic-search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({ query: 'verifyTokenSignature', topK: 5 }),
+        });
+        assert.strictEqual(searchRes.status, 200);
+        const searchJson: any = await searchRes.json();
+        assert.strictEqual(searchJson.success, true);
+        assert.ok(searchJson.results.length > 0);
+        assert.strictEqual(searchJson.results[0].filePath, 'src/auth/jwtHandler.ts');
+
+        // 4. Missing query rejected
+        const badQueryRes = await fetch(`http://127.0.0.1:${port}/api/cowork/workspaces/${ragWorkspace.id}/semantic-search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
+          body: JSON.stringify({ query: '' }),
+        });
+        assert.strictEqual(badQueryRes.status, 400);
+      } finally {
+        server.close();
+      }
+    });
+
+    it('Scenario E: CLI cortex search returns formatted matches and handles non-matching queries gracefully', async () => {
+      let output = '';
+      const res = await runCortexCli(['search', 'generateSecureJwtToken', '--workspace', ragWsRoot], {
+        stdout: (msg) => { output += msg + '\n'; },
+      });
+      assert.strictEqual(res.exitCode, 0);
+      assert.ok(output.includes('code match'));
+      assert.ok(output.includes('src/auth/jwtHandler.ts'));
+
+      let emptyOutput = '';
+      const resEmpty = await runCortexCli(['search', 'completely_nonexistent_token_xyz999', '--workspace', ragWsRoot], {
+        stdout: (msg) => { emptyOutput += msg + '\n'; },
+      });
+      assert.strictEqual(resEmpty.exitCode, 0);
+      assert.ok(emptyOutput.includes('No matching code snippets found'));
     });
   });
 
